@@ -1,0 +1,628 @@
+import DockhandAPI
+import Observation
+import SwiftUI
+
+@MainActor
+@Observable
+final class ImagesStore {
+    var images: [Components.Schemas.ImageSummary] = []
+    var isLoading = false
+    var error: String?
+    var actionMessage: String?
+    var activeActionID: String?
+
+    func load(appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else {
+            images = []
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            images = try await service.fetchImages(environmentID: environmentID)
+                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func pullImage(named name: String, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeActionID = "pull"
+        actionMessage = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.pullImage(imageName: name, environmentID: environmentID)
+            actionMessage = "\(name) pulled"
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func tagImage(_ image: Components.Schemas.ImageSummary, repo: String, tag: String, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeActionID = actionID("tag", image.id)
+        actionMessage = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.tagImage(imageID: image.id, environmentID: environmentID, repo: repo, tag: tag)
+            actionMessage = "\(repo):\(tag) created"
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteImage(reference: String, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeActionID = actionID("delete", reference)
+        actionMessage = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.deleteImage(imageReference: reference, environmentID: environmentID)
+            actionMessage = "\(reference) deleted"
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteImageTag(_ tag: String, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeActionID = actionID("delete-tag", tag)
+        actionMessage = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.deleteImageTag(imageTag: tag, environmentID: environmentID)
+            actionMessage = "\(tag) removed"
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func scanImage(_ image: Components.Schemas.ImageSummary, appModel: AppModel) async throws -> ImageScanDocument {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        activeActionID = actionID("scan", image.id)
+        actionMessage = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        let service = DockhandService(baseURL: baseURL, token: appModel.token)
+        return try await service.scanImage(imageName: image.displayName, environmentID: environmentID)
+    }
+
+    func image(id: String) -> Components.Schemas.ImageSummary? {
+        images.first(where: { $0.id == id })
+    }
+
+    func isRunning(_ action: String, reference: String) -> Bool {
+        activeActionID == actionID(action, reference)
+    }
+
+    private func actionID(_ action: String, _ reference: String) -> String {
+        "\(action):\(reference)"
+    }
+}
+
+struct ImagesView: View {
+    let appModel: AppModel
+    @State private var store = ImagesStore()
+    @State private var pullSheetPresented = false
+
+    var body: some View {
+        List {
+            Section {
+                EnvironmentHeaderBar(appModel: appModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
+            if let error = store.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            if let actionMessage = store.actionMessage {
+                Section {
+                    Text(actionMessage)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Images") {
+                ForEach(store.images, id: \.id) { image in
+                    NavigationLink {
+                        ImageDetailView(image: image, appModel: appModel, store: store)
+                    } label: {
+                        ImageRow(image: image)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Images")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    pullSheetPresented = true
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $pullSheetPresented) {
+            PullImageSheet(appModel: appModel, store: store)
+                .presentationDetents([.medium])
+        }
+        .overlay {
+            if store.isLoading && store.images.isEmpty {
+                ProgressView()
+            }
+        }
+        .task(id: appModel.connectionScopeID) {
+            await store.load(appModel: appModel)
+        }
+        .refreshable {
+            await store.load(appModel: appModel)
+        }
+    }
+}
+
+private struct ImageRow: View {
+    let image: Components.Schemas.ImageSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(image.displayName)
+                    .font(.headline)
+                    .lineLimit(1)
+
+                if image.isUnused {
+                    Text("Unused")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.orange.opacity(0.12), in: Capsule())
+                }
+            }
+
+            Text(image.shortID)
+                .font(.footnote.monospaced())
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Text(image.size.dockhandByteCount)
+                Text(image.createdAtText)
+                Text("\(image.containers) containers")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct ImageDetailView: View {
+    let image: Components.Schemas.ImageSummary
+    let appModel: AppModel
+    let store: ImagesStore
+
+    @State private var scanResult: ImageScanDocument?
+    @State private var pullSheetPresented = false
+    @State private var tagSheetPresented = false
+    @State private var deleteConfirmationPresented = false
+    @State private var deleteTagConfirmation: ImageTagDeletionTarget?
+
+    private var liveImage: Components.Schemas.ImageSummary {
+        store.image(id: image.id) ?? image
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                statusCard
+                summaryCard
+                actionsCard
+                tagsCard
+                digestsCard
+                labelsCard
+                scanCard
+            }
+            .padding()
+        }
+        .navigationTitle(liveImage.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $pullSheetPresented) {
+            PullImageSheet(appModel: appModel, store: store, suggestedName: liveImage.displayName)
+                .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $tagSheetPresented) {
+            TagImageSheet(image: liveImage, appModel: appModel, store: store)
+                .presentationDetents([.medium])
+        }
+        .confirmationDialog("Delete image", isPresented: $deleteConfirmationPresented, titleVisibility: .visible) {
+            Button("Delete image", role: .destructive) {
+                Task { await store.deleteImage(reference: liveImage.id, appModel: appModel) }
+            }
+        } message: {
+            Text("This removes the full image object from the selected Dockhand environment.")
+        }
+        .confirmationDialog("Delete tag", isPresented: Binding(
+            get: { deleteTagConfirmation != nil },
+            set: { if !$0 { deleteTagConfirmation = nil } }
+        ), titleVisibility: .visible) {
+            if let target = deleteTagConfirmation {
+                Button("Delete tag", role: .destructive) {
+                    Task { await store.deleteImageTag(target.reference, appModel: appModel) }
+                    deleteTagConfirmation = nil
+                }
+            }
+        } message: {
+            Text(deleteTagConfirmation?.message ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private var statusCard: some View {
+        if let error = store.error {
+            Text(error)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassEffect(.regular.tint(.red.opacity(0.08)), in: .rect(cornerRadius: 18))
+        } else if let actionMessage = store.actionMessage {
+            Text(actionMessage)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+        }
+    }
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(liveImage.displayName)
+                    .font(.title3.weight(.semibold))
+                if liveImage.isUnused {
+                    Text("Unused")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Text(liveImage.id)
+                .font(.footnote.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
+                metric("Size", liveImage.size.dockhandByteCount)
+                metric("Virtual", liveImage.virtualSize.dockhandByteCount)
+                metric("Created", liveImage.createdAtText)
+                metric("Used by", "\(liveImage.containers) containers")
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
+    }
+
+    private var actionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Actions")
+                .font(.headline)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
+                actionButton(
+                    title: "Scan",
+                    systemImage: "shield.checkered",
+                    isRunning: store.isRunning("scan", reference: liveImage.id)
+                ) {
+                    Task {
+                        do {
+                            scanResult = try await store.scanImage(liveImage, appModel: appModel)
+                        } catch {
+                            store.error = error.localizedDescription
+                        }
+                    }
+                }
+
+                actionButton(title: "Tag", systemImage: "tag") {
+                    tagSheetPresented = true
+                }
+
+                actionButton(title: "Pull", systemImage: "arrow.down.circle") {
+                    pullSheetPresented = true
+                }
+
+                actionButton(title: "Delete", systemImage: "trash", role: .destructive) {
+                    deleteConfirmationPresented = true
+                }
+                .disabled(liveImage.containers > 0)
+            }
+
+            if liveImage.containers > 0 {
+                Text("Delete is disabled while the image is used by containers.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    private var tagsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tags")
+                .font(.headline)
+
+            if liveImage.allTags.isEmpty {
+                Text("No tags")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(liveImage.allTags, id: \.self) { tag in
+                    HStack {
+                        Text(tag)
+                            .font(.footnote.monospaced())
+                            .textSelection(.enabled)
+                        Spacer()
+                        Button {
+                            deleteTagConfirmation = .init(reference: tag)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(store.isRunning("delete-tag", reference: tag))
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    @ViewBuilder
+    private var digestsCard: some View {
+        if !liveImage.allDigests.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Digests")
+                    .font(.headline)
+
+                ForEach(liveImage.allDigests, id: \.self) { digest in
+                    Text(digest)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(20)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        }
+    }
+
+    @ViewBuilder
+    private var labelsCard: some View {
+        if !liveImage.labelPairs.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Labels")
+                    .font(.headline)
+
+                ForEach(liveImage.labelPairs, id: \.key) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.key)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.blue)
+                        Text(item.value)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .padding(20)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        }
+    }
+
+    @ViewBuilder
+    private var scanCard: some View {
+        if let scanResult {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Scan")
+                    .font(.headline)
+                Text(scanResult.message)
+                    .foregroundStyle(.secondary)
+
+                if let progress = scanResult.progress {
+                    Text("\(progress)%")
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                if scanResult.results.isEmpty {
+                    Text("No vulnerabilities reported")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(scanResult.results, id: \.self) { line in
+                        Text(line)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(20)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        }
+    }
+
+    private func metric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.medium))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        role: ButtonRole? = nil,
+        isRunning: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            VStack(spacing: 8) {
+                if isRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(height: 18)
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(height: 18)
+                }
+                Text(title)
+                    .font(.footnote.weight(.medium))
+            }
+            .frame(maxWidth: .infinity, minHeight: 64)
+        }
+        .buttonStyle(.glass)
+    }
+}
+
+private struct ImageTagDeletionTarget: Equatable {
+    let reference: String
+
+    var message: String {
+        "Remove tag \(reference)?"
+    }
+}
+
+private struct PullImageSheet: View {
+    let appModel: AppModel
+    let store: ImagesStore
+    var suggestedName: String = ""
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var imageName = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("nginx:latest", text: $imageName)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            .navigationTitle("Pull image")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Pull") {
+                        Task {
+                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, appModel: appModel)
+                            dismiss()
+                        }
+                    }
+                    .disabled((imageName.isEmpty ? suggestedName : imageName).isEmpty || store.activeActionID == "pull")
+                }
+            }
+        }
+        .onAppear {
+            if imageName.isEmpty {
+                imageName = suggestedName
+            }
+        }
+    }
+}
+
+private struct TagImageSheet: View {
+    let image: Components.Schemas.ImageSummary
+    let appModel: AppModel
+    let store: ImagesStore
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var repo = ""
+    @State private var tag = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Repository", text: $repo)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                TextField("Tag", text: $tag)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            .navigationTitle("Tag image")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            await store.tagImage(image, repo: repo, tag: tag, appModel: appModel)
+                            dismiss()
+                        }
+                    }
+                    .disabled(repo.isEmpty || tag.isEmpty || store.isRunning("tag", reference: image.id))
+                }
+            }
+        }
+        .onAppear {
+            if repo.isEmpty {
+                let base = image.displayName.split(separator: ":").dropLast().joined(separator: ":")
+                repo = base.isEmpty ? image.displayName : base
+            }
+        }
+    }
+}

@@ -1,0 +1,582 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		058D6BC2FCEEC7E05E612A86 /* ContainersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */; };
+		08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A429AD5D837F77D7096E4664 /* DashboardView.swift */; };
+		19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */; };
+		1C165AF5EAFAC8DFF5889FFE /* DockhandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956D5C8E99FCD80742BF586C /* DockhandRootView.swift */; };
+		40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F56858EF25CC073EFD0846 /* Formatting.swift */; };
+		4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88C67A91A207F8EBE7A121C /* ImagesView.swift */; };
+		5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A1342B619AADBFCAF7582E /* DockhandService.swift */; };
+		64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F846090140816C679D138A /* StackEditorSupport.swift */; };
+		7B369144D2CEB78771441943 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3266A680155F8775A56868 /* AppModel.swift */; };
+		AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1F5D851E40D36A5154376B /* PreferencesStore.swift */; };
+		B388C775A10358DC31C430CD /* StacksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FC6A2CB1B06506690B8E1E /* StacksView.swift */; };
+		B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E28C30131DD132BCF62665 /* SettingsView.swift */; };
+		C98C9BD249BE376D06B0D029 /* ContainerLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658C94BF66735EF772455033 /* ContainerLogsView.swift */; };
+		CD1A5221D5DBD371587F7027 /* DockhandAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 51B7CD00CA402C86142567D7 /* DockhandAPI */; };
+		D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */; };
+		D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */; };
+		E882AE90D8FD0104F7520724 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 125F5F1A04A3D953027B8DB4 /* Yams */; };
+		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		412E9C323C86F1C4FAB9D686 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C18D3579BA3CC4C3216196B9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 94C638E78EAA353184954E07;
+			remoteInfo = DockhandMobile;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileApp.swift; sourceTree = "<group>"; };
+		08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
+		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
+		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
+		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
+		65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainersView.swift; sourceTree = "<group>"; };
+		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
+		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
+		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DockhandAPI; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
+		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
+		D4F56858EF25CC073EFD0846 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
+		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E88C67A91A207F8EBE7A121C /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		09E6128853DF17CFD0AE6BA1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CD1A5221D5DBD371587F7027 /* DockhandAPI in Frameworks */,
+				E882AE90D8FD0104F7520724 /* Yams in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		44165C81445DAED68DC41951 /* DockhandMobile */ = {
+			isa = PBXGroup;
+			children = (
+				7F95D938C11C7EE7B3CC35B0 /* App */,
+				9C4F11BDBB66979A36E86A23 /* Features */,
+				D7E4F1B99D5D427D7EABFF78 /* Services */,
+				C923DA4C20AAABF34E46FBFF /* Shared */,
+			);
+			path = DockhandMobile;
+			sourceTree = "<group>";
+		};
+		554C3B6E0D257A607369986D = {
+			isa = PBXGroup;
+			children = (
+				44165C81445DAED68DC41951 /* DockhandMobile */,
+				6533012C87BA3BC0BD79B8DA /* DockhandMobileTests */,
+				5C23E7D49A194963016D28C4 /* Packages */,
+				96FEB7984C53112248D463C3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5C23E7D49A194963016D28C4 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9F2FDC76CC6027751A0B547F /* DockhandAPI */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		6533012C87BA3BC0BD79B8DA /* DockhandMobileTests */ = {
+			isa = PBXGroup;
+			children = (
+				3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */,
+			);
+			path = DockhandMobileTests;
+			sourceTree = "<group>";
+		};
+		6740CEC087BEF848097093A8 /* Containers */ = {
+			isa = PBXGroup;
+			children = (
+				65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */,
+			);
+			path = Containers;
+			sourceTree = "<group>";
+		};
+		6F945C305978AF233853B2DD /* Images */ = {
+			isa = PBXGroup;
+			children = (
+				E88C67A91A207F8EBE7A121C /* ImagesView.swift */,
+			);
+			path = Images;
+			sourceTree = "<group>";
+		};
+		7F95D938C11C7EE7B3CC35B0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0D3266A680155F8775A56868 /* AppModel.swift */,
+				0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */,
+				956D5C8E99FCD80742BF586C /* DockhandRootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		96FEB7984C53112248D463C3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				56B712631CB23E96021C59F0 /* DockhandMobile.app */,
+				E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		9C4F11BDBB66979A36E86A23 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				6740CEC087BEF848097093A8 /* Containers */,
+				A73A4AC14A12E13B71FC208F /* Dashboard */,
+				6F945C305978AF233853B2DD /* Images */,
+				FA8A81E4F1190EEB25E50E0D /* Settings */,
+				EEF7C2D050EE0EB81FE7FA0A /* Stacks */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A73A4AC14A12E13B71FC208F /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				A429AD5D837F77D7096E4664 /* DashboardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		C923DA4C20AAABF34E46FBFF /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				658C94BF66735EF772455033 /* ContainerLogsView.swift */,
+				87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */,
+				D4F56858EF25CC073EFD0846 /* Formatting.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		D7E4F1B99D5D427D7EABFF78 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				E5A1342B619AADBFCAF7582E /* DockhandService.swift */,
+				08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */,
+				3A1F5D851E40D36A5154376B /* PreferencesStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		EEF7C2D050EE0EB81FE7FA0A /* Stacks */ = {
+			isa = PBXGroup;
+			children = (
+				36F846090140816C679D138A /* StackEditorSupport.swift */,
+				C5FC6A2CB1B06506690B8E1E /* StacksView.swift */,
+			);
+			path = Stacks;
+			sourceTree = "<group>";
+		};
+		FA8A81E4F1190EEB25E50E0D /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				13E28C30131DD132BCF62665 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8A087C8BA082B2659F842299 /* DockhandMobileTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 041ADBB5040D5124821CE00E /* Build configuration list for PBXNativeTarget "DockhandMobileTests" */;
+			buildPhases = (
+				5B6CCC7B2B81CC08E688431F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A99DD3EEA8C452C68BACA2B5 /* PBXTargetDependency */,
+			);
+			name = DockhandMobileTests;
+			packageProductDependencies = (
+			);
+			productName = DockhandMobileTests;
+			productReference = E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		94C638E78EAA353184954E07 /* DockhandMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6815786542EFA0CDA9F2EFF8 /* Build configuration list for PBXNativeTarget "DockhandMobile" */;
+			buildPhases = (
+				01189824FD0FB4D9A1034C7F /* Sources */,
+				09E6128853DF17CFD0AE6BA1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DockhandMobile;
+			packageProductDependencies = (
+				51B7CD00CA402C86142567D7 /* DockhandAPI */,
+				125F5F1A04A3D953027B8DB4 /* Yams */,
+			);
+			productName = DockhandMobile;
+			productReference = 56B712631CB23E96021C59F0 /* DockhandMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C18D3579BA3CC4C3216196B9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 67E736548DC41300D0662263 /* Build configuration list for PBXProject "DockhandMobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 554C3B6E0D257A607369986D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				16B77C0C226DD692AC2E3C89 /* XCRemoteSwiftPackageReference "Yams" */,
+				6B0FF1B7EE30A54856C10D0D /* XCLocalSwiftPackageReference "DockhandAPI" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 96FEB7984C53112248D463C3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				94C638E78EAA353184954E07 /* DockhandMobile */,
+				8A087C8BA082B2659F842299 /* DockhandMobileTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		01189824FD0FB4D9A1034C7F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B369144D2CEB78771441943 /* AppModel.swift in Sources */,
+				C98C9BD249BE376D06B0D029 /* ContainerLogsView.swift in Sources */,
+				058D6BC2FCEEC7E05E612A86 /* ContainersView.swift in Sources */,
+				08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */,
+				19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */,
+				1C165AF5EAFAC8DFF5889FFE /* DockhandRootView.swift in Sources */,
+				5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */,
+				F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */,
+				40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */,
+				4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */,
+				D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */,
+				AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */,
+				B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */,
+				64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */,
+				B388C775A10358DC31C430CD /* StacksView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B6CCC7B2B81CC08E688431F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A99DD3EEA8C452C68BACA2B5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 94C638E78EAA353184954E07 /* DockhandMobile */;
+			targetProxy = 412E9C323C86F1C4FAB9D686 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0DFFBC04E30CABDA98C70717 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DockhandMobile.app/DockhandMobile";
+			};
+			name = Release;
+		};
+		1317272F12925AECD06296C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DockhandMobile.app/DockhandMobile";
+			};
+			name = Debug;
+		};
+		17DC331F755D3AC0AA16A2A9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5A9C7269A20A7AEE685DE52C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6C5EB5FFFCACE31C49386CE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A4081A750973722C84E8D483 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		041ADBB5040D5124821CE00E /* Build configuration list for PBXNativeTarget "DockhandMobileTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1317272F12925AECD06296C1 /* Debug */,
+				0DFFBC04E30CABDA98C70717 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		67E736548DC41300D0662263 /* Build configuration list for PBXProject "DockhandMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A4081A750973722C84E8D483 /* Debug */,
+				17DC331F755D3AC0AA16A2A9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6815786542EFA0CDA9F2EFF8 /* Build configuration list for PBXNativeTarget "DockhandMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C5EB5FFFCACE31C49386CE4 /* Debug */,
+				5A9C7269A20A7AEE685DE52C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		6B0FF1B7EE30A54856C10D0D /* XCLocalSwiftPackageReference "DockhandAPI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = DockhandAPI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		16B77C0C226DD692AC2E3C89 /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.2.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		125F5F1A04A3D953027B8DB4 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 16B77C0C226DD692AC2E3C89 /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+		51B7CD00CA402C86142567D7 /* DockhandAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DockhandAPI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C18D3579BA3CC4C3216196B9 /* Project object */;
+}

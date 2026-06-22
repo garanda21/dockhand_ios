@@ -1,0 +1,34 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS metadata
+._*
+.Spotlight-V100
+.Trashes
+
+# Xcode user state
+*.xcuserdatad/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+xcuserdata/
+
+# SwiftPM / Xcode build artifacts
+.build/
+DerivedData/
+build/
+
+# XCTest / profiling outputs
+*.xcresult
+*.trace
+*.profdata
+*.profraw
+
+# Editor and temp files
+*.swp
+*.swo
+*~
+*.tmp
+*.orig
+

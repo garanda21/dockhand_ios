@@ -1,0 +1,43 @@
+name: DockhandMobile
+options:
+  bundleIdPrefix: pro.dockhand
+  deploymentTarget:
+    iOS: "26.0"
+packages:
+  DockhandAPI:
+    path: DockhandAPI
+  Yams:
+    url: https://github.com/jpsim/Yams.git
+    from: 6.2.2
+targets:
+  DockhandMobile:
+    type: application
+    platform: iOS
+    sources:
+      - path: DockhandMobile
+    dependencies:
+      - package: DockhandAPI
+      - package: Yams
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pro.dockhand.mobile
+        SWIFT_VERSION: 6.0
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_CFBundleDisplayName: Dockhand
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+  DockhandMobileTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DockhandMobileTests
+    dependencies:
+      - target: DockhandMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pro.dockhand.mobile.tests
+        SWIFT_VERSION: 6.0
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DockhandMobile.app/DockhandMobile"

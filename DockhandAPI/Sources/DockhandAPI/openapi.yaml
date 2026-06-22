@@ -1,0 +1,547 @@
+openapi: 3.1.0
+info:
+  title: Dockhand Mobile API
+  version: 0.1.0
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/environments:
+    get:
+      operationId: listEnvironments
+      responses:
+        "200":
+          description: Environments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Environment"
+  /api/containers:
+    get:
+      operationId: listContainers
+      parameters:
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Containers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Container"
+  /api/images:
+    get:
+      operationId: listImages
+      parameters:
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImageSummary"
+  /api/stacks:
+    get:
+      operationId: listStacks
+      parameters:
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Stacks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StackSummary"
+  /api/stacks/{name}/compose:
+    get:
+      operationId: getStackCompose
+      parameters:
+        - $ref: "#/components/parameters/StackName"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Stack compose file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StackComposeDocument"
+        "404":
+          description: Missing compose file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StackComposeDocument"
+    put:
+      operationId: updateStackCompose
+      parameters:
+        - $ref: "#/components/parameters/StackName"
+        - $ref: "#/components/parameters/EnvironmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStackComposeRequest"
+      responses:
+        "200":
+          description: Updated compose file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/stacks/{name}/env/raw:
+    get:
+      operationId: getStackEnvFile
+      parameters:
+        - $ref: "#/components/parameters/StackName"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Raw environment file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawEnvDocument"
+    put:
+      operationId: updateStackEnvFile
+      parameters:
+        - $ref: "#/components/parameters/StackName"
+        - $ref: "#/components/parameters/EnvironmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRawEnvRequest"
+      responses:
+        "200":
+          description: Updated environment file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/containers/{id}/start:
+    post:
+      operationId: startContainer
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Started container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/containers/{id}/stop:
+    post:
+      operationId: stopContainer
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Stopped container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/containers/{id}/restart:
+    post:
+      operationId: restartContainer
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Restarted container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/containers/{id}/pause:
+    post:
+      operationId: pauseContainer
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Paused container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+  /api/containers/{id}/unpause:
+    post:
+      operationId: unpauseContainer
+      parameters:
+        - $ref: "#/components/parameters/ContainerId"
+        - $ref: "#/components/parameters/EnvironmentId"
+      responses:
+        "200":
+          description: Unpaused container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResponse"
+components:
+  parameters:
+    EnvironmentId:
+      name: env
+      in: query
+      required: true
+      schema:
+        type: integer
+    ContainerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    StackName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Health:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+        timestamp:
+          type: string
+    Environment:
+      type: object
+      required:
+        - id
+        - name
+        - port
+        - protocol
+        - icon
+        - collectActivity
+        - collectMetrics
+        - highlightChanges
+        - labels
+        - connectionType
+        - socketPath
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        host:
+          type: [string, "null"]
+        port:
+          type: integer
+        protocol:
+          type: string
+        icon:
+          type: string
+        collectActivity:
+          type: boolean
+        collectMetrics:
+          type: boolean
+        highlightChanges:
+          type: boolean
+        labels:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        connectionType:
+          type: string
+        socketPath:
+          type: string
+        publicIp:
+          type: [string, "null"]
+        timezone:
+          type: [string, "null"]
+        updateCheckEnabled:
+          type: boolean
+        updateCheckAutoUpdate:
+          type: boolean
+        imagePruneEnabled:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: [string, "null"]
+    Container:
+      type: object
+      required:
+        - id
+        - name
+        - image
+        - state
+        - status
+        - created
+        - ports
+        - networks
+        - labels
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        image:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+        created:
+          type: integer
+        health:
+          type: [string, "null"]
+        restartCount:
+          type: [integer, "null"]
+        exitCode:
+          type: [integer, "null"]
+        command:
+          type: [string, "null"]
+        systemContainer:
+          type: [string, "null"]
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerPort"
+        networks:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/NetworkInfo"
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/MountInfo"
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+    ContainerPort:
+      type: object
+      required: [PrivatePort, Type]
+      properties:
+        IP:
+          type: [string, "null"]
+        PrivatePort:
+          type: integer
+        PublicPort:
+          type: [integer, "null"]
+        Type:
+          type: string
+    NetworkInfo:
+      type: object
+      properties:
+        ipAddress:
+          type: [string, "null"]
+    MountInfo:
+      type: object
+      properties:
+        type:
+          type: [string, "null"]
+        source:
+          type: [string, "null"]
+        destination:
+          type: [string, "null"]
+        mode:
+          type: [string, "null"]
+        rw:
+          type: [boolean, "null"]
+    ImageSummary:
+      type: object
+      required:
+        - id
+        - size
+        - virtualSize
+        - created
+        - containers
+      properties:
+        id:
+          type: string
+        repoTags:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        repoDigests:
+          type: array
+          items:
+            type: string
+        size:
+          type: integer
+        virtualSize:
+          type: integer
+        created:
+          type: integer
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        containers:
+          type: integer
+    StackSummary:
+      type: object
+      required:
+        - name
+        - containers
+        - containerDetails
+        - status
+      properties:
+        name:
+          type: string
+        containers:
+          type: array
+          items:
+            type: string
+        containerDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/StackContainerDetail"
+        status:
+          type: string
+        sourceType:
+          type: [string, "null"]
+    StackContainerDetail:
+      type: object
+      required:
+        - id
+        - name
+        - service
+        - state
+        - status
+        - image
+        - ports
+        - networks
+        - labels
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        service:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+        image:
+          type: string
+        health:
+          type: [string, "null"]
+        created:
+          type: [integer, "null"]
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/StackPort"
+        networks:
+          type: array
+          items:
+            $ref: "#/components/schemas/StackNetwork"
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+    StackPort:
+      type: object
+      properties:
+        publicPort:
+          type: [integer, "null"]
+        privatePort:
+          type: [integer, "null"]
+        type:
+          type: [string, "null"]
+        display:
+          type: [string, "null"]
+    StackNetwork:
+      type: object
+      properties:
+        name:
+          type: [string, "null"]
+        ipAddress:
+          type: [string, "null"]
+    StackComposeDocument:
+      type: object
+      properties:
+        content:
+          type: [string, "null"]
+        stackDir:
+          type: [string, "null"]
+        composePath:
+          type: [string, "null"]
+        envPath:
+          type: [string, "null"]
+        suggestedEnvPath:
+          type: [string, "null"]
+        needsFileLocation:
+          type: [boolean, "null"]
+        error:
+          type: [string, "null"]
+    RawEnvDocument:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        noEnvFile:
+          type: [boolean, "null"]
+    UpdateStackComposeRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        restart:
+          type: boolean
+        composePath:
+          type: [string, "null"]
+        envPath:
+          type: [string, "null"]
+        moveFromDir:
+          type: [string, "null"]
+        oldComposePath:
+          type: [string, "null"]
+        oldEnvPath:
+          type: [string, "null"]
+    UpdateRawEnvRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+    ActionResponse:
+      type: object
+      properties:
+        success:
+          type: [boolean, "null"]
+        deleted:
+          type: [boolean, "null"]
+        noEnvFile:
+          type: [boolean, "null"]
+        error:
+          type: [string, "null"]
