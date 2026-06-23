@@ -3,45 +3,306 @@ import SwiftUI
 struct SettingsView: View {
     let appModel: AppModel
 
-    @State private var editingProfileID: String?
-    @State private var draftName = ""
-    @State private var draftBaseURL = ""
-    @State private var draftToken = ""
     @State private var statusMessage: String?
 
     var body: some View {
-        Form {
-            Section("Servers") {
-                ForEach(appModel.serverProfiles) { profile in
-                    Button {
-                        loadDraft(from: profile)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(profile.name)
-                                    .foregroundStyle(.primary)
-                                Text(profile.baseURL)
-                                    .font(.footnote.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer()
-                            if appModel.selectedProfileID == profile.id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                activeServerCard
+                serverLibraryCard
+
+                if let statusMessage {
+                    statusCard(statusMessage)
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ServerProfileDetailView(appModel: appModel, profileID: nil)
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+    }
+
+    private var activeServerCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Active server")
+                        .font(.title3.weight(.semibold))
+                    Text("Switch server quickly without opening its configuration.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
-                Button {
-                    startNewProfile()
-                } label: {
-                    Label("Add server", systemImage: "plus")
+                Spacer(minLength: 12)
+
+                if appModel.isLoadingEnvironments {
+                    ProgressView()
                 }
             }
 
-            Section(editingProfileID == nil ? "New server" : "Edit server") {
+            if let profile = appModel.selectedProfile {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "server.rack")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, height: 40)
+                            .glassEffect(.regular.tint(.white.opacity(0.06)), in: .circle)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profile.name)
+                                .font(.headline)
+                            Text(profile.baseURL)
+                                .font(.footnote.monospaced())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    serverSwitcherMenu
+
+                    HStack(spacing: 12) {
+                        infoChip("Environment", appModel.selectedEnvironmentName)
+                        if let health = appModel.lastHealthStatus {
+                            infoChip("Status", health.uppercased(), tint: health == "ok" ? .green : .secondary)
+                        }
+                    }
+
+                    Button {
+                        Task {
+                            await appModel.refreshEnvironments(forceEnvironmentReset: false)
+                            statusMessage = appModel.environmentError ?? "Active server refreshed"
+                        }
+                    } label: {
+                        Label("Refresh active server", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+                }
+            } else {
+                ContentUnavailableView(
+                    "No server configured",
+                    systemImage: "server.rack",
+                    description: Text("Add a Dockhand server to start switching environments.")
+                )
+
+                NavigationLink {
+                    ServerProfileDetailView(appModel: appModel, profileID: nil)
+                } label: {
+                    Label("Add server", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
+    }
+
+    private var serverSwitcherMenu: some View {
+        Menu {
+            ForEach(appModel.serverProfiles) { profile in
+                Button {
+                    Task {
+                        await appModel.selectServerProfile(profile.id, forceEnvironmentReset: true)
+                        statusMessage = appModel.environmentError ?? "Server changed"
+                    }
+                } label: {
+                    Label(
+                        profile.name,
+                        systemImage: appModel.selectedProfileID == profile.id ? "checkmark.circle.fill" : "server.rack"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.left.arrow.right.circle.fill")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Switch server")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(appModel.selectedProfileName)
+                        .font(.headline)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .glassEffect(.regular.tint(.orange.opacity(0.18)), in: .rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .disabled(appModel.serverProfiles.isEmpty)
+    }
+
+    private var serverLibraryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Server library")
+                        .font(.title3.weight(.semibold))
+                    Text("Each server keeps its own details, token and selected environment.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                NavigationLink {
+                    ServerProfileDetailView(appModel: appModel, profileID: nil)
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.glass)
+            }
+
+            VStack(spacing: 10) {
+                ForEach(appModel.serverProfiles) { profile in
+                    NavigationLink {
+                        ServerProfileDetailView(appModel: appModel, profileID: profile.id)
+                    } label: {
+                        ServerProfileRow(
+                            profile: profile,
+                            isActive: appModel.selectedProfileID == profile.id,
+                            environmentName: appModel.selectedProfileID == profile.id ? appModel.selectedEnvironmentName : nil
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    private func infoChip(_ title: String, _ value: String, tint: Color = .secondary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+    }
+
+    private func statusCard(_ message: String) -> some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+    }
+}
+
+private struct ServerProfileRow: View {
+    let profile: DockhandServerProfile
+    let isActive: Bool
+    let environmentName: String?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: isActive ? "server.rack" : "circle.grid.3x3.fill")
+                .font(.headline)
+                .foregroundStyle(isActive ? .blue : .secondary)
+                .frame(width: 38, height: 38)
+                .glassEffect(.regular.tint(.white.opacity(0.05)), in: .circle)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(profile.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    if isActive {
+                        Text("ACTIVE")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .foregroundStyle(.blue)
+                            .glassEffect(.regular.tint(.blue.opacity(0.12)), in: .capsule)
+                    }
+                }
+
+                Text(profile.baseURL)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if let environmentName, isActive {
+                    Text("Environment: \(environmentName)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(14)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 20))
+    }
+}
+
+private struct ServerProfileDetailView: View {
+    let appModel: AppModel
+    let profileID: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var draftName = ""
+    @State private var draftBaseURL = "http://"
+    @State private var draftToken = ""
+    @State private var statusMessage: String?
+    @State private var isSaving = false
+    @State private var showDeleteConfirmation = false
+
+    private var editingProfile: DockhandServerProfile? {
+        guard let profileID else { return nil }
+        return appModel.serverProfiles.first(where: { $0.id == profileID })
+    }
+
+    private var isActive: Bool {
+        appModel.selectedProfileID == profileID
+    }
+
+    var body: some View {
+        Form {
+            if let editingProfile {
+                Section {
+                    LabeledContent("Server ID", value: editingProfile.id)
+                        .font(.footnote.monospaced())
+                    LabeledContent("Active", value: isActive ? "Yes" : "No")
+                    if isActive {
+                        LabeledContent("Environment", value: appModel.selectedEnvironmentName)
+                    }
+                }
+            }
+
+            Section("Connection") {
                 TextField("Name", text: $draftName)
                     .textInputAutocapitalization(.words)
 
@@ -56,59 +317,33 @@ struct SettingsView: View {
             }
 
             Section {
-                Button(editingProfileID == nil ? "Save server" : "Save changes") {
-                    Task {
-                        await appModel.saveServerProfile(
-                            profileID: editingProfileID,
-                            name: draftName,
-                            baseURLText: draftBaseURL,
-                            token: draftToken,
-                            makeActive: true
-                        )
-                        if let selected = appModel.selectedProfile {
-                            loadDraft(from: selected)
-                        }
-                        statusMessage = appModel.environmentError ?? "Server saved"
+                Button {
+                    Task { await saveProfile() }
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text(editingProfile == nil ? "Create server" : "Save changes")
+                            .frame(maxWidth: .infinity)
                     }
                 }
-                .disabled(draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(isSaving || draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                if let editingProfileID {
+                if let profileID, !isActive {
                     Button("Use this server") {
                         Task {
-                            await appModel.selectServerProfile(editingProfileID, forceEnvironmentReset: true)
+                            await appModel.selectServerProfile(profileID, forceEnvironmentReset: true)
                             statusMessage = appModel.environmentError ?? "Server changed"
                         }
                     }
+                }
 
+                if profileID != nil {
                     Button("Delete server", role: .destructive) {
-                        Task {
-                            await appModel.deleteServerProfile(editingProfileID)
-                            if let selected = appModel.selectedProfile {
-                                loadDraft(from: selected)
-                            } else {
-                                startNewProfile()
-                            }
-                            statusMessage = "Server deleted"
-                        }
+                        showDeleteConfirmation = true
                     }
-                    .disabled(appModel.serverProfiles.count <= 1 && appModel.selectedProfileID == editingProfileID)
-                }
-
-                Button("Refresh active server") {
-                    Task {
-                        await appModel.refreshEnvironments(forceEnvironmentReset: false)
-                        statusMessage = appModel.environmentError ?? "Server refreshed"
-                    }
-                }
-                .disabled(appModel.selectedProfile == nil)
-            }
-
-            if let selectedProfile = appModel.selectedProfile {
-                Section("Active server") {
-                    LabeledContent("Name", value: selectedProfile.name)
-                    LabeledContent("URL", value: selectedProfile.baseURL)
-                    LabeledContent("Environment", value: appModel.selectedEnvironmentName)
+                    .disabled(appModel.serverProfiles.count <= 1 && isActive)
                 }
             }
 
@@ -118,27 +353,55 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("Settings")
-        .task {
-            if let selected = appModel.selectedProfile {
-                loadDraft(from: selected)
-            } else {
-                startNewProfile()
+        .navigationTitle(editingProfile == nil ? "New Server" : "Server Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: profileID) {
+            loadDraft()
+        }
+        .alert("Delete server?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                Task { await deleteProfile() }
             }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the saved URL, token and per-server environment selection.")
         }
     }
 
-    private func loadDraft(from profile: DockhandServerProfile) {
-        editingProfileID = profile.id
-        draftName = profile.name
-        draftBaseURL = profile.baseURL
-        draftToken = KeychainStore.readToken(profileID: profile.id) ?? ""
+    private func loadDraft() {
+        if let editingProfile {
+            draftName = editingProfile.name
+            draftBaseURL = editingProfile.baseURL
+            draftToken = KeychainStore.readToken(profileID: editingProfile.id) ?? ""
+        } else {
+            draftName = ""
+            draftBaseURL = "http://"
+            draftToken = ""
+        }
+        statusMessage = nil
     }
 
-    private func startNewProfile() {
-        editingProfileID = nil
-        draftName = ""
-        draftBaseURL = "http://"
-        draftToken = ""
+    @MainActor
+    private func saveProfile() async {
+        isSaving = true
+        defer { isSaving = false }
+
+        await appModel.saveServerProfile(
+            profileID: profileID,
+            name: draftName,
+            baseURLText: draftBaseURL,
+            token: draftToken,
+            makeActive: true
+        )
+        statusMessage = appModel.environmentError ?? "Server saved"
+        dismiss()
+    }
+
+    @MainActor
+    private func deleteProfile() async {
+        guard let profileID else { return }
+
+        await appModel.deleteServerProfile(profileID)
+        dismiss()
     }
 }

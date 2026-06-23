@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <path d="M350 410h88v66h-88z"/>
+  <path d="M454 410h88v66h-88z"/>
+  <path d="M558 410h88v66h-88z"/>
+  <path d="M662 410h88v66h-88z"/>
+  <path d="M350 492h88v66h-88z"/>
+  <path d="M454 492h88v66h-88z"/>
+  <path d="M558 492h88v66h-88z"/>
+  <path d="M662 492h88v66h-88z"/>
+  <path d="M316 578h478c16 0 30 14 30 30s-14 30-30 30H316c-16 0-30-14-30-30s14-30 30-30z"/>
+</svg>

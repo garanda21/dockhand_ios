@@ -23,6 +23,102 @@ struct ImageScanDocument: Sendable, Hashable {
     var results: [String]
 }
 
+struct DashboardEnvironmentSnapshot: Sendable, Hashable {
+    struct Containers: Sendable, Hashable {
+        var total: Int
+        var running: Int
+        var stopped: Int
+        var paused: Int
+        var restarting: Int
+        var unhealthy: Int
+        var pendingUpdates: Int
+    }
+
+    struct Images: Sendable, Hashable {
+        var total: Int
+        var totalSize: Int
+    }
+
+    struct Volumes: Sendable, Hashable {
+        var total: Int
+        var totalSize: Int
+    }
+
+    struct Networks: Sendable, Hashable {
+        var total: Int
+    }
+
+    struct Stacks: Sendable, Hashable {
+        var total: Int
+        var running: Int
+        var partial: Int
+        var stopped: Int
+    }
+
+    struct Metrics: Sendable, Hashable {
+        var cpuPercent: Double
+        var memoryPercent: Double
+        var memoryUsed: Int
+        var memoryTotal: Int
+    }
+
+    struct Events: Sendable, Hashable {
+        var total: Int
+        var today: Int
+    }
+
+    var id: Int
+    var name: String
+    var port: Int
+    var icon: String
+    var socketPath: String
+    var collectActivity: Bool
+    var collectMetrics: Bool
+    var scannerEnabled: Bool
+    var updateCheckEnabled: Bool
+    var updateCheckAutoUpdate: Bool
+    var connectionType: String
+    var online: Bool
+    var containers: Containers
+    var images: Images
+    var volumes: Volumes
+    var containersSize: Int
+    var buildCacheSize: Int
+    var networks: Networks
+    var stacks: Stacks
+    var metrics: Metrics
+    var events: Events
+}
+
+struct DashboardHostSnapshot: Sendable, Hashable {
+    struct Docker: Sendable, Hashable {
+        var version: String
+        var apiVersion: String
+        var os: String
+        var arch: String
+        var kernelVersion: String
+        var serverVersion: String
+        var connectionType: String
+        var socketPath: String?
+    }
+
+    struct Host: Sendable, Hashable {
+        var name: String
+        var cpus: Int
+        var memory: Int
+        var storageDriver: String
+    }
+
+    var docker: Docker
+    var host: Host
+}
+
+struct StackDeployOptions: Sendable, Hashable {
+    var pull = true
+    var build = false
+    var forceRecreate = false
+}
+
 enum DockhandServiceError: LocalizedError {
     case invalidResponse
     case message(String)
@@ -59,13 +155,25 @@ struct DockhandService {
     }
 
     func fetchEnvironments() async throws -> [Components.Schemas.Environment] {
-        let output = try await client.listEnvironments()
-        switch output {
-        case .ok(let response):
-            return try response.body.json
-        case .undocumented(let statusCode, _):
-            throw DockhandServiceError.unexpectedStatus(statusCode)
+        var request = URLRequest(url: baseURL.appending(path: "/api/environments"))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DockhandServiceError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw DockhandServiceError.unexpectedStatus(httpResponse.statusCode)
+        }
+        guard let payload = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        return try payload.map(Self.decodeEnvironment)
     }
 
     func fetchContainers(environmentID: Int) async throws -> [Components.Schemas.Container] {
@@ -96,6 +204,24 @@ struct DockhandService {
         case .undocumented(let statusCode, _):
             throw DockhandServiceError.unexpectedStatus(statusCode)
         }
+    }
+
+    func fetchDashboardStats(environmentID: Int) async throws -> DashboardEnvironmentSnapshot {
+        let response = try await performJSONRequest(
+            path: "/api/dashboard/stats",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return try Self.decodeDashboardStats(response)
+    }
+
+    func fetchDashboardHost(environmentID: Int) async throws -> DashboardHostSnapshot {
+        let response = try await performJSONRequest(
+            path: "/api/system",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return try Self.decodeDashboardHost(response)
     }
 
     func fetchStackEditorDocument(name: String, environmentID: Int) async throws -> StackEditorDocument {
@@ -326,6 +452,26 @@ struct DockhandService {
         throw DockhandServiceError.invalidResponse
     }
 
+    func pruneImages(
+        environmentID: Int,
+        danglingOnly: Bool
+    ) async throws {
+        let response = try await performJSONRequest(
+            path: "/api/prune/images",
+            method: "POST",
+            environmentID: environmentID,
+            additionalQueryItems: danglingOnly ? [] : [URLQueryItem(name: "dangling", value: "false")]
+        )
+
+        if response["success"] as? Bool == true {
+            return
+        }
+        if let error = response["error"] as? String, !error.isEmpty {
+            throw DockhandServiceError.message(error)
+        }
+        throw DockhandServiceError.invalidResponse
+    }
+
     func tagImage(
         imageID: String,
         environmentID: Int,
@@ -456,59 +602,45 @@ struct DockhandService {
 
     func stackAction(_ action: StackAction, stackName: String, environmentID: Int) async throws {
         let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
-        let path = "/api/stacks/\(encodedName)/\(action.endpoint)"
-        var request = URLRequest(url: baseURL.appending(path: path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        if action == .restart {
-            var components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
-            components?.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
-            request.url = components?.url
-        } else {
-            var components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
-            components?.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
-            request.url = components?.url
-        }
+        let response = try await performJSONRequest(
+            path: "/api/stacks/\(encodedName)/\(action.endpoint)",
+            method: "POST",
+            environmentID: environmentID
+        )
 
-        let session = URLSession(configuration: .ephemeral)
-        let (bytes, response) = try await session.bytes(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DockhandServiceError.invalidResponse
+        if response["success"] as? Bool == true || response["status"] as? String == "complete" {
+            return
         }
-        guard httpResponse.statusCode == 200 else {
-            throw DockhandServiceError.unexpectedStatus(httpResponse.statusCode)
+        if let error = response["error"] as? String, !error.isEmpty {
+            throw DockhandServiceError.message(error)
         }
+        throw DockhandServiceError.invalidResponse
+    }
 
-        var currentEvent: String?
-        var payloadLines: [String] = []
+    func redeployStack(
+        stackName: String,
+        environmentID: Int,
+        options: StackDeployOptions
+    ) async throws {
+        let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
+        let response = try await performJSONRequest(
+            path: "/api/stacks/\(encodedName)/deploy",
+            method: "POST",
+            environmentID: environmentID,
+            body: [
+                "pull": options.pull,
+                "build": options.build,
+                "forceRecreate": options.forceRecreate
+            ]
+        )
 
-        for try await line in bytes.lines {
-            if line.isEmpty {
-                if currentEvent == "result" {
-                    let payload = payloadLines.joined(separator: "\n")
-                    guard let data = payload.data(using: .utf8) else { break }
-                    let result = try JSONDecoder().decode(SSEActionResult.self, from: data)
-                    if result.success == true {
-                        return
-                    }
-                    throw DockhandServiceError.message(result.error ?? "Dockhand action failed")
-                }
-                currentEvent = nil
-                payloadLines = []
-                continue
-            }
-
-            if line.hasPrefix("event:") {
-                currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("data:") {
-                payloadLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces))
-            }
+        if response["success"] as? Bool == true || response["status"] as? String == "complete" {
+            return
         }
-
-        throw DockhandServiceError.message("No completion event received from Dockhand")
+        if let error = response["error"] as? String, !error.isEmpty {
+            throw DockhandServiceError.message(error)
+        }
+        throw DockhandServiceError.invalidResponse
     }
 
     private func validateAction(_ output: some Sendable) throws {
@@ -557,16 +689,206 @@ struct DockhandService {
         }
     }
 
+    private static func decodeEnvironment(_ object: [String: Any]) throws -> Components.Schemas.Environment {
+        guard let id = intValue(object["id"]),
+              let name = object["name"] as? String,
+              let port = intValue(object["port"]),
+              let protocolValue = object["protocol"] as? String,
+              let icon = object["icon"] as? String,
+              let collectActivity = object["collectActivity"] as? Bool,
+              let collectMetrics = object["collectMetrics"] as? Bool,
+              let highlightChanges = object["highlightChanges"] as? Bool,
+              let connectionType = object["connectionType"] as? String,
+              let socketPath = object["socketPath"] as? String,
+              let createdAt = object["createdAt"] as? String else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        return .init(
+            id: id,
+            name: name,
+            host: object["host"] as? String,
+            port: port,
+            _protocol: protocolValue,
+            icon: icon,
+            collectActivity: collectActivity,
+            collectMetrics: collectMetrics,
+            highlightChanges: highlightChanges,
+            labels: [],
+            connectionType: connectionType,
+            socketPath: socketPath,
+            publicIp: object["publicIp"] as? String,
+            timezone: object["timezone"] as? String,
+            updateCheckEnabled: object["updateCheckEnabled"] as? Bool,
+            updateCheckAutoUpdate: object["updateCheckAutoUpdate"] as? Bool,
+            imagePruneEnabled: object["imagePruneEnabled"] as? Bool,
+            createdAt: createdAt,
+            updatedAt: object["updatedAt"] as? String
+        )
+    }
+
+    private static func intValue(_ value: Any?) -> Int? {
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.intValue
+        }
+        return nil
+    }
+
+    private static func doubleValue(_ value: Any?) -> Double? {
+        if let value = value as? Double {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.doubleValue
+        }
+        return nil
+    }
+
+    private static func decodeDashboardStats(_ object: [String: Any]) throws -> DashboardEnvironmentSnapshot {
+        guard let id = intValue(object["id"]),
+              let name = object["name"] as? String,
+              let port = intValue(object["port"]),
+              let icon = object["icon"] as? String,
+              let socketPath = object["socketPath"] as? String,
+              let collectActivity = object["collectActivity"] as? Bool,
+              let collectMetrics = object["collectMetrics"] as? Bool,
+              let scannerEnabled = object["scannerEnabled"] as? Bool,
+              let updateCheckEnabled = object["updateCheckEnabled"] as? Bool,
+              let updateCheckAutoUpdate = object["updateCheckAutoUpdate"] as? Bool,
+              let connectionType = object["connectionType"] as? String,
+              let online = object["online"] as? Bool,
+              let containersObject = object["containers"] as? [String: Any],
+              let imagesObject = object["images"] as? [String: Any],
+              let volumesObject = object["volumes"] as? [String: Any],
+              let networksObject = object["networks"] as? [String: Any],
+              let stacksObject = object["stacks"] as? [String: Any],
+              let metricsObject = object["metrics"] as? [String: Any],
+              let eventsObject = object["events"] as? [String: Any],
+              let containersSize = intValue(object["containersSize"]),
+              let buildCacheSize = intValue(object["buildCacheSize"]),
+              let containersTotal = intValue(containersObject["total"]),
+              let containersRunning = intValue(containersObject["running"]),
+              let containersStopped = intValue(containersObject["stopped"]),
+              let containersPaused = intValue(containersObject["paused"]),
+              let containersRestarting = intValue(containersObject["restarting"]),
+              let containersUnhealthy = intValue(containersObject["unhealthy"]),
+              let containersPendingUpdates = intValue(containersObject["pendingUpdates"]),
+              let imagesTotal = intValue(imagesObject["total"]),
+              let imagesTotalSize = intValue(imagesObject["totalSize"]),
+              let volumesTotal = intValue(volumesObject["total"]),
+              let volumesTotalSize = intValue(volumesObject["totalSize"]),
+              let networksTotal = intValue(networksObject["total"]),
+              let stacksTotal = intValue(stacksObject["total"]),
+              let stacksRunning = intValue(stacksObject["running"]),
+              let stacksPartial = intValue(stacksObject["partial"]),
+              let stacksStopped = intValue(stacksObject["stopped"]),
+              let cpuPercent = doubleValue(metricsObject["cpuPercent"]),
+              let memoryPercent = doubleValue(metricsObject["memoryPercent"]),
+              let memoryUsed = intValue(metricsObject["memoryUsed"]),
+              let memoryTotal = intValue(metricsObject["memoryTotal"]),
+              let eventsTotal = intValue(eventsObject["total"]),
+              let eventsToday = intValue(eventsObject["today"]) else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        return DashboardEnvironmentSnapshot(
+            id: id,
+            name: name,
+            port: port,
+            icon: icon,
+            socketPath: socketPath,
+            collectActivity: collectActivity,
+            collectMetrics: collectMetrics,
+            scannerEnabled: scannerEnabled,
+            updateCheckEnabled: updateCheckEnabled,
+            updateCheckAutoUpdate: updateCheckAutoUpdate,
+            connectionType: connectionType,
+            online: online,
+            containers: .init(
+                total: containersTotal,
+                running: containersRunning,
+                stopped: containersStopped,
+                paused: containersPaused,
+                restarting: containersRestarting,
+                unhealthy: containersUnhealthy,
+                pendingUpdates: containersPendingUpdates
+            ),
+            images: .init(total: imagesTotal, totalSize: imagesTotalSize),
+            volumes: .init(total: volumesTotal, totalSize: volumesTotalSize),
+            containersSize: containersSize,
+            buildCacheSize: buildCacheSize,
+            networks: .init(total: networksTotal),
+            stacks: .init(
+                total: stacksTotal,
+                running: stacksRunning,
+                partial: stacksPartial,
+                stopped: stacksStopped
+            ),
+            metrics: .init(
+                cpuPercent: cpuPercent,
+                memoryPercent: memoryPercent,
+                memoryUsed: memoryUsed,
+                memoryTotal: memoryTotal
+            ),
+            events: .init(total: eventsTotal, today: eventsToday)
+        )
+    }
+
+    private static func decodeDashboardHost(_ object: [String: Any]) throws -> DashboardHostSnapshot {
+        guard let dockerObject = object["docker"] as? [String: Any],
+              let hostObject = object["host"] as? [String: Any],
+              let dockerVersion = dockerObject["version"] as? String,
+              let dockerAPIVersion = dockerObject["apiVersion"] as? String,
+              let dockerOS = dockerObject["os"] as? String,
+              let dockerArch = dockerObject["arch"] as? String,
+              let dockerKernelVersion = dockerObject["kernelVersion"] as? String,
+              let dockerServerVersion = dockerObject["serverVersion"] as? String,
+              let dockerConnection = dockerObject["connection"] as? [String: Any],
+              let dockerConnectionType = dockerConnection["type"] as? String,
+              let hostName = hostObject["name"] as? String,
+              let hostCPUs = intValue(hostObject["cpus"]),
+              let hostMemory = intValue(hostObject["memory"]),
+              let storageDriver = hostObject["storageDriver"] as? String else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        return DashboardHostSnapshot(
+            docker: .init(
+                version: dockerVersion,
+                apiVersion: dockerAPIVersion,
+                os: dockerOS,
+                arch: dockerArch,
+                kernelVersion: dockerKernelVersion,
+                serverVersion: dockerServerVersion,
+                connectionType: dockerConnectionType,
+                socketPath: dockerConnection["socketPath"] as? String
+            ),
+            host: .init(
+                name: hostName,
+                cpus: hostCPUs,
+                memory: hostMemory,
+                storageDriver: storageDriver
+            )
+        )
+    }
+
     private func performJSONRequest(
         path: String,
         method: String,
         environmentID: Int,
+        additionalQueryItems: [URLQueryItem] = [],
         body: [String: Any]? = nil
     ) async throws -> [String: Any] {
         guard var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
             throw DockhandServiceError.invalidResponse
         }
-        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        var queryItems = components.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "env", value: "\(environmentID)"))
+        queryItems.append(contentsOf: additionalQueryItems)
+        components.queryItems = queryItems
         guard let url = components.url else {
             throw DockhandServiceError.invalidResponse
         }
@@ -602,11 +924,6 @@ struct DockhandService {
     }
 }
 
-private struct SSEActionResult: Decodable {
-    let success: Bool?
-    let error: String?
-}
-
 private struct ContainerLogsResponse: Decodable {
     let logs: String
 }
@@ -634,8 +951,16 @@ enum StackAction: String, CaseIterable, Identifiable {
     case start
     case stop
     case restart
+    case redeploy
 
     var id: String { rawValue }
 
-    var endpoint: String { rawValue }
+    var endpoint: String {
+        switch self {
+        case .start, .stop, .restart:
+            return rawValue
+        case .redeploy:
+            return "deploy"
+        }
+    }
 }

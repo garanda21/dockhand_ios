@@ -87,7 +87,11 @@ enum PreferencesStore {
     }
 
     private static func migratedLegacyProfiles() -> [DockhandServerProfile] {
-        let legacyURL = defaults.string(forKey: legacyBaseURLKey) ?? "http://10.70.29.223:3230"
+        guard let legacyURL = defaults.string(forKey: legacyBaseURLKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !legacyURL.isEmpty else {
+            return []
+        }
         return [DockhandServerProfile(name: "Primary", baseURL: legacyURL)]
     }
 

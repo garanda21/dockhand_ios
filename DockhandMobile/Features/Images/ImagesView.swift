@@ -9,6 +9,7 @@ final class ImagesStore {
     var isLoading = false
     var error: String?
     var actionMessage: String?
+    var actionMessageScope: ImageActionScope?
     var activeActionID: String?
 
     func load(appModel: AppModel) async {
@@ -31,12 +32,13 @@ final class ImagesStore {
         }
     }
 
-    func pullImage(named name: String, appModel: AppModel) async {
+    func pullImage(named name: String, scope: ImageActionScope = .list, appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
         activeActionID = "pull"
         actionMessage = nil
+        actionMessageScope = nil
         error = nil
         defer { activeActionID = nil }
 
@@ -44,6 +46,28 @@ final class ImagesStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.pullImage(imageName: name, environmentID: environmentID)
             actionMessage = "\(name) pulled"
+            actionMessageScope = scope
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func pruneImages(danglingOnly: Bool, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeActionID = danglingOnly ? "prune" : "prune-unused"
+        actionMessage = nil
+        actionMessageScope = nil
+        error = nil
+        defer { activeActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.pruneImages(environmentID: environmentID, danglingOnly: danglingOnly)
+            actionMessage = danglingOnly ? "Dangling images pruned" : "Unused images pruned"
+            actionMessageScope = .list
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
@@ -56,6 +80,7 @@ final class ImagesStore {
 
         activeActionID = actionID("tag", image.id)
         actionMessage = nil
+        actionMessageScope = nil
         error = nil
         defer { activeActionID = nil }
 
@@ -63,6 +88,7 @@ final class ImagesStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.tagImage(imageID: image.id, environmentID: environmentID, repo: repo, tag: tag)
             actionMessage = "\(repo):\(tag) created"
+            actionMessageScope = .image(image.id)
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
@@ -75,6 +101,7 @@ final class ImagesStore {
 
         activeActionID = actionID("delete", reference)
         actionMessage = nil
+        actionMessageScope = nil
         error = nil
         defer { activeActionID = nil }
 
@@ -82,18 +109,20 @@ final class ImagesStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.deleteImage(imageReference: reference, environmentID: environmentID)
             actionMessage = "\(reference) deleted"
+            actionMessageScope = .image(reference)
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    func deleteImageTag(_ tag: String, appModel: AppModel) async {
+    func deleteImageTag(_ tag: String, imageID: String, appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
         activeActionID = actionID("delete-tag", tag)
         actionMessage = nil
+        actionMessageScope = nil
         error = nil
         defer { activeActionID = nil }
 
@@ -101,6 +130,7 @@ final class ImagesStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.deleteImageTag(imageTag: tag, environmentID: environmentID)
             actionMessage = "\(tag) removed"
+            actionMessageScope = .image(imageID)
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
@@ -115,6 +145,7 @@ final class ImagesStore {
 
         activeActionID = actionID("scan", image.id)
         actionMessage = nil
+        actionMessageScope = nil
         error = nil
         defer { activeActionID = nil }
 
@@ -126,6 +157,16 @@ final class ImagesStore {
         images.first(where: { $0.id == id })
     }
 
+    var listActionMessage: String? {
+        guard actionMessageScope == .list else { return nil }
+        return actionMessage
+    }
+
+    func actionMessage(for imageID: String) -> String? {
+        guard actionMessageScope == .image(imageID) else { return nil }
+        return actionMessage
+    }
+
     func isRunning(_ action: String, reference: String) -> Bool {
         activeActionID == actionID(action, reference)
     }
@@ -135,10 +176,35 @@ final class ImagesStore {
     }
 }
 
+enum ImageActionScope: Equatable {
+    case list
+    case image(String)
+}
+
 struct ImagesView: View {
     let appModel: AppModel
     @State private var store = ImagesStore()
     @State private var pullSheetPresented = false
+    @State private var stateFilter = ImageStateFilter.all
+    @State private var pruneConfirmation: ImagePruneMode?
+
+    private var repositoryUsage: [String: RepositoryImageUsage] {
+        Dictionary(
+            grouping: store.images,
+            by: \.repositoryKey
+        ).mapValues { images in
+            let hasUsed = images.contains { $0.containers > 0 }
+            let hasUnused = images.contains { $0.containers == 0 }
+            return RepositoryImageUsage(hasUsed: hasUsed, hasUnused: hasUnused)
+        }
+    }
+
+    private var filteredImages: [Components.Schemas.ImageSummary] {
+        store.images.filter { image in
+            let usage = repositoryUsage[image.repositoryKey] ?? .init(hasUsed: image.containers > 0, hasUnused: image.containers == 0)
+            return stateFilter.matches(image: image, usage: usage)
+        }
+    }
 
     var body: some View {
         List {
@@ -155,19 +221,26 @@ struct ImagesView: View {
                 }
             }
 
-            if let actionMessage = store.actionMessage {
-                Section {
-                    Text(actionMessage)
-                        .foregroundStyle(.secondary)
-                }
+            Section {
+                imageActionsPanel
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
             }
 
             Section("Images") {
-                ForEach(store.images, id: \.id) { image in
-                    NavigationLink {
-                        ImageDetailView(image: image, appModel: appModel, store: store)
-                    } label: {
-                        ImageRow(image: image)
+                if filteredImages.isEmpty {
+                    Text(stateFilter == .all ? "No images" : "No images in \(stateFilter.title)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredImages, id: \.id) { image in
+                        NavigationLink {
+                            ImageDetailView(image: image, appModel: appModel, store: store)
+                        } label: {
+                            ImageRow(
+                                image: image,
+                                usage: repositoryUsage[image.repositoryKey]
+                            )
+                        }
                     }
                 }
             }
@@ -176,16 +249,36 @@ struct ImagesView: View {
         .navigationTitle("Images")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    pullSheetPresented = true
+                Menu {
+                    ForEach(ImageStateFilter.allCases) { filter in
+                        Button {
+                            stateFilter = filter
+                        } label: {
+                            selectionLabel(filter.title, isSelected: stateFilter == filter)
+                        }
+                    }
                 } label: {
-                    Image(systemName: "arrow.down.circle")
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                 }
             }
         }
         .sheet(isPresented: $pullSheetPresented) {
-            PullImageSheet(appModel: appModel, store: store)
+            PullImageSheet(appModel: appModel, store: store, scope: .list)
                 .presentationDetents([.medium])
+        }
+        .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
+            get: { pruneConfirmation != nil },
+            set: { if !$0 { pruneConfirmation = nil } }
+        ), titleVisibility: .visible) {
+            if let pruneConfirmation {
+                Button(pruneConfirmation.confirmTitle, role: .destructive) {
+                    let danglingOnly = pruneConfirmation == .danglingOnly
+                    Task { await store.pruneImages(danglingOnly: danglingOnly, appModel: appModel) }
+                    self.pruneConfirmation = nil
+                }
+            }
+        } message: {
+            Text(pruneConfirmation?.message ?? "")
         }
         .overlay {
             if store.isLoading && store.images.isEmpty {
@@ -199,10 +292,148 @@ struct ImagesView: View {
             await store.load(appModel: appModel)
         }
     }
+
+    private var imageActionsPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Image actions")
+                    .font(.headline)
+                Spacer()
+                if stateFilter != .all {
+                    Text(stateFilter.title)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let actionMessage = store.listActionMessage {
+                Label(actionMessage, systemImage: "checkmark.circle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    toolButton(
+                        title: "Prune",
+                        systemImage: "wand.and.stars.inverse",
+                        tint: .primary,
+                        isRunning: store.activeActionID == "prune"
+                    ) {
+                        pruneConfirmation = .danglingOnly
+                    }
+
+                    toolButton(
+                        title: "Prune unused",
+                        systemImage: "wand.and.stars",
+                        tint: .orange,
+                        isRunning: store.activeActionID == "prune-unused"
+                    ) {
+                        pruneConfirmation = .allUnused
+                    }
+
+                    toolButton(
+                        title: "Pull",
+                        systemImage: "arrow.down.circle",
+                        tint: .blue,
+                        isProminent: true
+                    ) {
+                        pullSheetPresented = true
+                    }
+                }
+
+                VStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        toolButton(
+                            title: "Prune",
+                            systemImage: "wand.and.stars.inverse",
+                            tint: .primary,
+                            isRunning: store.activeActionID == "prune"
+                        ) {
+                            pruneConfirmation = .danglingOnly
+                        }
+
+                        toolButton(
+                            title: "Prune unused",
+                            systemImage: "wand.and.stars",
+                            tint: .orange,
+                            isRunning: store.activeActionID == "prune-unused"
+                        ) {
+                            pruneConfirmation = .allUnused
+                        }
+                    }
+
+                    toolButton(
+                        title: "Pull image",
+                        systemImage: "arrow.down.circle",
+                        tint: .blue,
+                        isProminent: true
+                    ) {
+                        pullSheetPresented = true
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer(minLength: 12)
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+        }
+    }
+
+    private func toolButton(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        isProminent: Bool = false,
+        isRunning: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                if isRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: systemImage)
+                }
+                Text(title)
+                    .lineLimit(1)
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+        }
+        .buttonStyle(isProminent ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.bordered))
+        .tint(tint)
+        .disabled(isRunning)
+    }
+}
+
+private struct AnyButtonStyle: PrimitiveButtonStyle {
+    private let makeBodyClosure: (Configuration) -> AnyView
+
+    init<S: PrimitiveButtonStyle>(_ style: S) {
+        self.makeBodyClosure = { configuration in
+            AnyView(style.makeBody(configuration: configuration))
+        }
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        makeBodyClosure(configuration)
+    }
 }
 
 private struct ImageRow: View {
     let image: Components.Schemas.ImageSummary
+    let usage: RepositoryImageUsage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -213,6 +444,13 @@ private struct ImageRow: View {
 
                 if image.isUnused {
                     Text("Unused")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.orange.opacity(0.12), in: Capsule())
+                } else if usage?.isPartiallyUnused == true {
+                    Text("Some unused")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange)
                         .padding(.horizontal, 8)
@@ -235,6 +473,82 @@ private struct ImageRow: View {
             .lineLimit(1)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct RepositoryImageUsage {
+    let hasUsed: Bool
+    let hasUnused: Bool
+
+    var isPartiallyUnused: Bool {
+        hasUsed && hasUnused
+    }
+}
+
+private enum ImageStateFilter: String, CaseIterable, Identifiable {
+    case all
+    case inUse = "in-use"
+    case someUnused = "some-unused"
+    case unused
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return "All"
+        case .inUse:
+            return "In use"
+        case .someUnused:
+            return "Some unused"
+        case .unused:
+            return "Unused"
+        }
+    }
+
+    func matches(image: Components.Schemas.ImageSummary, usage: RepositoryImageUsage) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .inUse:
+            return image.containers > 0
+        case .someUnused:
+            return usage.isPartiallyUnused
+        case .unused:
+            return image.containers == 0
+        }
+    }
+}
+
+private enum ImagePruneMode {
+    case danglingOnly
+    case allUnused
+
+    var title: String {
+        switch self {
+        case .danglingOnly:
+            return "Prune dangling images"
+        case .allUnused:
+            return "Prune unused images"
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .danglingOnly:
+            return "Prune"
+        case .allUnused:
+            return "Prune unused"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .danglingOnly:
+            return "This removes untagged intermediate layers in the selected Dockhand environment."
+        case .allUnused:
+            return "This removes every image not used by any container in the selected Dockhand environment."
+        }
     }
 }
 
@@ -269,7 +583,7 @@ private struct ImageDetailView: View {
         .navigationTitle(liveImage.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $pullSheetPresented) {
-            PullImageSheet(appModel: appModel, store: store, suggestedName: liveImage.displayName)
+            PullImageSheet(appModel: appModel, store: store, suggestedName: liveImage.displayName, scope: .image(liveImage.id))
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $tagSheetPresented) {
@@ -289,7 +603,7 @@ private struct ImageDetailView: View {
         ), titleVisibility: .visible) {
             if let target = deleteTagConfirmation {
                 Button("Delete tag", role: .destructive) {
-                    Task { await store.deleteImageTag(target.reference, appModel: appModel) }
+                    Task { await store.deleteImageTag(target.reference, imageID: liveImage.id, appModel: appModel) }
                     deleteTagConfirmation = nil
                 }
             }
@@ -308,7 +622,7 @@ private struct ImageDetailView: View {
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .glassEffect(.regular.tint(.red.opacity(0.08)), in: .rect(cornerRadius: 18))
-        } else if let actionMessage = store.actionMessage {
+        } else if let actionMessage = store.actionMessage(for: liveImage.id) {
             Text(actionMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -546,6 +860,7 @@ private struct PullImageSheet: View {
     let appModel: AppModel
     let store: ImagesStore
     var suggestedName: String = ""
+    var scope: ImageActionScope = .list
 
     @Environment(\.dismiss) private var dismiss
     @State private var imageName = ""
@@ -566,7 +881,7 @@ private struct PullImageSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Pull") {
                         Task {
-                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, appModel: appModel)
+                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, scope: scope, appModel: appModel)
                             dismiss()
                         }
                     }

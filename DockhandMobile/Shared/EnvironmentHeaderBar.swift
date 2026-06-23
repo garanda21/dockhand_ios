@@ -39,7 +39,9 @@ struct EnvironmentHeaderBar: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                 }
+                .id(menuIdentity)
                 .buttonStyle(.glassProminent)
+                .disabled(appModel.environments.isEmpty)
 
                 Spacer(minLength: 0)
 
@@ -80,5 +82,10 @@ struct EnvironmentHeaderBar: View {
 
     private var lastHealthStatus: String? {
         appModel.lastHealthStatus?.uppercased()
+    }
+
+    private var menuIdentity: String {
+        let environmentIDs = appModel.environments.map(\.id).map(String.init).joined(separator: ",")
+        return "\(appModel.selectedProfileID ?? "none")|\(environmentIDs)"
     }
 }

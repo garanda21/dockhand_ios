@@ -65,6 +65,7 @@ enum StackEditorSyntaxKind {
 @MainActor
 struct SyntaxHighlightingTextEditor: UIViewRepresentable {
     @Binding var text: String
+    @Binding var isFocused: Bool
     let kind: StackEditorSyntaxKind
 
     func makeCoordinator() -> Coordinator {
@@ -86,6 +87,7 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
         view.textContainerInset = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
         view.textContainer.lineFragmentPadding = 0
         view.tintColor = UIColor(Color.accentColor)
+        view.inputAccessoryView = context.coordinator.makeAccessoryToolbar()
         context.coordinator.applyHighlight(to: view)
         return view
     }
@@ -93,20 +95,68 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.applyHighlight(to: uiView)
+        if isFocused, !uiView.isFirstResponder {
+            uiView.becomeFirstResponder()
+        } else if !isFocused, uiView.isFirstResponder {
+            uiView.resignFirstResponder()
+        }
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: SyntaxHighlightingTextEditor
         private var isApplyingHighlight = false
+        private weak var textView: UITextView?
 
         init(parent: SyntaxHighlightingTextEditor) {
             self.parent = parent
         }
 
+        func makeAccessoryToolbar() -> UIToolbar {
+            let toolbar = UIToolbar()
+            toolbar.sizeToFit()
+            let flexible = UIBarButtonItem(systemItem: .flexibleSpace)
+            let done = UIBarButtonItem(title: "Done", style: .prominent, target: self, action: #selector(doneTapped))
+            toolbar.items = [flexible, done]
+            return toolbar
+        }
+
         func textViewDidChange(_ textView: UITextView) {
             guard !isApplyingHighlight else { return }
-            parent.text = textView.text
+            syncText(textView.text)
             applyHighlight(to: textView)
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            self.textView = textView
+            syncFocus(true)
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            syncFocus(false)
+        }
+
+        @objc
+        private func doneTapped() {
+            textView?.resignFirstResponder()
+            syncFocus(false)
+        }
+
+        private func syncText(_ text: String) {
+            guard parent.text != text else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.parent.text != text else { return }
+                self.parent.text = text
+            }
+        }
+
+        private func syncFocus(_ isFocused: Bool) {
+            guard parent.isFocused != isFocused else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.parent.isFocused != isFocused else { return }
+                self.parent.isFocused = isFocused
+            }
         }
 
         func applyHighlight(to textView: UITextView) {

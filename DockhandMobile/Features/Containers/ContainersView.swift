@@ -61,6 +61,33 @@ final class ContainersStore {
 struct ContainersView: View {
     let appModel: AppModel
     @State private var store = ContainersStore()
+    @State private var sort = ContainerListSort.name
+    @State private var stateFilter = DockhandStateFilter.all
+
+    private var filteredContainers: [Components.Schemas.Container] {
+        let filtered = store.containers.filter { stateFilter.matches($0.state) }
+        switch sort {
+        case .name:
+            return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .state:
+            return filtered.sorted {
+                if $0.stateRank == $1.stateRank {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                return $0.stateRank < $1.stateRank
+            }
+        }
+    }
+
+    private var availableStates: [String] {
+        Array(Set(store.containers.map(\.state.normalizedDockhandState)))
+            .sorted {
+                let lhsRank = $0.dockhandStateRank
+                let rhsRank = $1.dockhandStateRank
+                if lhsRank == rhsRank { return $0 < $1 }
+                return lhsRank < rhsRank
+            }
+    }
 
     var body: some View {
         List {
@@ -78,17 +105,55 @@ struct ContainersView: View {
             }
 
             Section("Containers") {
-                ForEach(store.containers, id: \.id) { container in
-                    NavigationLink {
-                        ContainerDetailView(container: container, appModel: appModel, store: store)
-                    } label: {
-                        ContainerRow(container: container)
+                if filteredContainers.isEmpty {
+                    Text(stateFilter == .all ? "No containers" : "No containers in \(stateFilter.title)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredContainers, id: \.id) { container in
+                        NavigationLink {
+                            ContainerDetailView(container: container, appModel: appModel, store: store)
+                        } label: {
+                            ContainerRow(container: container)
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Containers")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Section("Sort") {
+                        ForEach(ContainerListSort.allCases) { option in
+                            Button {
+                                sort = option
+                            } label: {
+                                selectionLabel(option.title, isSelected: sort == option)
+                            }
+                        }
+                    }
+
+                    Section("Filter") {
+                        Button {
+                            stateFilter = .all
+                        } label: {
+                            selectionLabel("All states", isSelected: stateFilter == .all)
+                        }
+
+                        ForEach(availableStates, id: \.self) { state in
+                            Button {
+                                stateFilter = DockhandStateFilter.state(state)
+                            } label: {
+                                selectionLabel(state.capitalized, isSelected: stateFilter == DockhandStateFilter.state(state))
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
         .overlay {
             if store.isLoading && store.containers.isEmpty {
                 ProgressView()
@@ -99,6 +164,31 @@ struct ContainersView: View {
         }
         .refreshable {
             await store.load(appModel: appModel)
+        }
+    }
+
+    @ViewBuilder
+    private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer(minLength: 12)
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+        }
+    }
+}
+
+private enum ContainerListSort: String, CaseIterable, Identifiable {
+    case name
+    case state
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .name: return "Name"
+        case .state: return "State"
         }
     }
 }
@@ -138,6 +228,7 @@ private struct ContainerDetailView: View {
     let container: Components.Schemas.Container
     let appModel: AppModel
     let store: ContainersStore
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ScrollView {
@@ -211,12 +302,14 @@ private struct ContainerDetailView: View {
     }
 
     private func actionButton(_ action: ContainerAction, _ icon: String, _ title: String) -> some View {
-        Button {
+        let isEnabled = container.canPerform(action) && store.activeActionID == nil
+
+        return Button {
             Task {
                 await store.run(action, container: container, appModel: appModel)
             }
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 if store.isRunning(action, containerID: container.id) {
                     ProgressView()
                         .controlSize(.small)
@@ -228,14 +321,15 @@ private struct ContainerDetailView: View {
                 }
 
                 Text(title)
-                    .font(.footnote.weight(.medium))
+                    .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 64)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
         }
         .buttonStyle(.glass)
-        .disabled(store.activeActionID != nil)
+        .disabled(!isEnabled)
     }
 
     private func detailsBlock(_ title: String, _ value: String) -> some View {

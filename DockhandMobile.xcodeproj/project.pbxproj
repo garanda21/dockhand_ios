@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		058D6BC2FCEEC7E05E612A86 /* ContainersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */; };
 		08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A429AD5D837F77D7096E4664 /* DashboardView.swift */; };
+		14C8A8018B0DF5A1005D11A1 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = 14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */; };
 		19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */; };
 		1C165AF5EAFAC8DFF5889FFE /* DockhandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956D5C8E99FCD80742BF586C /* DockhandRootView.swift */; };
 		40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F56858EF25CC073EFD0846 /* Formatting.swift */; };
@@ -41,21 +42,22 @@
 		0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileApp.swift; sourceTree = "<group>"; };
 		08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
-		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
 		65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainersView.swift; sourceTree = "<group>"; };
 		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
 		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
-		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DockhandAPI; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
+		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
 		D4F56858EF25CC073EFD0846 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
-		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E88C67A91A207F8EBE7A121C /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -70,6 +72,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		14C8A8028B0DF5A1005D11A1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				14C8A8018B0DF5A1005D11A1 /* dockhand_glass.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		44165C81445DAED68DC41951 /* DockhandMobile */ = {
@@ -86,6 +99,7 @@
 		554C3B6E0D257A607369986D = {
 			isa = PBXGroup;
 			children = (
+				14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */,
 				44165C81445DAED68DC41951 /* DockhandMobile */,
 				6533012C87BA3BC0BD79B8DA /* DockhandMobileTests */,
 				5C23E7D49A194963016D28C4 /* Packages */,
@@ -228,6 +242,7 @@
 			buildPhases = (
 				01189824FD0FB4D9A1034C7F /* Sources */,
 				09E6128853DF17CFD0AE6BA1 /* Frameworks */,
+				14C8A8028B0DF5A1005D11A1 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -249,9 +264,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
+				LastUpgradeCheck = 2650;
 			};
 			buildConfigurationList = 67E736548DC41300D0662263 /* Build configuration list for PBXProject "DockhandMobile" */;
 			developmentRegion = en;
@@ -392,6 +405,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -405,6 +419,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -414,13 +429,16 @@
 		5A9C7269A20A7AEE685DE52C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = dockhand_glass;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -435,13 +453,16 @@
 		6C5EB5FFFCACE31C49386CE4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = dockhand_glass;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -490,6 +511,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -510,6 +532,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;

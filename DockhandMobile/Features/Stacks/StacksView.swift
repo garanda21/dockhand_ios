@@ -9,6 +9,7 @@ final class StacksStore {
     var isLoading = false
     var error: String?
     var actionMessage: String?
+    var actionMessageOwner: String?
     var activeStackActionID: String?
     var activeContainerActionID: String?
 
@@ -44,13 +45,37 @@ final class StacksStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.stackAction(action, stackName: stack.name, environmentID: environmentID)
             actionMessage = "\(stack.name) \(action.rawValue) requested"
+            actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    func run(_ action: ContainerAction, container: Components.Schemas.StackContainerDetail, appModel: AppModel) async {
+    func redeploy(stack: Components.Schemas.StackSummary, appModel: AppModel, options: StackDeployOptions) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return }
+
+        activeStackActionID = stackActionID(for: .redeploy, stackName: stack.name)
+        error = nil
+        defer { activeStackActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.redeployStack(
+                stackName: stack.name,
+                environmentID: environmentID,
+                options: options
+            )
+            actionMessage = "\(stack.name) redeployed"
+            actionMessageOwner = stack.name
+            await load(appModel: appModel)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func run(_ action: ContainerAction, container: Components.Schemas.StackContainerDetail, stackName: String, appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
@@ -62,10 +87,16 @@ final class StacksStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
             actionMessage = "\(container.name) \(action.rawValue)d"
+            actionMessageOwner = stackName
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    func actionMessage(for stackName: String) -> String? {
+        guard actionMessageOwner == stackName else { return nil }
+        return actionMessage
     }
 
     func stack(named name: String) -> Components.Schemas.StackSummary? {
@@ -96,6 +127,33 @@ final class StacksStore {
 struct StacksView: View {
     let appModel: AppModel
     @State private var store = StacksStore()
+    @State private var sort = StackListSort.name
+    @State private var stateFilter = DockhandStateFilter.all
+
+    private var filteredStacks: [Components.Schemas.StackSummary] {
+        let filtered = store.stacks.filter { stateFilter.matches($0.status) }
+        switch sort {
+        case .name:
+            return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .state:
+            return filtered.sorted {
+                if $0.statusRank == $1.statusRank {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                return $0.statusRank < $1.statusRank
+            }
+        }
+    }
+
+    private var availableStates: [String] {
+        Array(Set(store.stacks.map(\.status.normalizedDockhandState)))
+            .sorted {
+                let lhsRank = $0.dockhandStateRank
+                let rhsRank = $1.dockhandStateRank
+                if lhsRank == rhsRank { return $0 < $1 }
+                return lhsRank < rhsRank
+            }
+    }
 
     var body: some View {
         List {
@@ -113,17 +171,55 @@ struct StacksView: View {
             }
 
             Section("Stacks") {
-                ForEach(store.stacks, id: \.name) { stack in
-                    NavigationLink {
-                        StackEditorView(appModel: appModel, stack: stack, store: store)
-                    } label: {
-                        StackRow(stack: stack)
+                if filteredStacks.isEmpty {
+                    Text(stateFilter == .all ? "No stacks" : "No stacks in \(stateFilter.title)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(filteredStacks, id: \.name) { stack in
+                        NavigationLink {
+                            StackEditorView(appModel: appModel, stack: stack, store: store)
+                        } label: {
+                            StackRow(stack: stack)
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Stacks")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Section("Sort") {
+                        ForEach(StackListSort.allCases) { option in
+                            Button {
+                                sort = option
+                            } label: {
+                                selectionLabel(option.title, isSelected: sort == option)
+                            }
+                        }
+                    }
+
+                    Section("Filter") {
+                        Button {
+                            stateFilter = .all
+                        } label: {
+                            selectionLabel("All states", isSelected: stateFilter == .all)
+                        }
+
+                        ForEach(availableStates, id: \.self) { state in
+                            Button {
+                                stateFilter = DockhandStateFilter.state(state)
+                            } label: {
+                                selectionLabel(state.capitalized, isSelected: stateFilter == DockhandStateFilter.state(state))
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
         .overlay {
             if store.isLoading && store.stacks.isEmpty {
                 ProgressView()
@@ -134,6 +230,31 @@ struct StacksView: View {
         }
         .refreshable {
             await store.load(appModel: appModel)
+        }
+    }
+
+    @ViewBuilder
+    private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer(minLength: 12)
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+        }
+    }
+}
+
+private enum StackListSort: String, CaseIterable, Identifiable {
+    case name
+    case state
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .name: return "Name"
+        case .state: return "State"
         }
     }
 }
@@ -163,6 +284,7 @@ private struct StackEditorView: View {
     let appModel: AppModel
     let stack: Components.Schemas.StackSummary
     let store: StacksStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var document = StackEditorDocument(composeContent: "", envContent: "", composePath: nil, envPath: nil, suggestedEnvPath: nil, needsFileLocation: false, noEnvFile: false, composeError: nil)
     @State private var isLoading = false
@@ -170,6 +292,9 @@ private struct StackEditorView: View {
     @State private var saveMessage: String?
     @State private var saveMessageIsError = false
     @State private var activePane: EditorPane = .compose
+    @State private var showsRedeploySheet = false
+    @State private var deployOptions = StackDeployOptions()
+    @State private var isEditorFocused = false
 
     private var liveStack: Components.Schemas.StackSummary {
         store.stack(named: stack.name) ?? stack
@@ -199,10 +324,25 @@ private struct StackEditorView: View {
             }
             .padding()
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isEditorFocused = false
+        }
         .navigationTitle(liveStack.name)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: appModel.connectionScopeID) {
             await loadDocument()
+        }
+        .sheet(isPresented: $showsRedeploySheet) {
+            StackRedeploySheet(
+                options: $deployOptions,
+                isRunning: store.isRunning(.redeploy, stackName: liveStack.name)
+            ) {
+                showsRedeploySheet = false
+                Task { await runRedeploy() }
+            }
+            .presentationDetents([.height(320)])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -212,7 +352,7 @@ private struct StackEditorView: View {
                 Text("Stack actions")
                     .font(.headline)
                 Spacer()
-                if let actionMessage = store.actionMessage {
+                if let actionMessage = store.actionMessage(for: liveStack.name) {
                     Text(actionMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -226,6 +366,9 @@ private struct StackEditorView: View {
                 stackActionButton(.start, "play.fill", "Start")
                 stackActionButton(.stop, "stop.fill", "Stop")
                 stackActionButton(.restart, "arrow.clockwise", "Restart")
+                if liveStack.supportsRedeploy {
+                    redeployButton
+                }
             }
         }
         .padding(20)
@@ -249,7 +392,7 @@ private struct StackEditorView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(liveStack.containerDetails, id: \.id) { container in
-                    StackContainerCard(container: container, appModel: appModel, store: store)
+                    StackContainerCard(container: container, stackName: liveStack.name, appModel: appModel, store: store)
                 }
             }
         }
@@ -318,7 +461,7 @@ private struct StackEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.headline)
-            SyntaxHighlightingTextEditor(text: text, kind: kind)
+            SyntaxHighlightingTextEditor(text: text, isFocused: $isEditorFocused, kind: kind)
                 .frame(minHeight: 380)
                 .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 18))
         }
@@ -394,11 +537,19 @@ private struct StackEditorView: View {
         saveMessageIsError = store.error != nil
     }
 
+    private func runRedeploy() async {
+        await store.redeploy(stack: liveStack, appModel: appModel, options: deployOptions)
+        saveMessage = store.error
+        saveMessageIsError = store.error != nil
+    }
+
     private func stackActionButton(_ action: StackAction, _ icon: String, _ title: String) -> some View {
-        Button {
+        let isEnabled = liveStack.canPerform(action) && !store.hasPendingAction
+
+        return Button {
             Task { await runStackAction(action) }
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 if store.isRunning(action, stackName: liveStack.name) {
                     ProgressView()
                         .controlSize(.small)
@@ -410,21 +561,53 @@ private struct StackEditorView: View {
                 }
 
                 Text(title)
-                    .font(.footnote.weight(.medium))
+                    .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 64)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
         }
         .buttonStyle(.glass)
-        .disabled(store.hasPendingAction)
+        .disabled(!isEnabled)
+    }
+
+    private var redeployButton: some View {
+        let isEnabled = liveStack.canPerform(.redeploy) && !store.hasPendingAction
+
+        return Button {
+            showsRedeploySheet = true
+        } label: {
+            VStack(spacing: 6) {
+                if store.isRunning(.redeploy, stackName: liveStack.name) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(height: 18)
+                } else {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(height: 18)
+                }
+
+                Text("Redeploy")
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
+        }
+        .buttonStyle(.glassProminent)
+        .disabled(!isEnabled)
     }
 }
 
 private struct StackContainerCard: View {
     let container: Components.Schemas.StackContainerDetail
+    let stackName: String
     let appModel: AppModel
     let store: StacksStore
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -491,9 +674,11 @@ private struct StackContainerCard: View {
     }
 
     private func stackContainerActionButton(_ action: ContainerAction, _ icon: String, _ title: String) -> some View {
-        Button {
+        let isEnabled = container.canPerform(action) && !store.hasPendingAction
+
+        return Button {
             Task {
-                await store.run(action, container: container, appModel: appModel)
+                await store.run(action, container: container, stackName: stackName, appModel: appModel)
             }
         } label: {
             VStack(spacing: 6) {
@@ -513,9 +698,62 @@ private struct StackContainerCard: View {
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, minHeight: 58)
+            .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
         }
         .buttonStyle(.glass)
-        .disabled(store.hasPendingAction)
+        .disabled(!isEnabled)
+    }
+}
+
+private struct StackRedeploySheet: View {
+    @Binding var options: StackDeployOptions
+    let isRunning: Bool
+    let onDeploy: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Redeploy stack")
+                        .font(.title3.weight(.semibold))
+                    Text("Choose how Dockhand should redeploy this compose stack.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(spacing: 12) {
+                    Toggle("Pull images", isOn: $options.pull)
+                    Toggle("Build images", isOn: $options.build)
+                    Toggle("Force recreate", isOn: $options.forceRecreate)
+                }
+                .toggleStyle(.switch)
+                .padding(18)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+
+                Button {
+                    dismiss()
+                    onDeploy()
+                } label: {
+                    if isRunning {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Deploy", systemImage: "paperplane.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(isRunning)
+
+                Spacer(minLength: 0)
+            }
+            .padding()
+            .navigationTitle("Redeploy")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }
 

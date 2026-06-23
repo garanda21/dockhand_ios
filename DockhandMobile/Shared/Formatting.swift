@@ -1,6 +1,71 @@
 import DockhandAPI
 import Foundation
 
+private enum DockhandRuntimeState: String {
+    case running
+    case exited
+    case stopped
+    case paused
+    case created
+    case restarting
+    case dead
+    case removing
+
+    init(rawState: String) {
+        self = DockhandRuntimeState(rawValue: rawState.lowercased()) ?? .exited
+    }
+}
+
+extension String {
+    var normalizedDockhandState: String {
+        trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var dockhandStateRank: Int {
+        switch normalizedDockhandState {
+        case "running":
+            return 0
+        case "restarting":
+            return 1
+        case "paused":
+            return 2
+        case "created":
+            return 3
+        case "exited", "stopped":
+            return 4
+        case "dead":
+            return 5
+        case "removing":
+            return 6
+        default:
+            return 7
+        }
+    }
+}
+
+enum DockhandStateFilter: Hashable {
+    case all
+    case state(String)
+
+    var title: String {
+        switch self {
+        case .all:
+            return "all states"
+        case .state(let state):
+            return state.capitalized
+        }
+    }
+
+    func matches(_ state: String) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .state(let value):
+            return state.normalizedDockhandState == value.normalizedDockhandState
+        }
+    }
+}
+
 extension Int {
     var dockhandByteCount: String {
         ByteCountFormatter.string(fromByteCount: Int64(self), countStyle: .binary)
@@ -32,6 +97,35 @@ extension Components.Schemas.Environment {
 }
 
 extension Components.Schemas.Container {
+    private var runtimeState: DockhandRuntimeState {
+        DockhandRuntimeState(rawState: state)
+    }
+
+    func canPerform(_ action: ContainerAction) -> Bool {
+        switch (action, runtimeState) {
+        case (.start, .running), (.start, .restarting):
+            return false
+        case (.start, _):
+            return true
+        case (.stop, .running), (.stop, .paused), (.stop, .restarting):
+            return true
+        case (.stop, _):
+            return false
+        case (.restart, .running), (.restart, .paused), (.restart, .restarting):
+            return true
+        case (.restart, _):
+            return false
+        case (.pause, .running):
+            return true
+        case (.pause, _):
+            return false
+        case (.unpause, .paused):
+            return true
+        case (.unpause, _):
+            return false
+        }
+    }
+
     var primaryPortLabel: String {
         let labels: [String] = ports.compactMap { (port: Components.Schemas.ContainerPort) -> String? in
                 guard let publicPort = port.publicPort else { return nil }
@@ -51,15 +145,78 @@ extension Components.Schemas.Container {
             .sorted()
             .joined(separator: " · ")
     }
+
+    var stateRank: Int {
+        state.dockhandStateRank
+    }
 }
 
 extension Components.Schemas.StackSummary {
     var servicesCount: Int {
         containerDetails.count
     }
+
+    private var normalizedStatus: String {
+        status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var statusRank: Int {
+        status.dockhandStateRank
+    }
+
+    var supportsRedeploy: Bool {
+        sourceType?.lowercased() != "git"
+    }
+
+    func canPerform(_ action: StackAction) -> Bool {
+        let hasActiveContainers = containerDetails.contains {
+            let state = DockhandRuntimeState(rawState: $0.state)
+            return state == .running || state == .paused || state == .restarting
+        }
+
+        switch action {
+        case .start:
+            return !hasActiveContainers && normalizedStatus != "running"
+        case .stop:
+            return hasActiveContainers
+        case .restart:
+            return hasActiveContainers
+        case .redeploy:
+            return supportsRedeploy
+        }
+    }
 }
 
 extension Components.Schemas.StackContainerDetail {
+    private var runtimeState: DockhandRuntimeState {
+        DockhandRuntimeState(rawState: state)
+    }
+
+    func canPerform(_ action: ContainerAction) -> Bool {
+        switch (action, runtimeState) {
+        case (.start, .running), (.start, .restarting):
+            return false
+        case (.start, _):
+            return true
+        case (.stop, .running), (.stop, .paused), (.stop, .restarting):
+            return true
+        case (.stop, _):
+            return false
+        case (.restart, .running), (.restart, .paused), (.restart, .restarting):
+            return true
+        case (.restart, _):
+            return false
+        case (.pause, .running):
+            return true
+        case (.pause, _):
+            return false
+        case (.unpause, .paused):
+            return true
+        case (.unpause, _):
+            return false
+        }
+    }
+
     var primaryPortLabel: String {
         let labels = ports.compactMap { port -> String? in
             if let display = port.display, !display.isEmpty {
@@ -116,5 +273,28 @@ extension Components.Schemas.ImageSummary {
 
     var allDigests: [String] {
         (repoDigests ?? []).sorted()
+    }
+
+    var repositoryKey: String {
+        if let reference = allTags.first {
+            return reference.dockhandRepositoryName
+        }
+        if let digest = allDigests.first,
+           let atIndex = digest.firstIndex(of: "@") {
+            return String(digest[..<atIndex])
+        }
+        return id
+    }
+}
+
+private extension String {
+    var dockhandRepositoryName: String {
+        let slashIndex = lastIndex(of: "/")
+        let colonIndex = lastIndex(of: ":")
+        if let colonIndex,
+           slashIndex.map({ colonIndex > $0 }) ?? true {
+            return String(prefix(upTo: colonIndex))
+        }
+        return self
     }
 }
