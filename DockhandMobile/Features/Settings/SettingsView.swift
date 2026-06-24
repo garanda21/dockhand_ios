@@ -358,11 +358,10 @@ private struct ServerProfileDetailView: View {
         .task(id: profileID) {
             loadDraft()
         }
-        .alert("Delete server?", isPresented: $showDeleteConfirmation) {
+        .confirmationDialog("Delete server?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 Task { await deleteProfile() }
             }
-            Button("Cancel", role: .cancel) { }
         } message: {
             Text("This removes the saved URL, token and per-server environment selection.")
         }

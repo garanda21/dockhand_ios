@@ -314,23 +314,9 @@ struct ImagesView: View {
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
-                    toolButton(
-                        title: "Prune",
-                        systemImage: "wand.and.stars.inverse",
-                        tint: .primary,
-                        isRunning: store.activeActionID == "prune"
-                    ) {
-                        pruneConfirmation = .danglingOnly
-                    }
+                    pruneButton(.danglingOnly, title: "Prune", systemImage: "wand.and.stars.inverse", tint: .primary, isRunning: store.activeActionID == "prune")
 
-                    toolButton(
-                        title: "Prune unused",
-                        systemImage: "wand.and.stars",
-                        tint: .orange,
-                        isRunning: store.activeActionID == "prune-unused"
-                    ) {
-                        pruneConfirmation = .allUnused
-                    }
+                    pruneButton(.allUnused, title: "Prune unused", systemImage: "wand.and.stars", tint: .orange, isRunning: store.activeActionID == "prune-unused")
 
                     toolButton(
                         title: "Pull",
@@ -344,23 +330,9 @@ struct ImagesView: View {
 
                 VStack(spacing: 10) {
                     HStack(spacing: 10) {
-                        toolButton(
-                            title: "Prune",
-                            systemImage: "wand.and.stars.inverse",
-                            tint: .primary,
-                            isRunning: store.activeActionID == "prune"
-                        ) {
-                            pruneConfirmation = .danglingOnly
-                        }
+                        pruneButton(.danglingOnly, title: "Prune", systemImage: "wand.and.stars.inverse", tint: .primary, isRunning: store.activeActionID == "prune")
 
-                        toolButton(
-                            title: "Prune unused",
-                            systemImage: "wand.and.stars",
-                            tint: .orange,
-                            isRunning: store.activeActionID == "prune-unused"
-                        ) {
-                            pruneConfirmation = .allUnused
-                        }
+                        pruneButton(.allUnused, title: "Prune unused", systemImage: "wand.and.stars", tint: .orange, isRunning: store.activeActionID == "prune-unused")
                     }
 
                     toolButton(
@@ -414,6 +386,23 @@ struct ImagesView: View {
         .buttonStyle(isProminent ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.bordered))
         .tint(tint)
         .disabled(isRunning)
+    }
+
+    private func pruneButton(
+        _ mode: ImagePruneMode,
+        title: String,
+        systemImage: String,
+        tint: Color,
+        isRunning: Bool
+    ) -> some View {
+        toolButton(
+            title: title,
+            systemImage: systemImage,
+            tint: tint,
+            isRunning: isRunning
+        ) {
+            pruneConfirmation = mode
+        }
     }
 }
 

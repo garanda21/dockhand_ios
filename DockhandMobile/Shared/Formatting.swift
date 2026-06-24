@@ -181,6 +181,10 @@ extension Components.Schemas.StackSummary {
             return hasActiveContainers
         case .restart:
             return hasActiveContainers
+        case .down:
+            return normalizedStatus == "running"
+                || normalizedStatus == "stopped"
+                || normalizedStatus == "exited"
         case .redeploy:
             return supportsRedeploy
         }
