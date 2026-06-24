@@ -44,7 +44,7 @@ final class StacksStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.stackAction(action, stackName: stack.name, environmentID: environmentID)
-            actionMessage = "\(stack.name) \(action.rawValue) requested"
+            actionMessage = actionMessage(for: action, stackName: stack.name)
             actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
@@ -72,6 +72,42 @@ final class StacksStore {
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    func deleteStack(
+        _ stack: Components.Schemas.StackSummary,
+        appModel: AppModel,
+        deleteVolumes: Bool
+    ) async -> Bool {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else { return false }
+
+        activeStackActionID = stackActionID(for: .down, stackName: stack.name) + ":delete"
+        error = nil
+        defer { activeStackActionID = nil }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            try await service.deleteStack(
+                stackName: stack.name,
+                environmentID: environmentID,
+                deleteVolumes: deleteVolumes
+            )
+
+            if await confirmStackDeletion(
+                named: stack.name,
+                appModel: appModel,
+                deleteVolumes: deleteVolumes
+            ) {
+                return true
+            }
+
+            self.error = "Dockhand reported success, but the stack is still present."
+            return false
+        } catch {
+            self.error = error.localizedDescription
+            return false
         }
     }
 
@@ -115,12 +151,52 @@ final class StacksStore {
         activeStackActionID != nil || activeContainerActionID != nil
     }
 
+    func isDeletingStack(_ stackName: String) -> Bool {
+        activeStackActionID == stackActionID(for: .down, stackName: stackName) + ":delete"
+    }
+
     private func stackActionID(for action: StackAction, stackName: String) -> String {
         "\(stackName):\(action.rawValue)"
     }
 
     private func containerActionID(for action: ContainerAction, containerID: String) -> String {
         "\(containerID):\(action.rawValue)"
+    }
+
+    private func actionMessage(for action: StackAction, stackName: String) -> String {
+        switch action {
+        case .start:
+            return "\(stackName) started"
+        case .stop:
+            return "\(stackName) stopped"
+        case .restart:
+            return "\(stackName) restarted"
+        case .down:
+            return "\(stackName) brought down"
+        case .redeploy:
+            return "\(stackName) redeployed"
+        }
+    }
+
+    private func confirmStackDeletion(
+        named stackName: String,
+        appModel: AppModel,
+        deleteVolumes: Bool
+    ) async -> Bool {
+        for attempt in 0..<6 {
+            await load(appModel: appModel)
+            if self.stack(named: stackName) == nil {
+                actionMessage = deleteVolumes ? "\(stackName) removed with volumes" : "\(stackName) removed"
+                actionMessageOwner = stackName
+                return true
+            }
+
+            if attempt < 5 {
+                try? await Task.sleep(for: .milliseconds(450))
+            }
+        }
+
+        return false
     }
 }
 
@@ -284,6 +360,7 @@ private struct StackEditorView: View {
     let appModel: AppModel
     let stack: Components.Schemas.StackSummary
     let store: StacksStore
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var document = StackEditorDocument(composeContent: "", envContent: "", composePath: nil, envPath: nil, suggestedEnvPath: nil, needsFileLocation: false, noEnvFile: false, composeError: nil)
@@ -293,6 +370,8 @@ private struct StackEditorView: View {
     @State private var saveMessageIsError = false
     @State private var activePane: EditorPane = .compose
     @State private var showsRedeploySheet = false
+    @State private var showsDownConfirmation = false
+    @State private var showsDeleteConfirmation = false
     @State private var deployOptions = StackDeployOptions()
     @State private var isEditorFocused = false
 
@@ -341,8 +420,25 @@ private struct StackEditorView: View {
                 showsRedeploySheet = false
                 Task { await runRedeploy() }
             }
-            .presentationDetents([.height(320)])
+            .presentationDetents([.height(380)])
             .presentationDragIndicator(.visible)
+        }
+        .confirmationDialog("Bring stack down", isPresented: $showsDownConfirmation, titleVisibility: .visible) {
+            Button("Down stack", role: .destructive) {
+                Task { await runStackAction(.down) }
+            }
+        } message: {
+            Text("This stops and removes the containers created by this stack in the selected environment.")
+        }
+        .confirmationDialog("Delete stack", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete stack", role: .destructive) {
+                Task { await deleteStack(deleteVolumes: false) }
+            }
+            Button("Delete stack and volumes", role: .destructive) {
+                Task { await deleteStack(deleteVolumes: true) }
+            }
+        } message: {
+            Text("This removes the stack from the selected Dockhand environment. Deleting volumes also removes attached persistent data.")
         }
     }
 
@@ -366,9 +462,11 @@ private struct StackEditorView: View {
                 stackActionButton(.start, "play.fill", "Start")
                 stackActionButton(.stop, "stop.fill", "Stop")
                 stackActionButton(.restart, "arrow.clockwise", "Restart")
+                stackActionButton(.down, "arrow.down.to.line.compact", "Down")
                 if liveStack.supportsRedeploy {
                     redeployButton
                 }
+                deleteButton
             }
         }
         .padding(20)
@@ -543,11 +641,24 @@ private struct StackEditorView: View {
         saveMessageIsError = store.error != nil
     }
 
+    private func deleteStack(deleteVolumes: Bool) async {
+        let didDelete = await store.deleteStack(liveStack, appModel: appModel, deleteVolumes: deleteVolumes)
+        saveMessage = store.error
+        saveMessageIsError = store.error != nil
+        if didDelete {
+            dismiss()
+        }
+    }
+
     private func stackActionButton(_ action: StackAction, _ icon: String, _ title: String) -> some View {
         let isEnabled = liveStack.canPerform(action) && !store.hasPendingAction
 
         return Button {
-            Task { await runStackAction(action) }
+            if action == .down {
+                showsDownConfirmation = true
+            } else {
+                Task { await runStackAction(action) }
+            }
         } label: {
             VStack(spacing: 6) {
                 if store.isRunning(action, stackName: liveStack.name) {
@@ -598,6 +709,36 @@ private struct StackEditorView: View {
             .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
         }
         .buttonStyle(.glassProminent)
+        .disabled(!isEnabled)
+    }
+
+    private var deleteButton: some View {
+        let isEnabled = !store.hasPendingAction
+
+        return Button {
+            showsDeleteConfirmation = true
+        } label: {
+            VStack(spacing: 6) {
+                if store.isDeletingStack(liveStack.name) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(height: 18)
+                } else {
+                    Image(systemName: "trash")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(height: 18)
+                }
+
+                Text("Delete")
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .opacity(isEnabled ? 1 : (colorScheme == .dark ? 0.82 : 0.97))
+        }
+        .buttonStyle(.glass)
+        .tint(.red)
         .disabled(!isEnabled)
     }
 }

@@ -643,6 +643,33 @@ struct DockhandService {
         throw DockhandServiceError.invalidResponse
     }
 
+    func deleteStack(
+        stackName: String,
+        environmentID: Int,
+        deleteVolumes: Bool
+    ) async throws {
+        let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
+        var queryItems = [URLQueryItem(name: "force", value: "true")]
+        if deleteVolumes {
+            queryItems.append(URLQueryItem(name: "volumes", value: "true"))
+        }
+
+        let response = try await performJSONRequest(
+            path: "/api/stacks/\(encodedName)",
+            method: "DELETE",
+            environmentID: environmentID,
+            additionalQueryItems: queryItems
+        )
+
+        if response["success"] as? Bool == true || response["status"] as? String == "complete" {
+            return
+        }
+        if let error = response["error"] as? String, !error.isEmpty {
+            throw DockhandServiceError.message(error)
+        }
+        throw DockhandServiceError.invalidResponse
+    }
+
     private func validateAction(_ output: some Sendable) throws {
         if let output = output as? Operations.StartContainer.Output {
             switch output {
@@ -951,13 +978,14 @@ enum StackAction: String, CaseIterable, Identifiable {
     case start
     case stop
     case restart
+    case down
     case redeploy
 
     var id: String { rawValue }
 
     var endpoint: String {
         switch self {
-        case .start, .stop, .restart:
+        case .start, .stop, .restart, .down:
             return rawValue
         case .redeploy:
             return "deploy"
