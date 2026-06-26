@@ -267,7 +267,7 @@ private struct ContainerDetailView: View {
                 }
 
                 actionBar
-                logsLink
+                quickLinks
 
                 detailsBlock("Networks", liveContainer.networkSummary.isEmpty ? "No networks" : liveContainer.networkSummary)
                 detailsBlock("Command", liveContainer.command ?? "No command")
@@ -317,21 +317,38 @@ private struct ContainerDetailView: View {
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
     }
 
-    private var logsLink: some View {
-        NavigationLink {
-            ContainerLogsView(
-                target: .init(id: liveContainer.id, name: liveContainer.name),
-                scope: scope,
-                appModel: appModel
-            )
-        } label: {
-            Label("View Logs", systemImage: "text.alignleft")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-                .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    private var quickLinks: some View {
+        VStack(spacing: 10) {
+            NavigationLink {
+                ContainerShellView(
+                    target: .init(id: liveContainer.id, name: liveContainer.name),
+                    scope: scope,
+                    appModel: appModel
+                )
+            } label: {
+                Label("Open Shell", systemImage: "terminal")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+                    .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+            }
+            .buttonStyle(.plain)
+            .disabled(!isCurrentScope || !liveContainer.canOpenShell)
+
+            NavigationLink {
+                ContainerLogsView(
+                    target: .init(id: liveContainer.id, name: liveContainer.name),
+                    scope: scope,
+                    appModel: appModel
+                )
+            } label: {
+                Label("View Logs", systemImage: "text.alignleft")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+                    .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+            }
+            .buttonStyle(.plain)
+            .disabled(!isCurrentScope)
         }
-        .buttonStyle(.plain)
-        .disabled(!isCurrentScope)
     }
 
     private func actionButton(_ action: ContainerAction, _ icon: String, _ title: String) -> some View {

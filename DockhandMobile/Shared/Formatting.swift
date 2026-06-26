@@ -126,6 +126,10 @@ extension Components.Schemas.Container {
         }
     }
 
+    var canOpenShell: Bool {
+        state.normalizedDockhandState == "running"
+    }
+
     var primaryPortLabel: String {
         let labels: [String] = ports.compactMap { (port: Components.Schemas.ContainerPort) -> String? in
                 guard let publicPort = port.publicPort else { return nil }
@@ -219,6 +223,10 @@ extension Components.Schemas.StackContainerDetail {
         case (.unpause, _):
             return false
         }
+    }
+
+    var canOpenShell: Bool {
+        state.normalizedDockhandState == "running"
     }
 
     var primaryPortLabel: String {

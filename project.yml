@@ -9,6 +9,9 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: 6.2.2
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm.git
+    exactVersion: 1.10.1
 targets:
   DockhandMobile:
     type: application
@@ -20,6 +23,7 @@ targets:
     dependencies:
       - package: DockhandAPI
       - package: Yams
+      - package: SwiftTerm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pro.dockhand.mobile

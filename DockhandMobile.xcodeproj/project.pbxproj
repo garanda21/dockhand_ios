@@ -19,6 +19,7 @@
 		77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */; };
 		7B369144D2CEB78771441943 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3266A680155F8775A56868 /* AppModel.swift */; };
 		A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */; };
+		A8F9039D7C41A72D87FFE6C8 /* SwiftTermContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0434B449F5D96778B679B176 /* SwiftTermContainerView.swift */; };
 		AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1F5D851E40D36A5154376B /* PreferencesStore.swift */; };
 		B388C775A10358DC31C430CD /* StacksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FC6A2CB1B06506690B8E1E /* StacksView.swift */; };
 		B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E28C30131DD132BCF62665 /* SettingsView.swift */; };
@@ -26,6 +27,10 @@
 		CD1A5221D5DBD371587F7027 /* DockhandAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 51B7CD00CA402C86142567D7 /* DockhandAPI */; };
 		D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */; };
 		D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */; };
+		D701C4AC0D3E16F8C32BFEC4 /* ContainerShellStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */; };
+		D81EF90DB2E1C18AA9B1D46C /* ContainerShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */; };
+		DC17580525152C8C828E703B /* ContainerShellModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A92E116DFB84B69D12240A /* ContainerShellModels.swift */; };
+		E250B753CFA89B5B4699A38B /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 6C73308032173B848E282173 /* SwiftTerm */; };
 		E882AE90D8FD0104F7520724 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 125F5F1A04A3D953027B8DB4 /* Yams */; };
 		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
 		FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */; };
@@ -43,9 +48,11 @@
 
 /* Begin PBXFileReference section */
 		0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileApp.swift; sourceTree = "<group>"; };
+		0434B449F5D96778B679B176 /* SwiftTermContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftTermContainerView.swift; sourceTree = "<group>"; };
 		08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		24A92E116DFB84B69D12240A /* ContainerShellModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellModels.swift; sourceTree = "<group>"; };
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
@@ -65,6 +72,8 @@
 		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
 		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E88C67A91A207F8EBE7A121C /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
+		EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellView.swift; sourceTree = "<group>"; };
+		FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,12 +83,24 @@
 			files = (
 				CD1A5221D5DBD371587F7027 /* DockhandAPI in Frameworks */,
 				E882AE90D8FD0104F7520724 /* Yams in Frameworks */,
+				E250B753CFA89B5B4699A38B /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4235237EFC10FBEF71895994 /* Shell */ = {
+			isa = PBXGroup;
+			children = (
+				24A92E116DFB84B69D12240A /* ContainerShellModels.swift */,
+				FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */,
+				EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */,
+				0434B449F5D96778B679B176 /* SwiftTermContainerView.swift */,
+			);
+			path = Shell;
+			sourceTree = "<group>";
+		};
 		44165C81445DAED68DC41951 /* DockhandMobile */ = {
 			isa = PBXGroup;
 			children = (
@@ -180,6 +201,7 @@
 				658C94BF66735EF772455033 /* ContainerLogsView.swift */,
 				87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */,
 				D4F56858EF25CC073EFD0846 /* Formatting.swift */,
+				4235237EFC10FBEF71895994 /* Shell */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -250,6 +272,7 @@
 			packageProductDependencies = (
 				51B7CD00CA402C86142567D7 /* DockhandAPI */,
 				125F5F1A04A3D953027B8DB4 /* Yams */,
+				6C73308032173B848E282173 /* SwiftTerm */,
 			);
 			productName = DockhandMobile;
 			productReference = 56B712631CB23E96021C59F0 /* DockhandMobile.app */;
@@ -274,6 +297,7 @@
 			mainGroup = 554C3B6E0D257A607369986D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				2B582CBAE8CCED4EE5A7F6DD /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				16B77C0C226DD692AC2E3C89 /* XCRemoteSwiftPackageReference "Yams" */,
 				6B0FF1B7EE30A54856C10D0D /* XCLocalSwiftPackageReference "DockhandAPI" */,
 			);
@@ -306,6 +330,9 @@
 			files = (
 				7B369144D2CEB78771441943 /* AppModel.swift in Sources */,
 				C98C9BD249BE376D06B0D029 /* ContainerLogsView.swift in Sources */,
+				DC17580525152C8C828E703B /* ContainerShellModels.swift in Sources */,
+				D701C4AC0D3E16F8C32BFEC4 /* ContainerShellStore.swift in Sources */,
+				D81EF90DB2E1C18AA9B1D46C /* ContainerShellView.swift in Sources */,
 				058D6BC2FCEEC7E05E612A86 /* ContainersView.swift in Sources */,
 				08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */,
 				19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */,
@@ -322,6 +349,7 @@
 				64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */,
 				17795D5F56F0735052BAF912 /* StacksStore.swift in Sources */,
 				B388C775A10358DC31C430CD /* StacksView.swift in Sources */,
+				A8F9039D7C41A72D87FFE6C8 /* SwiftTermContainerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -595,6 +623,14 @@
 				minimumVersion = 6.2.2;
 			};
 		};
+		2B582CBAE8CCED4EE5A7F6DD /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.10.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -606,6 +642,11 @@
 		51B7CD00CA402C86142567D7 /* DockhandAPI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DockhandAPI;
+		};
+		6C73308032173B848E282173 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2B582CBAE8CCED4EE5A7F6DD /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

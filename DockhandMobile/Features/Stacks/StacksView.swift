@@ -636,19 +636,35 @@ private struct StackContainerCard: View {
                 stackContainerActionButton(.unpause, "playpause.fill", "Resume")
             }
 
-            NavigationLink {
-                ContainerLogsView(
-                    target: .init(id: container.id, name: container.name),
-                    scope: scope,
-                    appModel: appModel
-                )
-            } label: {
-                Label("Logs", systemImage: "text.alignleft")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
+            HStack(spacing: 10) {
+                NavigationLink {
+                    ContainerShellView(
+                        target: .init(id: container.id, name: container.name),
+                        scope: scope,
+                        appModel: appModel
+                    )
+                } label: {
+                    Label("Shell", systemImage: "terminal")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.glass)
+                .disabled(!isCurrentScope || !container.canOpenShell)
+
+                NavigationLink {
+                    ContainerLogsView(
+                        target: .init(id: container.id, name: container.name),
+                        scope: scope,
+                        appModel: appModel
+                    )
+                } label: {
+                    Label("Logs", systemImage: "text.alignleft")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.glass)
+                .disabled(!isCurrentScope)
             }
-            .buttonStyle(.glass)
-            .disabled(!isCurrentScope)
         }
         .padding(16)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))

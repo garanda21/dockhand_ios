@@ -301,6 +301,70 @@ struct DockhandService {
         return ContainerLogsDocument(logs: decoded.logs)
     }
 
+    func fetchContainerShells(
+        containerID: String,
+        environmentID: Int
+    ) async throws -> ContainerShellDetectionResult {
+        let encodedID = containerID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerID
+        let path = "/api/containers/\(encodedID)/shells"
+
+        guard var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DockhandServiceError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw DockhandServiceError.unexpectedStatus(httpResponse.statusCode)
+        }
+
+        let decoded = try JSONDecoder().decode(ContainerShellDetectionResponse.self, from: data)
+        return decoded.result
+    }
+
+    func makeContainerShellRequest(
+        containerID: String,
+        environmentID: Int,
+        shell: String,
+        user: String
+    ) throws -> URLRequest {
+        let encodedID = containerID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? containerID
+        let path = "/api/containers/\(encodedID)/exec"
+        guard var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "shell", value: shell),
+            URLQueryItem(name: "user", value: user),
+            URLQueryItem(name: "envId", value: "\(environmentID)")
+        ]
+
+        guard let url = try components.url?.dockhandWebSocketURL() else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return request
+    }
+
     func streamContainerLogs(
         containerID: String,
         environmentID: Int,
@@ -767,6 +831,30 @@ struct DockhandService {
 
 private struct ContainerLogsResponse: Decodable {
     let logs: String
+}
+
+private struct ContainerShellDetectionResponse: Decodable {
+    struct ShellInfo: Decodable {
+        var path: String
+        var label: String
+        var available: Bool
+    }
+
+    var shells: [String]
+    var defaultShell: String?
+    var allShells: [ShellInfo]
+    var error: String?
+
+    var result: ContainerShellDetectionResult {
+        ContainerShellDetectionResult(
+            shells: shells,
+            defaultShell: defaultShell,
+            allShells: allShells.map {
+                ContainerShellInfo(path: $0.path, label: $0.label, available: $0.available)
+            },
+            error: error
+        )
+    }
 }
 
 private struct StreamedLogPayload: Decodable {
