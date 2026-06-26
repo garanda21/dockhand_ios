@@ -1,204 +1,5 @@
 import DockhandAPI
-import Observation
 import SwiftUI
-
-@MainActor
-@Observable
-final class StacksStore {
-    var stacks: [Components.Schemas.StackSummary] = []
-    var isLoading = false
-    var error: String?
-    var actionMessage: String?
-    var actionMessageOwner: String?
-    var activeStackActionID: String?
-    var activeContainerActionID: String?
-
-    func load(appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else {
-            stacks = []
-            return
-        }
-
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            stacks = try await service.fetchStacks(environmentID: environmentID)
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func run(_ action: StackAction, stack: Components.Schemas.StackSummary, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeStackActionID = stackActionID(for: action, stackName: stack.name)
-        error = nil
-        defer { activeStackActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.stackAction(action, stackName: stack.name, environmentID: environmentID)
-            actionMessage = actionMessage(for: action, stackName: stack.name)
-            actionMessageOwner = stack.name
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func redeploy(stack: Components.Schemas.StackSummary, appModel: AppModel, options: StackDeployOptions) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeStackActionID = stackActionID(for: .redeploy, stackName: stack.name)
-        error = nil
-        defer { activeStackActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.redeployStack(
-                stackName: stack.name,
-                environmentID: environmentID,
-                options: options
-            )
-            actionMessage = "\(stack.name) redeployed"
-            actionMessageOwner = stack.name
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func deleteStack(
-        _ stack: Components.Schemas.StackSummary,
-        appModel: AppModel,
-        deleteVolumes: Bool
-    ) async -> Bool {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return false }
-
-        activeStackActionID = stackActionID(for: .down, stackName: stack.name) + ":delete"
-        error = nil
-        defer { activeStackActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.deleteStack(
-                stackName: stack.name,
-                environmentID: environmentID,
-                deleteVolumes: deleteVolumes
-            )
-
-            if await confirmStackDeletion(
-                named: stack.name,
-                appModel: appModel,
-                deleteVolumes: deleteVolumes
-            ) {
-                return true
-            }
-
-            self.error = "Dockhand reported success, but the stack is still present."
-            return false
-        } catch {
-            self.error = error.localizedDescription
-            return false
-        }
-    }
-
-    func run(_ action: ContainerAction, container: Components.Schemas.StackContainerDetail, stackName: String, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeContainerActionID = containerActionID(for: action, containerID: container.id)
-        error = nil
-        defer { activeContainerActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
-            actionMessage = "\(container.name) \(action.rawValue)d"
-            actionMessageOwner = stackName
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func actionMessage(for stackName: String) -> String? {
-        guard actionMessageOwner == stackName else { return nil }
-        return actionMessage
-    }
-
-    func stack(named name: String) -> Components.Schemas.StackSummary? {
-        stacks.first(where: { $0.name == name })
-    }
-
-    func isRunning(_ action: StackAction, stackName: String) -> Bool {
-        activeStackActionID == stackActionID(for: action, stackName: stackName)
-    }
-
-    func isRunning(_ action: ContainerAction, containerID: String) -> Bool {
-        activeContainerActionID == containerActionID(for: action, containerID: containerID)
-    }
-
-    var hasPendingAction: Bool {
-        activeStackActionID != nil || activeContainerActionID != nil
-    }
-
-    func isDeletingStack(_ stackName: String) -> Bool {
-        activeStackActionID == stackActionID(for: .down, stackName: stackName) + ":delete"
-    }
-
-    private func stackActionID(for action: StackAction, stackName: String) -> String {
-        "\(stackName):\(action.rawValue)"
-    }
-
-    private func containerActionID(for action: ContainerAction, containerID: String) -> String {
-        "\(containerID):\(action.rawValue)"
-    }
-
-    private func actionMessage(for action: StackAction, stackName: String) -> String {
-        switch action {
-        case .start:
-            return "\(stackName) started"
-        case .stop:
-            return "\(stackName) stopped"
-        case .restart:
-            return "\(stackName) restarted"
-        case .down:
-            return "\(stackName) brought down"
-        case .redeploy:
-            return "\(stackName) redeployed"
-        }
-    }
-
-    private func confirmStackDeletion(
-        named stackName: String,
-        appModel: AppModel,
-        deleteVolumes: Bool
-    ) async -> Bool {
-        for attempt in 0..<6 {
-            await load(appModel: appModel)
-            if self.stack(named: stackName) == nil {
-                actionMessage = deleteVolumes ? "\(stackName) removed with volumes" : "\(stackName) removed"
-                actionMessageOwner = stackName
-                return true
-            }
-
-            if attempt < 5 {
-                try? await Task.sleep(for: .milliseconds(450))
-            }
-        }
-
-        return false
-    }
-}
 
 struct StacksView: View {
     let appModel: AppModel
@@ -253,7 +54,12 @@ struct StacksView: View {
                 } else {
                     ForEach(filteredStacks, id: \.name) { stack in
                         NavigationLink {
-                            StackEditorView(appModel: appModel, stack: stack, store: store)
+                            StackEditorView(
+                                appModel: appModel,
+                                stack: stack,
+                                scope: appModel.connectionScope,
+                                store: store
+                            )
                         } label: {
                             StackRow(stack: stack)
                         }
@@ -359,6 +165,7 @@ private struct StackRow: View {
 private struct StackEditorView: View {
     let appModel: AppModel
     let stack: Components.Schemas.StackSummary
+    let scope: DockhandConnectionScope
     let store: StacksStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -376,7 +183,11 @@ private struct StackEditorView: View {
     @State private var isEditorFocused = false
 
     private var liveStack: Components.Schemas.StackSummary {
-        store.stack(named: stack.name) ?? stack
+        isCurrentScope ? (store.stack(named: stack.name) ?? stack) : stack
+    }
+
+    private var isCurrentScope: Bool {
+        appModel.isCurrentScope(scope)
     }
 
     var body: some View {
@@ -397,6 +208,10 @@ private struct StackEditorView: View {
                 .padding(20)
                 .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
 
+                if !isCurrentScope {
+                    staleScopeWarning
+                }
+
                 actionBar
                 containersCard
                 editorCard
@@ -409,7 +224,7 @@ private struct StackEditorView: View {
         }
         .navigationTitle(liveStack.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: appModel.connectionScopeID) {
+        .task(id: "\(scope.profileID ?? "none"):\(scope.environmentID ?? -1):\(stack.name)") {
             await loadDocument()
         }
         .sheet(isPresented: $showsRedeploySheet) {
@@ -440,6 +255,15 @@ private struct StackEditorView: View {
         } message: {
             Text("This removes the stack from the selected Dockhand environment. Deleting volumes also removes attached persistent data.")
         }
+    }
+
+    private var staleScopeWarning: some View {
+        Text("Server or environment changed. Go back and reopen this stack before saving or running actions.")
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(.orange.opacity(0.08)), in: .rect(cornerRadius: 18))
     }
 
     private var actionBar: some View {
@@ -490,7 +314,14 @@ private struct StackEditorView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(liveStack.containerDetails, id: \.id) { container in
-                    StackContainerCard(container: container, stackName: liveStack.name, appModel: appModel, store: store)
+                    StackContainerCard(
+                        container: container,
+                        stackName: liveStack.name,
+                        scope: scope,
+                        isCurrentScope: isCurrentScope,
+                        appModel: appModel,
+                        store: store
+                    )
                 }
             }
         }
@@ -523,7 +354,7 @@ private struct StackEditorView: View {
                     }
                 }
                 .buttonStyle(.glassProminent)
-                .disabled(isSaving || isLoading)
+                .disabled(!isCurrentScope || isSaving || isLoading)
             }
 
             if document.needsFileLocation {
@@ -567,7 +398,8 @@ private struct StackEditorView: View {
 
     private func loadDocument() async {
         guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else {
+              let environmentID = appModel.selectedEnvironment?.id,
+              isCurrentScope else {
             return
         }
 
@@ -587,7 +419,8 @@ private struct StackEditorView: View {
 
     private func saveActivePane() async {
         guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else {
+              let environmentID = appModel.selectedEnvironment?.id,
+              isCurrentScope else {
             return
         }
 
@@ -630,18 +463,21 @@ private struct StackEditorView: View {
     }
 
     private func runStackAction(_ action: StackAction) async {
+        guard isCurrentScope else { return }
         await store.run(action, stack: liveStack, appModel: appModel)
         saveMessage = store.error
         saveMessageIsError = store.error != nil
     }
 
     private func runRedeploy() async {
+        guard isCurrentScope else { return }
         await store.redeploy(stack: liveStack, appModel: appModel, options: deployOptions)
         saveMessage = store.error
         saveMessageIsError = store.error != nil
     }
 
     private func deleteStack(deleteVolumes: Bool) async {
+        guard isCurrentScope else { return }
         let didDelete = await store.deleteStack(liveStack, appModel: appModel, deleteVolumes: deleteVolumes)
         saveMessage = store.error
         saveMessageIsError = store.error != nil
@@ -651,7 +487,7 @@ private struct StackEditorView: View {
     }
 
     private func stackActionButton(_ action: StackAction, _ icon: String, _ title: String) -> some View {
-        let isEnabled = liveStack.canPerform(action) && !store.hasPendingAction
+        let isEnabled = isCurrentScope && liveStack.canPerform(action) && !store.hasPendingAction
 
         return Button {
             if action == .down {
@@ -684,7 +520,7 @@ private struct StackEditorView: View {
     }
 
     private var redeployButton: some View {
-        let isEnabled = liveStack.canPerform(.redeploy) && !store.hasPendingAction
+        let isEnabled = isCurrentScope && liveStack.canPerform(.redeploy) && !store.hasPendingAction
 
         return Button {
             showsRedeploySheet = true
@@ -713,7 +549,7 @@ private struct StackEditorView: View {
     }
 
     private var deleteButton: some View {
-        let isEnabled = !store.hasPendingAction
+        let isEnabled = isCurrentScope && !store.hasPendingAction
 
         return Button {
             showsDeleteConfirmation = true
@@ -746,6 +582,8 @@ private struct StackEditorView: View {
 private struct StackContainerCard: View {
     let container: Components.Schemas.StackContainerDetail
     let stackName: String
+    let scope: DockhandConnectionScope
+    let isCurrentScope: Bool
     let appModel: AppModel
     let store: StacksStore
     @Environment(\.colorScheme) private var colorScheme
@@ -801,6 +639,7 @@ private struct StackContainerCard: View {
             NavigationLink {
                 ContainerLogsView(
                     target: .init(id: container.id, name: container.name),
+                    scope: scope,
                     appModel: appModel
                 )
             } label: {
@@ -809,15 +648,17 @@ private struct StackContainerCard: View {
                     .padding(.vertical, 10)
             }
             .buttonStyle(.glass)
+            .disabled(!isCurrentScope)
         }
         .padding(16)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
     }
 
     private func stackContainerActionButton(_ action: ContainerAction, _ icon: String, _ title: String) -> some View {
-        let isEnabled = container.canPerform(action) && !store.hasPendingAction
+        let isEnabled = isCurrentScope && container.canPerform(action) && !store.hasPendingAction
 
         return Button {
+            guard isCurrentScope else { return }
             Task {
                 await store.run(action, container: container, stackName: stackName, appModel: appModel)
             }

@@ -2,6 +2,11 @@ import DockhandAPI
 import Foundation
 import Observation
 
+struct DockhandConnectionScope: Hashable, Sendable {
+    var profileID: String?
+    var environmentID: Int?
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -17,6 +22,9 @@ final class AppModel {
     init() {
         let storedProfiles = PreferencesStore.serverProfiles
         let resolvedProfileID = PreferencesStore.selectedProfileID ?? storedProfiles.first?.id
+        if let resolvedProfileID {
+            KeychainStore.migrateLegacyTokenIfNeeded(to: resolvedProfileID)
+        }
         let resolvedToken = resolvedProfileID.flatMap { KeychainStore.readToken(profileID: $0) } ?? ""
         let resolvedEnvironmentID = resolvedProfileID.flatMap { PreferencesStore.selectedEnvironmentID(for: $0) }
 
@@ -66,6 +74,14 @@ final class AppModel {
 
     var connectionScopeID: String {
         "\(selectedProfileID ?? "none"):\(selectedEnvironmentID ?? -1)"
+    }
+
+    var connectionScope: DockhandConnectionScope {
+        DockhandConnectionScope(profileID: selectedProfileID, environmentID: selectedEnvironmentID)
+    }
+
+    func isCurrentScope(_ scope: DockhandConnectionScope) -> Bool {
+        connectionScope == scope
     }
 
     func bootstrap() async {

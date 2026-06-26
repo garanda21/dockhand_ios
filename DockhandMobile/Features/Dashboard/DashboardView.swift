@@ -197,7 +197,7 @@ struct DashboardView: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                metadataChip("Connection", value: environment.connectionType.replacingOccurrences(of: "-", with: " "), systemImage: "circle.connected.to.line.below")
+                metadataChip("Connection", value: environment.connectionType.replacingOccurrences(of: "-", with: " "), systemImage: "link")
                 metadataChip("Docker", value: host?.docker.serverVersion ?? "Unknown", systemImage: "shippingbox")
                 metadataChip("CPU", value: "\(host?.host.cpus ?? 0) cores", systemImage: "cpu")
                 metadataChip("Memory", value: (host?.host.memory ?? snapshot.metrics.memoryTotal).dockhandByteCount, systemImage: "memorychip")

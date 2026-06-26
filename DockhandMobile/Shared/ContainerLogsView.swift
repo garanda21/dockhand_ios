@@ -11,6 +11,7 @@ struct ContainerLogTarget: Identifiable, Hashable {
 @Observable
 final class ContainerLogsStore {
     var document = ContainerLogsDocument(logs: "")
+    var formattedLogs = AttributedString("")
     var isLoading = false
     var error: String?
     var tail = 200
@@ -28,7 +29,7 @@ final class ContainerLogsStore {
     func loadSnapshot(target: ContainerLogTarget, appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
-            document = ContainerLogsDocument(logs: "")
+            replaceLogs("")
             return
         }
 
@@ -39,11 +40,12 @@ final class ContainerLogsStore {
 
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            document = try await service.fetchContainerLogs(
+            let loadedDocument = try await service.fetchContainerLogs(
                 containerID: target.id,
                 environmentID: environmentID,
                 tail: tail
             )
+            replaceLogs(loadedDocument.logs)
             streamStatus = "Snapshot"
         } catch {
             self.error = error.localizedDescription
@@ -54,13 +56,13 @@ final class ContainerLogsStore {
     func stream(target: ContainerLogTarget, appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
-            document = ContainerLogsDocument(logs: "")
+            replaceLogs("")
             return
         }
 
         isLoading = true
         error = nil
-        document = ContainerLogsDocument(logs: "")
+        replaceLogs("")
         streamStatus = "Connecting"
         defer { isLoading = false }
 
@@ -77,7 +79,7 @@ final class ContainerLogsStore {
                     case .connected:
                         self.streamStatus = "Live"
                     case .log(let line):
-                        self.document.logs.append(line)
+                        self.prependLiveLog(line)
                     }
                 }
             }
@@ -88,17 +90,42 @@ final class ContainerLogsStore {
             streamStatus = "Error"
         }
     }
+
+    private func replaceLogs(_ logs: String) {
+        document = ContainerLogsDocument(logs: logs)
+        formattedLogs = ContainerLogFormatter.make(from: logs, latestFirst: false)
+    }
+
+    private func prependLiveLog(_ log: String) {
+        let separator = log.hasSuffix("\n") ? "" : "\n"
+        document.logs = log + separator + document.logs
+
+        let maxLength = 200_000
+        if document.logs.count > maxLength {
+            document.logs = String(document.logs.prefix(maxLength))
+        }
+
+        formattedLogs = ContainerLogFormatter.make(from: document.logs, latestFirst: true)
+    }
 }
 
 struct ContainerLogsView: View {
     let target: ContainerLogTarget
+    let scope: DockhandConnectionScope
     let appModel: AppModel
 
     @State private var store = ContainerLogsStore()
 
+    private var isCurrentScope: Bool {
+        appModel.isCurrentScope(scope)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                if !isCurrentScope {
+                    staleScopeWarning
+                }
                 controlsCard
                 logsCard
             }
@@ -107,15 +134,29 @@ struct ContainerLogsView: View {
         .navigationTitle(target.name)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: taskKey) {
+            guard isCurrentScope else {
+                store.streamStatus = "Context changed"
+                return
+            }
             await store.run(target: target, appModel: appModel)
         }
         .refreshable {
+            guard isCurrentScope else { return }
             await store.run(target: target, appModel: appModel)
         }
     }
 
     private var taskKey: String {
-        "\(target.id)-\(appModel.connectionScopeID)-\(store.tail)-\(store.follow)"
+        "\(target.id)-\(scope.profileID ?? "none")-\(scope.environmentID ?? -1)-\(appModel.connectionScopeID)-\(store.tail)-\(store.follow)"
+    }
+
+    private var staleScopeWarning: some View {
+        Text("Server or environment changed. Go back and reopen logs for the active context.")
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(.orange.opacity(0.08)), in: .rect(cornerRadius: 18))
     }
 
     private var controlsCard: some View {
@@ -125,11 +166,13 @@ struct ContainerLogsView: View {
                     .font(.headline)
                 Spacer()
                 Button {
+                    guard isCurrentScope else { return }
                     Task { await store.run(target: target, appModel: appModel) }
                 } label: {
                     Label(store.follow ? "Reconnect" : "Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.glass)
+                .disabled(!isCurrentScope)
             }
 
             Toggle(isOn: $store.follow) {
@@ -174,7 +217,7 @@ struct ContainerLogsView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(formattedLogs)
+                    Text(store.formattedLogs)
                         .font(.system(.footnote, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -186,17 +229,16 @@ struct ContainerLogsView: View {
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
     }
 
-    private var formattedLogs: AttributedString {
-        ContainerLogFormatter.make(from: store.document.logs)
-    }
 }
 
 private enum ContainerLogFormatter {
-    static func make(from rawLogs: String) -> AttributedString {
-        let orderedLines = rawLogs
-            .components(separatedBy: .newlines)
-            .reversed()
-            .joined(separator: "\n")
+    static func make(from rawLogs: String, latestFirst: Bool) -> AttributedString {
+        let orderedLines = latestFirst
+            ? rawLogs
+            : rawLogs
+                .components(separatedBy: .newlines)
+                .reversed()
+                .joined(separator: "\n")
 
         let attributed = NSMutableAttributedString(
             string: orderedLines,

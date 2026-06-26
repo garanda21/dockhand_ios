@@ -53,6 +53,10 @@ final class ContainersStore {
         activeActionID == actionID(for: action, containerID: containerID)
     }
 
+    func container(id: String) -> Components.Schemas.Container? {
+        containers.first(where: { $0.id == id })
+    }
+
     private func actionID(for action: ContainerAction, containerID: String) -> String {
         "\(containerID):\(action.rawValue)"
     }
@@ -111,7 +115,12 @@ struct ContainersView: View {
                 } else {
                     ForEach(filteredContainers, id: \.id) { container in
                         NavigationLink {
-                            ContainerDetailView(container: container, appModel: appModel, store: store)
+                            ContainerDetailView(
+                                container: container,
+                                scope: appModel.connectionScope,
+                                appModel: appModel,
+                                store: store
+                            )
                         } label: {
                             ContainerRow(container: container)
                         }
@@ -226,35 +235,57 @@ private struct ContainerRow: View {
 
 private struct ContainerDetailView: View {
     let container: Components.Schemas.Container
+    let scope: DockhandConnectionScope
     let appModel: AppModel
     let store: ContainersStore
     @Environment(\.colorScheme) private var colorScheme
+
+    private var isCurrentScope: Bool {
+        appModel.isCurrentScope(scope)
+    }
+
+    private var liveContainer: Components.Schemas.Container {
+        isCurrentScope ? (store.container(id: container.id) ?? container) : container
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(container.name)
+                    Text(liveContainer.name)
                         .font(.title2.weight(.semibold))
-                    Text(container.image)
+                    Text(liveContainer.image)
                         .foregroundStyle(.secondary)
-                    Text(container.status)
+                    Text(liveContainer.status)
                         .font(.subheadline)
                 }
                 .padding(20)
                 .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
 
+                if !isCurrentScope {
+                    staleScopeWarning
+                }
+
                 actionBar
                 logsLink
 
-                detailsBlock("Networks", container.networkSummary.isEmpty ? "No networks" : container.networkSummary)
-                detailsBlock("Command", container.command ?? "No command")
-                detailsBlock("System Container", container.systemContainer ?? "No")
+                detailsBlock("Networks", liveContainer.networkSummary.isEmpty ? "No networks" : liveContainer.networkSummary)
+                detailsBlock("Command", liveContainer.command ?? "No command")
+                detailsBlock("System Container", liveContainer.systemContainer ?? "No")
             }
             .padding()
         }
-        .navigationTitle(container.name)
+        .navigationTitle(liveContainer.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var staleScopeWarning: some View {
+        Text("Server or environment changed. Go back and reopen this container before running actions.")
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(.orange.opacity(0.08)), in: .rect(cornerRadius: 18))
     }
 
     private var actionBar: some View {
@@ -289,7 +320,8 @@ private struct ContainerDetailView: View {
     private var logsLink: some View {
         NavigationLink {
             ContainerLogsView(
-                target: .init(id: container.id, name: container.name),
+                target: .init(id: liveContainer.id, name: liveContainer.name),
+                scope: scope,
                 appModel: appModel
             )
         } label: {
@@ -299,18 +331,20 @@ private struct ContainerDetailView: View {
                 .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
         }
         .buttonStyle(.plain)
+        .disabled(!isCurrentScope)
     }
 
     private func actionButton(_ action: ContainerAction, _ icon: String, _ title: String) -> some View {
-        let isEnabled = container.canPerform(action) && store.activeActionID == nil
+        let isEnabled = isCurrentScope && liveContainer.canPerform(action) && store.activeActionID == nil
 
         return Button {
+            guard isCurrentScope else { return }
             Task {
-                await store.run(action, container: container, appModel: appModel)
+                await store.run(action, container: liveContainer, appModel: appModel)
             }
         } label: {
             VStack(spacing: 6) {
-                if store.isRunning(action, containerID: container.id) {
+                if store.isRunning(action, containerID: liveContainer.id) {
                     ProgressView()
                         .controlSize(.small)
                         .frame(height: 18)

@@ -6,7 +6,7 @@ enum KeychainStore {
     private static let legacyAccount = "dockhand-token"
 
     static func readToken(profileID: String) -> String? {
-        readToken(account: account(for: profileID)) ?? readLegacyToken()
+        readToken(account: account(for: profileID))
     }
 
     static func writeToken(_ token: String, profileID: String) {
@@ -15,6 +15,18 @@ enum KeychainStore {
 
     static func deleteToken(profileID: String) {
         deleteToken(account: account(for: profileID))
+    }
+
+    static func migrateLegacyTokenIfNeeded(to profileID: String) {
+        let targetAccount = account(for: profileID)
+        guard readToken(account: targetAccount) == nil,
+              let legacyToken = readLegacyToken(),
+              !legacyToken.isEmpty else {
+            return
+        }
+
+        writeToken(legacyToken, account: targetAccount)
+        deleteToken(account: legacyAccount)
     }
 
     private static func account(for profileID: String) -> String {

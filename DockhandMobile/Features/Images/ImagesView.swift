@@ -1,185 +1,5 @@
 import DockhandAPI
-import Observation
 import SwiftUI
-
-@MainActor
-@Observable
-final class ImagesStore {
-    var images: [Components.Schemas.ImageSummary] = []
-    var isLoading = false
-    var error: String?
-    var actionMessage: String?
-    var actionMessageScope: ImageActionScope?
-    var activeActionID: String?
-
-    func load(appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else {
-            images = []
-            return
-        }
-
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            images = try await service.fetchImages(environmentID: environmentID)
-                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func pullImage(named name: String, scope: ImageActionScope = .list, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeActionID = "pull"
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.pullImage(imageName: name, environmentID: environmentID)
-            actionMessage = "\(name) pulled"
-            actionMessageScope = scope
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func pruneImages(danglingOnly: Bool, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeActionID = danglingOnly ? "prune" : "prune-unused"
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.pruneImages(environmentID: environmentID, danglingOnly: danglingOnly)
-            actionMessage = danglingOnly ? "Dangling images pruned" : "Unused images pruned"
-            actionMessageScope = .list
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func tagImage(_ image: Components.Schemas.ImageSummary, repo: String, tag: String, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeActionID = actionID("tag", image.id)
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.tagImage(imageID: image.id, environmentID: environmentID, repo: repo, tag: tag)
-            actionMessage = "\(repo):\(tag) created"
-            actionMessageScope = .image(image.id)
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func deleteImage(reference: String, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeActionID = actionID("delete", reference)
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.deleteImage(imageReference: reference, environmentID: environmentID)
-            actionMessage = "\(reference) deleted"
-            actionMessageScope = .image(reference)
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func deleteImageTag(_ tag: String, imageID: String, appModel: AppModel) async {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
-
-        activeActionID = actionID("delete-tag", tag)
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.deleteImageTag(imageTag: tag, environmentID: environmentID)
-            actionMessage = "\(tag) removed"
-            actionMessageScope = .image(imageID)
-            await load(appModel: appModel)
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func scanImage(_ image: Components.Schemas.ImageSummary, appModel: AppModel) async throws -> ImageScanDocument {
-        guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else {
-            throw DockhandServiceError.invalidResponse
-        }
-
-        activeActionID = actionID("scan", image.id)
-        actionMessage = nil
-        actionMessageScope = nil
-        error = nil
-        defer { activeActionID = nil }
-
-        let service = DockhandService(baseURL: baseURL, token: appModel.token)
-        return try await service.scanImage(imageName: image.displayName, environmentID: environmentID)
-    }
-
-    func image(id: String) -> Components.Schemas.ImageSummary? {
-        images.first(where: { $0.id == id })
-    }
-
-    var listActionMessage: String? {
-        guard actionMessageScope == .list else { return nil }
-        return actionMessage
-    }
-
-    func actionMessage(for imageID: String) -> String? {
-        guard actionMessageScope == .image(imageID) else { return nil }
-        return actionMessage
-    }
-
-    func isRunning(_ action: String, reference: String) -> Bool {
-        activeActionID == actionID(action, reference)
-    }
-
-    private func actionID(_ action: String, _ reference: String) -> String {
-        "\(action):\(reference)"
-    }
-}
-
-enum ImageActionScope: Equatable {
-    case list
-    case image(String)
-}
 
 struct ImagesView: View {
     let appModel: AppModel
@@ -234,7 +54,12 @@ struct ImagesView: View {
                 } else {
                     ForEach(filteredImages, id: \.id) { image in
                         NavigationLink {
-                            ImageDetailView(image: image, appModel: appModel, store: store)
+                            ImageDetailView(
+                                image: image,
+                                scope: appModel.connectionScope,
+                                appModel: appModel,
+                                store: store
+                            )
                         } label: {
                             ImageRow(
                                 image: image,
@@ -263,7 +88,7 @@ struct ImagesView: View {
             }
         }
         .sheet(isPresented: $pullSheetPresented) {
-            PullImageSheet(appModel: appModel, store: store, scope: .list)
+            PullImageSheet(appModel: appModel, scope: appModel.connectionScope, store: store, actionScope: .list)
                 .presentationDetents([.medium])
         }
         .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
@@ -543,6 +368,7 @@ private enum ImagePruneMode {
 
 private struct ImageDetailView: View {
     let image: Components.Schemas.ImageSummary
+    let scope: DockhandConnectionScope
     let appModel: AppModel
     let store: ImagesStore
 
@@ -553,12 +379,19 @@ private struct ImageDetailView: View {
     @State private var deleteTagConfirmation: ImageTagDeletionTarget?
 
     private var liveImage: Components.Schemas.ImageSummary {
-        store.image(id: image.id) ?? image
+        isCurrentScope ? (store.image(id: image.id) ?? image) : image
+    }
+
+    private var isCurrentScope: Bool {
+        appModel.isCurrentScope(scope)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                if !isCurrentScope {
+                    staleScopeWarning
+                }
                 statusCard
                 summaryCard
                 actionsCard
@@ -572,11 +405,17 @@ private struct ImageDetailView: View {
         .navigationTitle(liveImage.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $pullSheetPresented) {
-            PullImageSheet(appModel: appModel, store: store, suggestedName: liveImage.displayName, scope: .image(liveImage.id))
+            PullImageSheet(
+                appModel: appModel,
+                scope: scope,
+                store: store,
+                suggestedName: liveImage.displayName,
+                actionScope: .image(liveImage.id)
+            )
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $tagSheetPresented) {
-            TagImageSheet(image: liveImage, appModel: appModel, store: store)
+            TagImageSheet(image: liveImage, scope: scope, appModel: appModel, store: store)
                 .presentationDetents([.medium])
         }
         .confirmationDialog("Delete image", isPresented: $deleteConfirmationPresented, titleVisibility: .visible) {
@@ -599,6 +438,15 @@ private struct ImageDetailView: View {
         } message: {
             Text(deleteTagConfirmation?.message ?? "")
         }
+    }
+
+    private var staleScopeWarning: some View {
+        Text("Server or environment changed. Go back and reopen this image before running actions.")
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(.orange.opacity(0.08)), in: .rect(cornerRadius: 18))
     }
 
     @ViewBuilder
@@ -661,6 +509,7 @@ private struct ImageDetailView: View {
                     systemImage: "shield.checkered",
                     isRunning: store.isRunning("scan", reference: liveImage.id)
                 ) {
+                    guard isCurrentScope else { return }
                     Task {
                         do {
                             scanResult = try await store.scanImage(liveImage, appModel: appModel)
@@ -671,17 +520,20 @@ private struct ImageDetailView: View {
                 }
 
                 actionButton(title: "Tag", systemImage: "tag") {
+                    guard isCurrentScope else { return }
                     tagSheetPresented = true
                 }
 
                 actionButton(title: "Pull", systemImage: "arrow.down.circle") {
+                    guard isCurrentScope else { return }
                     pullSheetPresented = true
                 }
 
                 actionButton(title: "Delete", systemImage: "trash", role: .destructive) {
+                    guard isCurrentScope else { return }
                     deleteConfirmationPresented = true
                 }
-                .disabled(liveImage.containers > 0)
+                .disabled(!isCurrentScope || liveImage.containers > 0)
             }
 
             if liveImage.containers > 0 {
@@ -710,12 +562,13 @@ private struct ImageDetailView: View {
                             .textSelection(.enabled)
                         Spacer()
                         Button {
+                            guard isCurrentScope else { return }
                             deleteTagConfirmation = .init(reference: tag)
                         } label: {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.glass)
-                        .disabled(store.isRunning("delete-tag", reference: tag))
+                        .disabled(!isCurrentScope || store.isRunning("delete-tag", reference: tag))
                     }
                 }
             }
@@ -834,6 +687,7 @@ private struct ImageDetailView: View {
             .frame(maxWidth: .infinity, minHeight: 64)
         }
         .buttonStyle(.glass)
+        .disabled(!isCurrentScope)
     }
 }
 
@@ -847,9 +701,10 @@ private struct ImageTagDeletionTarget: Equatable {
 
 private struct PullImageSheet: View {
     let appModel: AppModel
+    let scope: DockhandConnectionScope
     let store: ImagesStore
     var suggestedName: String = ""
-    var scope: ImageActionScope = .list
+    var actionScope: ImageActionScope = .list
 
     @Environment(\.dismiss) private var dismiss
     @State private var imageName = ""
@@ -870,7 +725,8 @@ private struct PullImageSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Pull") {
                         Task {
-                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, scope: scope, appModel: appModel)
+                            guard appModel.isCurrentScope(scope) else { return }
+                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, scope: actionScope, appModel: appModel)
                             dismiss()
                         }
                     }
@@ -888,6 +744,7 @@ private struct PullImageSheet: View {
 
 private struct TagImageSheet: View {
     let image: Components.Schemas.ImageSummary
+    let scope: DockhandConnectionScope
     let appModel: AppModel
     let store: ImagesStore
 
@@ -914,6 +771,7 @@ private struct TagImageSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task {
+                            guard appModel.isCurrentScope(scope) else { return }
                             await store.tagImage(image, repo: repo, tag: tag, appModel: appModel)
                             dismiss()
                         }

@@ -9,14 +9,16 @@
 /* Begin PBXBuildFile section */
 		058D6BC2FCEEC7E05E612A86 /* ContainersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */; };
 		08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A429AD5D837F77D7096E4664 /* DashboardView.swift */; };
-		14C8A8018B0DF5A1005D11A1 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = 14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */; };
+		17795D5F56F0735052BAF912 /* StacksStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ED8574F1769840BE2533DA4 /* StacksStore.swift */; };
 		19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */; };
 		1C165AF5EAFAC8DFF5889FFE /* DockhandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956D5C8E99FCD80742BF586C /* DockhandRootView.swift */; };
 		40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F56858EF25CC073EFD0846 /* Formatting.swift */; };
 		4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88C67A91A207F8EBE7A121C /* ImagesView.swift */; };
 		5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A1342B619AADBFCAF7582E /* DockhandService.swift */; };
 		64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F846090140816C679D138A /* StackEditorSupport.swift */; };
+		77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */; };
 		7B369144D2CEB78771441943 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3266A680155F8775A56868 /* AppModel.swift */; };
+		A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */; };
 		AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1F5D851E40D36A5154376B /* PreferencesStore.swift */; };
 		B388C775A10358DC31C430CD /* StacksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FC6A2CB1B06506690B8E1E /* StacksView.swift */; };
 		B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E28C30131DD132BCF62665 /* SettingsView.swift */; };
@@ -26,6 +28,7 @@
 		D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */; };
 		E882AE90D8FD0104F7520724 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 125F5F1A04A3D953027B8DB4 /* Yams */; };
 		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
+		FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,7 +45,6 @@
 		0137260725D9D7D6B14F4E71 /* DockhandMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileApp.swift; sourceTree = "<group>"; };
 		08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
-		14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
@@ -50,11 +52,15 @@
 		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
 		65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainersView.swift; sourceTree = "<group>"; };
+		6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DockhandService+Decoding.swift"; sourceTree = "<group>"; };
+		6ED8574F1769840BE2533DA4 /* StacksStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksStore.swift; sourceTree = "<group>"; };
 		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
 		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
 		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
+		C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesStore.swift; sourceTree = "<group>"; };
 		D4F56858EF25CC073EFD0846 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
 		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -73,17 +79,6 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
-/* Begin PBXResourcesBuildPhase section */
-		14C8A8028B0DF5A1005D11A1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				14C8A8018B0DF5A1005D11A1 /* dockhand_glass.icon in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXGroup section */
 		44165C81445DAED68DC41951 /* DockhandMobile */ = {
 			isa = PBXGroup;
@@ -99,7 +94,7 @@
 		554C3B6E0D257A607369986D = {
 			isa = PBXGroup;
 			children = (
-				14C8A8008B0DF5A1005D11A1 /* dockhand_glass.icon */,
+				B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */,
 				44165C81445DAED68DC41951 /* DockhandMobile */,
 				6533012C87BA3BC0BD79B8DA /* DockhandMobileTests */,
 				5C23E7D49A194963016D28C4 /* Packages */,
@@ -134,6 +129,7 @@
 		6F945C305978AF233853B2DD /* Images */ = {
 			isa = PBXGroup;
 			children = (
+				C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */,
 				E88C67A91A207F8EBE7A121C /* ImagesView.swift */,
 			);
 			path = Images;
@@ -192,6 +188,7 @@
 			isa = PBXGroup;
 			children = (
 				E5A1342B619AADBFCAF7582E /* DockhandService.swift */,
+				6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */,
 				08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */,
 				3A1F5D851E40D36A5154376B /* PreferencesStore.swift */,
 			);
@@ -202,6 +199,7 @@
 			isa = PBXGroup;
 			children = (
 				36F846090140816C679D138A /* StackEditorSupport.swift */,
+				6ED8574F1769840BE2533DA4 /* StacksStore.swift */,
 				C5FC6A2CB1B06506690B8E1E /* StacksView.swift */,
 			);
 			path = Stacks;
@@ -241,8 +239,8 @@
 			buildConfigurationList = 6815786542EFA0CDA9F2EFF8 /* Build configuration list for PBXNativeTarget "DockhandMobile" */;
 			buildPhases = (
 				01189824FD0FB4D9A1034C7F /* Sources */,
+				ACF970AF7BA95AA9AE2B223B /* Resources */,
 				09E6128853DF17CFD0AE6BA1 /* Frameworks */,
-				14C8A8028B0DF5A1005D11A1 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -264,7 +262,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 			};
 			buildConfigurationList = 67E736548DC41300D0662263 /* Build configuration list for PBXProject "DockhandMobile" */;
 			developmentRegion = en;
@@ -290,6 +288,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		ACF970AF7BA95AA9AE2B223B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		01189824FD0FB4D9A1034C7F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -301,14 +310,17 @@
 				08E2113390C6F91FDC518AE6 /* DashboardView.swift in Sources */,
 				19230378F2960C2E17D37712 /* DockhandMobileApp.swift in Sources */,
 				1C165AF5EAFAC8DFF5889FFE /* DockhandRootView.swift in Sources */,
+				FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */,
 				5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */,
 				F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */,
 				40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */,
+				A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */,
 				4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */,
 				D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */,
 				AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */,
 				B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */,
 				64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */,
+				17795D5F56F0735052BAF912 /* StacksStore.swift in Sources */,
 				B388C775A10358DC31C430CD /* StacksView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -405,7 +417,6 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -419,7 +430,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -511,7 +521,6 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -532,7 +541,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
