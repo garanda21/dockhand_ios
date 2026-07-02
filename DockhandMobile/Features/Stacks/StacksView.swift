@@ -647,8 +647,10 @@ private struct StackContainerCard: View {
                     Label("Shell", systemImage: "terminal")
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 10)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.glass)
+                .frame(maxWidth: .infinity)
                 .disabled(!isCurrentScope || !container.canOpenShell)
 
                 NavigationLink {
@@ -661,8 +663,10 @@ private struct StackContainerCard: View {
                     Label("Logs", systemImage: "text.alignleft")
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 10)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.glass)
+                .frame(maxWidth: .infinity)
                 .disabled(!isCurrentScope)
             }
         }

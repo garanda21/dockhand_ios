@@ -6,20 +6,26 @@ struct EnvironmentHeaderBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "server.rack")
-                    .foregroundStyle(.secondary)
-                Text(appModel.selectedProfileName)
-                    .font(.subheadline.weight(.semibold))
-                if let host = appModel.normalizedBaseURL?.host(), !host.isEmpty {
-                    Text(host)
-                        .font(.footnote.monospaced())
+            HStack(alignment: .center, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "server.rack")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
 
-            HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(appModel.selectedProfileName)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+
+                        if let host = appModel.normalizedBaseURL?.host(), !host.isEmpty {
+                            Text(host)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
                 Menu {
                     ForEach(appModel.environments, id: \.id) { environment in
                         Button {
@@ -32,40 +38,47 @@ struct EnvironmentHeaderBar: View {
                     HStack(spacing: 8) {
                         Image(systemName: "globe.europe.africa.fill")
                         Text(appModel.selectedEnvironmentName)
-                            .font(.headline)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
                         Image(systemName: "chevron.down")
                             .font(.caption.weight(.semibold))
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .frame(minWidth: 0, maxWidth: 220, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
                 .id(menuIdentity)
                 .buttonStyle(.glassProminent)
                 .disabled(appModel.environments.isEmpty)
 
-                Spacer(minLength: 0)
-
                 if appModel.isLoadingEnvironments {
                     ProgressView()
-                } else if let lastHealthStatus {
-                    Label(lastHealthStatus, systemImage: "heart.text.square")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(lastHealthStatus == "ok" ? .green : .secondary)
+                        .controlSize(.small)
+                        .frame(width: 28, height: 28)
                 }
             }
 
             if let environment = appModel.selectedEnvironment {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
+                        if let lastHealthStatus {
+                            Label(lastHealthStatus, systemImage: "heart.text.square")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(lastHealthStatus == "ok" ? .green : .secondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .glassEffect(.regular.tint(.white.opacity(0.04)), in: .capsule)
+                        }
                         ForEach(environment.metadataChips, id: \.self) { chip in
                             Text(chip)
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .font(.footnote)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
                                 .glassEffect(.regular.tint(.white.opacity(0.06)).interactive(), in: .capsule)
                         }
                     }
-                    .padding(.vertical, 2)
                 }
             }
 
@@ -75,9 +88,9 @@ struct EnvironmentHeaderBar: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(16)
+        .padding(12)
         .background(.clear)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 22))
+        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 20))
     }
 
     private var lastHealthStatus: String? {

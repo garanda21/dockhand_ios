@@ -19,29 +19,24 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
-                    ServerProfileDetailView(appModel: appModel, profileID: nil)
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-        }
     }
 
     private var activeServerCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Active server")
-                        .font(.title3.weight(.semibold))
-                    Text("Switch server quickly without opening its configuration.")
-                        .font(.subheadline)
+                        .font(.headline.weight(.semibold))
+                    Text("Quick context and switching.")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 12)
+                if let health = appModel.lastHealthStatus {
+                    infoChip("Status", health.uppercased(), systemImage: "heart.text.square", tint: health == "ok" ? .green : .secondary)
+                        .frame(maxWidth: 120)
+                }
 
                 if appModel.isLoadingEnvironments {
                     ProgressView()
@@ -49,45 +44,44 @@ struct SettingsView: View {
             }
 
             if let profile = appModel.selectedProfile {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
                         Image(systemName: "server.rack")
-                            .font(.title2)
+                            .font(.headline)
                             .foregroundStyle(.secondary)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 36, height: 36)
                             .glassEffect(.regular.tint(.white.opacity(0.06)), in: .circle)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(profile.name)
-                                .font(.headline)
+                                .font(.headline.weight(.semibold))
+                                .lineLimit(1)
                             Text(profile.baseURL)
                                 .font(.footnote.monospaced())
                                 .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                                .lineLimit(1)
                         }
 
                         Spacer(minLength: 0)
                     }
 
-                    serverSwitcherMenu
-
-                    HStack(spacing: 12) {
-                        infoChip("Environment", appModel.selectedEnvironmentName)
-                        if let health = appModel.lastHealthStatus {
-                            infoChip("Status", health.uppercased(), tint: health == "ok" ? .green : .secondary)
+                    HStack(spacing: 10) {
+                        serverSwitcherMenu
+                        //infoChip("Environment", appModel.selectedEnvironmentName, systemImage: "globe")
+                        Button {
+                            Task {
+                                await appModel.refreshEnvironments(forceEnvironmentReset: false)
+                                statusMessage = appModel.environmentError ?? "Active server refreshed"
+                            }
+                        } label: {
+                            Label("Refresh server", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(.glass)
+                            .frame(maxWidth: 120)
                     }
 
-                    Button {
-                        Task {
-                            await appModel.refreshEnvironments(forceEnvironmentReset: false)
-                            statusMessage = appModel.environmentError ?? "Active server refreshed"
-                        }
-                    } label: {
-                        Label("Refresh active server", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glass)
+                    
                 }
             } else {
                 ContentUnavailableView(
@@ -105,8 +99,8 @@ struct SettingsView: View {
                 .buttonStyle(.glassProminent)
             }
         }
-        .padding(20)
-        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
+        .padding(16)
+        .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 22))
     }
 
     private var serverSwitcherMenu: some View {
@@ -133,7 +127,8 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(appModel.selectedProfileName)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.down")
@@ -141,7 +136,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .glassEffect(.regular.tint(.orange.opacity(0.18)), in: .rect(cornerRadius: 18))
         }
         .buttonStyle(.plain)
@@ -153,9 +148,9 @@ struct SettingsView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Server library")
-                        .font(.title3.weight(.semibold))
+                        .font(.headline.weight(.semibold))
                     Text("Each server keeps its own details, token and selected environment.")
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
@@ -164,7 +159,8 @@ struct SettingsView: View {
                 NavigationLink {
                     ServerProfileDetailView(appModel: appModel, profileID: nil)
                 } label: {
-                    Image(systemName: "plus")
+                    Label("New", systemImage: "plus")
+                        .labelStyle(.iconOnly)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.glass)
@@ -185,22 +181,29 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(20)
-        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        .padding(16)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
     }
 
-    private func infoChip(_ title: String, _ value: String, tint: Color = .secondary) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
+    private func infoChip(_ title: String, _ value: String, systemImage: String, tint: Color = .secondary) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(tint)
-                .lineLimit(1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
     }
 

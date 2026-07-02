@@ -330,8 +330,10 @@ private struct ContainerDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
                     .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
             .disabled(!isCurrentScope || !liveContainer.canOpenShell)
 
             NavigationLink {
@@ -345,8 +347,10 @@ private struct ContainerDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
                     .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
             .disabled(!isCurrentScope)
         }
     }

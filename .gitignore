@@ -32,3 +32,5 @@ build/
 *.tmp
 *.orig
 
+# App Store Connect API private keys
+AuthKey_*.p8
