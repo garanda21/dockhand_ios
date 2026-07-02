@@ -107,7 +107,7 @@ struct ContainerShellView: View {
             Circle()
                 .fill(store.isConnected ? .green : .secondary)
                 .frame(width: 8, height: 8)
-            Text(store.status.rawValue)
+            Text(store.status.localizedLabel)
                 .font(.subheadline.weight(.semibold))
             if store.isDetectingShells {
                 ProgressView()

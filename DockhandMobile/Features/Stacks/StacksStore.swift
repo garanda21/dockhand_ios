@@ -67,7 +67,11 @@ final class StacksStore {
                 environmentID: environmentID,
                 options: options
             )
-            actionMessage = "\(stack.name) redeployed"
+            actionMessage = String(
+                format: String(localized: "%@ redeployed"),
+                locale: Locale.current,
+                stack.name
+            )
             actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
@@ -103,7 +107,7 @@ final class StacksStore {
                 return true
             }
 
-            self.error = "Dockhand reported success, but the stack is still present."
+            self.error = String(localized: "Dockhand reported success, but the stack is still present.")
             return false
         } catch {
             self.error = error.localizedDescription
@@ -122,7 +126,12 @@ final class StacksStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
-            actionMessage = "\(container.name) \(action.rawValue)d"
+            actionMessage = String(
+                format: String(localized: "%@ %@"),
+                locale: Locale.current,
+                container.name,
+                action.completedLabel
+            )
             actionMessageOwner = stackName
             await load(appModel: appModel)
         } catch {
@@ -166,15 +175,15 @@ final class StacksStore {
     private func actionMessage(for action: StackAction, stackName: String) -> String {
         switch action {
         case .start:
-            return "\(stackName) started"
+            return String(format: String(localized: "%@ started"), locale: Locale.current, stackName)
         case .stop:
-            return "\(stackName) stopped"
+            return String(format: String(localized: "%@ stopped"), locale: Locale.current, stackName)
         case .restart:
-            return "\(stackName) restarted"
+            return String(format: String(localized: "%@ restarted"), locale: Locale.current, stackName)
         case .down:
-            return "\(stackName) brought down"
+            return String(format: String(localized: "%@ brought down"), locale: Locale.current, stackName)
         case .redeploy:
-            return "\(stackName) redeployed"
+            return String(format: String(localized: "%@ redeployed"), locale: Locale.current, stackName)
         }
     }
 
@@ -186,7 +195,9 @@ final class StacksStore {
         for attempt in 0..<6 {
             await load(appModel: appModel)
             if self.stack(named: stackName) == nil {
-                actionMessage = deleteVolumes ? "\(stackName) removed with volumes" : "\(stackName) removed"
+                actionMessage = deleteVolumes
+                    ? String(format: String(localized: "%@ removed with volumes"), locale: Locale.current, stackName)
+                    : String(format: String(localized: "%@ removed"), locale: Locale.current, stackName)
                 actionMessageOwner = stackName
                 return true
             }

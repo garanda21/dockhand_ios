@@ -29,12 +29,22 @@ enum StackEditorValidator {
                 : trimmed
 
             guard let separatorIndex = body.firstIndex(of: "=") else {
-                throw StackEditorValidationError.invalidEnv(line: index + 1, reason: "Missing '=' separator")
+                throw StackEditorValidationError.invalidEnv(
+                    line: index + 1,
+                    reason: String(localized: "Missing '=' separator")
+                )
             }
 
             let key = String(body[..<separatorIndex]).trimmingCharacters(in: .whitespaces)
             guard key.range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) != nil else {
-                throw StackEditorValidationError.invalidEnv(line: index + 1, reason: "Invalid variable name '\(key)'")
+                throw StackEditorValidationError.invalidEnv(
+                    line: index + 1,
+                    reason: String(
+                        format: String(localized: "Invalid variable name '%@'"),
+                        locale: Locale.current,
+                        key
+                    )
+                )
             }
         }
     }
@@ -48,11 +58,20 @@ enum StackEditorValidationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyCompose:
-            return "Compose file cannot be empty."
+            return String(localized: "Compose file cannot be empty.")
         case .invalidCompose(let reason):
-            return "Invalid YAML: \(reason)"
+            return String(
+                format: String(localized: "Invalid YAML: %@"),
+                locale: Locale.current,
+                reason
+            )
         case .invalidEnv(let line, let reason):
-            return "Invalid .env on line \(line): \(reason)"
+            return String(
+                format: String(localized: "Invalid .env on line %lld: %@"),
+                locale: Locale.current,
+                Int64(line),
+                reason
+            )
         }
     }
 }
@@ -115,7 +134,12 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
             let toolbar = UIToolbar()
             toolbar.sizeToFit()
             let flexible = UIBarButtonItem(systemItem: .flexibleSpace)
-            let done = UIBarButtonItem(title: "Done", style: .prominent, target: self, action: #selector(doneTapped))
+            let done = UIBarButtonItem(
+                title: String(localized: "Done"),
+                style: .prominent,
+                target: self,
+                action: #selector(doneTapped)
+            )
             toolbar.items = [flexible, done]
             return toolbar
         }

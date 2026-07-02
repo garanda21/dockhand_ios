@@ -39,7 +39,7 @@ enum ContainerShellUser: Hashable, Sendable {
     static let presets: [(value: String, label: String)] = [
         ("root", "root"),
         ("nobody", "nobody"),
-        ("", "Container default")
+        ("", String(localized: "Container default"))
     ]
 }
 
@@ -48,14 +48,33 @@ struct TerminalFeedEvent: Equatable, Sendable {
     var text: String
 }
 
-enum ContainerShellStatus: String, Sendable {
-    case idle = "Idle"
-    case detecting = "Detecting shells"
-    case connecting = "Connecting"
-    case connected = "Connected"
-    case disconnected = "Disconnected"
-    case ended = "Session ended"
-    case error = "Error"
+enum ContainerShellStatus: Sendable {
+    case idle
+    case detecting
+    case connecting
+    case connected
+    case disconnected
+    case ended
+    case error
+
+    var localizedLabel: String {
+        switch self {
+        case .idle:
+            return String(localized: "Idle")
+        case .detecting:
+            return String(localized: "Detecting shells")
+        case .connecting:
+            return String(localized: "Connecting")
+        case .connected:
+            return String(localized: "Connected")
+        case .disconnected:
+            return String(localized: "Disconnected")
+        case .ended:
+            return String(localized: "Session ended")
+        case .error:
+            return String(localized: "Error")
+        }
+    }
 }
 
 private struct ContainerShellInputPayload: Encodable {

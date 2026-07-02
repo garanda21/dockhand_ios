@@ -21,6 +21,108 @@ extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
+    var localizedDockhandStateLabel: String {
+        switch normalizedDockhandState {
+        case "running":
+            return String(localized: "Running")
+        case "restarting":
+            return String(localized: "Restarting")
+        case "paused":
+            return String(localized: "Paused")
+        case "created":
+            return String(localized: "Created")
+        case "exited":
+            return String(localized: "Exited")
+        case "stopped":
+            return String(localized: "Stopped")
+        case "dead":
+            return String(localized: "Dead")
+        case "removing":
+            return String(localized: "Removing")
+        default:
+            return self
+        }
+    }
+
+    var localizedConnectionTypeLabel: String {
+        switch normalizedDockhandState {
+        case "socket":
+            return String(localized: "Socket")
+        case "http":
+            return String(localized: "HTTP")
+        case "https":
+            return String(localized: "HTTPS")
+        case "tcp":
+            return String(localized: "TCP")
+        default:
+            return replacingOccurrences(of: "-", with: " ")
+        }
+    }
+
+    var localizedDockerRuntimeText: String {
+        let exactStateLabel = localizedDockhandStateLabel
+        if exactStateLabel != self {
+            return exactStateLabel
+        }
+
+        var text = self
+
+        let replacements = [
+            ("Up ", String(localized: "Up ")),
+            ("Exited ", String(localized: "Exited ")),
+            ("Created", String(localized: "Created")),
+            ("Paused", String(localized: "Paused")),
+            ("Restarting", String(localized: "Restarting")),
+            ("Dead", String(localized: "Dead")),
+            ("Removal In Progress", String(localized: "Removal In Progress")),
+            (" (healthy)", String(localized: " (healthy)")),
+            (" (unhealthy)", String(localized: " (unhealthy)")),
+            ("About an hour", String(localized: "About an hour")),
+            ("About a minute", String(localized: "About a minute")),
+            ("Less than a second", String(localized: "Less than a second")),
+            ("Less than a minute", String(localized: "Less than a minute"))
+        ]
+
+        for (source, target) in replacements {
+            text = text.replacingOccurrences(of: source, with: target)
+        }
+
+        let unitReplacements: [(pattern: String, singular: String, plural: String)] = [
+            (#"(\d+)\s+days?"#, String(localized: "%d day"), String(localized: "%d days")),
+            (#"(\d+)\s+hours?"#, String(localized: "%d hour"), String(localized: "%d hours")),
+            (#"(\d+)\s+minutes?"#, String(localized: "%d minute"), String(localized: "%d minutes")),
+            (#"(\d+)\s+seconds?"#, String(localized: "%d second"), String(localized: "%d seconds")),
+            (#"(\d+)\s+weeks?"#, String(localized: "%d week"), String(localized: "%d weeks")),
+            (#"(\d+)\s+months?"#, String(localized: "%d month"), String(localized: "%d months"))
+        ]
+
+        for replacement in unitReplacements {
+            guard let regex = try? NSRegularExpression(pattern: replacement.pattern, options: [.caseInsensitive]) else {
+                continue
+            }
+
+            let nsrange = NSRange(text.startIndex..., in: text)
+            let matches = regex.matches(in: text, options: [], range: nsrange).reversed()
+
+            for match in matches {
+                guard
+                    match.numberOfRanges > 1,
+                    let fullRange = Range(match.range(at: 0), in: text),
+                    let countRange = Range(match.range(at: 1), in: text),
+                    let count = Int(text[countRange])
+                else {
+                    continue
+                }
+
+                let format = count == 1 ? replacement.singular : replacement.plural
+                let localized = String(format: format, locale: Locale.current, count)
+                text.replaceSubrange(fullRange, with: localized)
+            }
+        }
+
+        return text
+    }
+
     var dockhandStateRank: Int {
         switch normalizedDockhandState {
         case "running":
@@ -50,9 +152,9 @@ enum DockhandStateFilter: Hashable {
     var title: String {
         switch self {
         case .all:
-            return "all states"
+            return String(localized: "All states")
         case .state(let state):
-            return state.capitalized
+            return state.localizedDockhandStateLabel
         }
     }
 
@@ -69,6 +171,21 @@ enum DockhandStateFilter: Hashable {
 extension Int {
     var dockhandByteCount: String {
         ByteCountFormatter.string(fromByteCount: Int64(self), countStyle: .binary)
+    }
+
+    var localizedServicesCountText: String {
+        let format = self == 1 ? String(localized: "%d service") : String(localized: "%d services")
+        return String(format: format, locale: Locale.current, self)
+    }
+
+    var localizedContainersCountText: String {
+        let format = self == 1 ? String(localized: "%d container") : String(localized: "%d containers")
+        return String(format: format, locale: Locale.current, self)
+    }
+
+    var localizedCoresCountText: String {
+        let format = self == 1 ? String(localized: "%d core") : String(localized: "%d cores")
+        return String(format: format, locale: Locale.current, self)
     }
 }
 
@@ -135,7 +252,7 @@ extension Components.Schemas.Container {
                 guard let publicPort = port.publicPort else { return nil }
                 return "\(publicPort):\(port.privatePort)"
             }
-        return labels.first ?? "No ports"
+        return labels.first ?? String(localized: "No ports")
     }
 
     var networkSummary: String {
@@ -158,6 +275,10 @@ extension Components.Schemas.Container {
 extension Components.Schemas.StackSummary {
     var servicesCount: Int {
         containerDetails.count
+    }
+
+    var localizedStatusText: String {
+        status.localizedDockhandStateLabel
     }
 
     private var normalizedStatus: String {
@@ -237,9 +358,9 @@ extension Components.Schemas.StackContainerDetail {
             guard let publicPort = port.publicPort, let privatePort = port.privatePort else {
                 return nil
             }
-            return "\(publicPort):\(privatePort)"
+                return "\(publicPort):\(privatePort)"
         }
-        return labels.first ?? "No ports"
+        return labels.first ?? String(localized: "No ports")
     }
 
     var networkSummary: String {
@@ -252,6 +373,10 @@ extension Components.Schemas.StackContainerDetail {
         }
         .sorted()
         .joined(separator: " · ")
+    }
+
+    var localizedStatusText: String {
+        status.localizedDockerRuntimeText
     }
 }
 

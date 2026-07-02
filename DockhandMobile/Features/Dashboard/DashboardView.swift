@@ -112,9 +112,9 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
-                summaryMetric("Protocol", environment._protocol.uppercased())
-                summaryMetric("Port", "\(environment.port)")
-                summaryMetric("Type", environment.connectionType)
+                summaryMetric(String(localized: "Protocol"), environment._protocol.uppercased())
+                summaryMetric(String(localized: "Port"), "\(environment.port)")
+                summaryMetric(String(localized: "Type"), environment.connectionType.localizedConnectionTypeLabel)
             }
         }
         .padding(20)
@@ -197,10 +197,10 @@ struct DashboardView: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                metadataChip("Connection", value: environment.connectionType.replacingOccurrences(of: "-", with: " "), systemImage: "link")
-                metadataChip("Docker", value: host?.docker.serverVersion ?? "Unknown", systemImage: "shippingbox")
-                metadataChip("CPU", value: "\(host?.host.cpus ?? 0) cores", systemImage: "cpu")
-                metadataChip("Memory", value: (host?.host.memory ?? snapshot.metrics.memoryTotal).dockhandByteCount, systemImage: "memorychip")
+                metadataChip(String(localized: "Connection"), value: environment.connectionType.localizedConnectionTypeLabel, systemImage: "link")
+                metadataChip(String(localized: "Docker"), value: host?.docker.serverVersion ?? String(localized: "Unknown"), systemImage: "shippingbox")
+                metadataChip(String(localized: "CPU"), value: (host?.host.cpus ?? 0).localizedCoresCountText, systemImage: "cpu")
+                metadataChip(String(localized: "Memory"), value: (host?.host.memory ?? snapshot.metrics.memoryTotal).dockhandByteCount, systemImage: "memorychip")
             }
         }
     }
@@ -220,9 +220,13 @@ struct DashboardView: View {
     }
 
     private func healthBanner(snapshot: DashboardEnvironmentSnapshot) -> some View {
-        HStack(spacing: 10) {
+        let message = snapshot.containers.unhealthy == 0
+            ? String(localized: "All containers healthy")
+            : String(format: String(localized: "%d unhealthy containers"), locale: Locale.current, snapshot.containers.unhealthy)
+
+        return HStack(spacing: 10) {
             Image(systemName: snapshot.containers.unhealthy == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            Text(snapshot.containers.unhealthy == 0 ? "All containers healthy" : "\(snapshot.containers.unhealthy) unhealthy containers")
+            Text(message)
                 .font(.headline.weight(.medium))
         }
         .foregroundStyle(snapshot.containers.unhealthy == 0 ? .green : .orange)
@@ -241,7 +245,7 @@ struct DashboardView: View {
                 .font(.headline)
 
             usageRow(
-                title: "CPU",
+                title: String(localized: "CPU"),
                 systemImage: "cpu",
                 value: snapshot.metrics.cpuPercent.percentText,
                 detail: nil,
@@ -250,7 +254,7 @@ struct DashboardView: View {
             )
 
             usageRow(
-                title: "Memory",
+                title: String(localized: "Memory"),
                 systemImage: "memorychip",
                 value: snapshot.metrics.memoryPercent.percentText,
                 detail: "\(snapshot.metrics.memoryUsed.dockhandByteCount) / \(snapshot.metrics.memoryTotal.dockhandByteCount)",
@@ -296,12 +300,12 @@ struct DashboardView: View {
                 .font(.headline)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                statusTile("Running", value: snapshot.containers.running, systemImage: "play.fill", tint: .green)
-                statusTile("Stopped", value: snapshot.containers.stopped, systemImage: "stop.fill", tint: .secondary)
-                statusTile("Paused", value: snapshot.containers.paused, systemImage: "pause.fill", tint: .orange)
-                statusTile("Restarting", value: snapshot.containers.restarting, systemImage: "arrow.clockwise", tint: .green)
-                statusTile("Alerts", value: snapshot.containers.unhealthy, systemImage: "exclamationmark.triangle", tint: snapshot.containers.unhealthy == 0 ? .green : .orange)
-                statusTile("Updates", value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: .secondary)
+                statusTile(String(localized: "Running"), value: snapshot.containers.running, systemImage: "play.fill", tint: .green)
+                statusTile(String(localized: "Stopped"), value: snapshot.containers.stopped, systemImage: "stop.fill", tint: .secondary)
+                statusTile(String(localized: "Paused"), value: snapshot.containers.paused, systemImage: "pause.fill", tint: .orange)
+                statusTile(String(localized: "Restarting"), value: snapshot.containers.restarting, systemImage: "arrow.clockwise", tint: .green)
+                statusTile(String(localized: "Alerts"), value: snapshot.containers.unhealthy, systemImage: "exclamationmark.triangle", tint: snapshot.containers.unhealthy == 0 ? .green : .orange)
+                statusTile(String(localized: "Updates"), value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: .secondary)
             }
 
             HStack {
@@ -337,12 +341,36 @@ struct DashboardView: View {
                 .font(.headline)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                inventoryTile("Images", value: "\(snapshot.images.total)", detail: snapshot.images.totalSize.dockhandByteCount, systemImage: "photo.stack")
-                inventoryTile("Stacks", value: "\(snapshot.stacks.total)", detail: "\(snapshot.stacks.running) running · \(snapshot.stacks.stopped) stopped", systemImage: "square.3.layers.3d")
-                inventoryTile("Volumes", value: "\(snapshot.volumes.total)", detail: snapshot.volumes.totalSize > 0 ? snapshot.volumes.totalSize.dockhandByteCount : "No size data", systemImage: "internaldrive")
-                inventoryTile("Networks", value: "\(snapshot.networks.total)", detail: host?.host.storageDriver ?? "Ready", systemImage: "point.3.connected.trianglepath.dotted")
-                inventoryTile("Events", value: "\(snapshot.events.today)", detail: "\(snapshot.events.total) total", systemImage: "waveform.path.ecg")
-                inventoryTile("Build cache", value: snapshot.buildCacheSize.dockhandByteCount, detail: "Containers \(snapshot.containersSize.dockhandByteCount)", systemImage: "shippingbox")
+                inventoryTile(String(localized: "Images"), value: "\(snapshot.images.total)", detail: snapshot.images.totalSize.dockhandByteCount, systemImage: "photo.stack")
+                inventoryTile(
+                    String(localized: "Stacks"),
+                    value: "\(snapshot.stacks.total)",
+                    detail: String(
+                        format: String(localized: "%1$d running · %2$d stopped"),
+                        locale: Locale.current,
+                        snapshot.stacks.running,
+                        snapshot.stacks.stopped
+                    ),
+                    systemImage: "square.3.layers.3d"
+                )
+                inventoryTile(String(localized: "Volumes"), value: "\(snapshot.volumes.total)", detail: snapshot.volumes.totalSize > 0 ? snapshot.volumes.totalSize.dockhandByteCount : String(localized: "No size data"), systemImage: "internaldrive")
+                inventoryTile(String(localized: "Networks"), value: "\(snapshot.networks.total)", detail: host?.host.storageDriver ?? String(localized: "Ready"), systemImage: "point.3.connected.trianglepath.dotted")
+                inventoryTile(
+                    String(localized: "Events"),
+                    value: "\(snapshot.events.today)",
+                    detail: String(format: String(localized: "%d total"), locale: Locale.current, snapshot.events.total),
+                    systemImage: "waveform.path.ecg"
+                )
+                inventoryTile(
+                    String(localized: "Build cache"),
+                    value: snapshot.buildCacheSize.dockhandByteCount,
+                    detail: String(
+                        format: String(localized: "Containers %@"),
+                        locale: Locale.current,
+                        snapshot.containersSize.dockhandByteCount
+                    ),
+                    systemImage: "shippingbox"
+                )
             }
         }
     }
@@ -405,6 +433,6 @@ struct DashboardView: View {
 
 private extension Double {
     var percentText: String {
-        String(format: "%.1f%%", self)
+        (self / 100).formatted(.percent.precision(.fractionLength(1)))
     }
 }

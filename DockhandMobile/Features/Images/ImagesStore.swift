@@ -45,7 +45,11 @@ final class ImagesStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.pullImage(imageName: name, environmentID: environmentID)
-            actionMessage = "\(name) pulled"
+            actionMessage = String(
+                format: String(localized: "%@ pulled"),
+                locale: Locale.current,
+                name
+            )
             actionMessageScope = scope
             await load(appModel: appModel)
         } catch {
@@ -66,7 +70,9 @@ final class ImagesStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.pruneImages(environmentID: environmentID, danglingOnly: danglingOnly)
-            actionMessage = danglingOnly ? "Dangling images pruned" : "Unused images pruned"
+            actionMessage = danglingOnly
+                ? String(localized: "Dangling images pruned")
+                : String(localized: "Unused images pruned")
             actionMessageScope = .list
             await load(appModel: appModel)
         } catch {
@@ -87,7 +93,12 @@ final class ImagesStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.tagImage(imageID: image.id, environmentID: environmentID, repo: repo, tag: tag)
-            actionMessage = "\(repo):\(tag) created"
+            actionMessage = String(
+                format: String(localized: "%@:%@ created"),
+                locale: Locale.current,
+                repo,
+                tag
+            )
             actionMessageScope = .image(image.id)
             await load(appModel: appModel)
         } catch {
@@ -108,7 +119,11 @@ final class ImagesStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.deleteImage(imageReference: reference, environmentID: environmentID)
-            actionMessage = "\(reference) deleted"
+            actionMessage = String(
+                format: String(localized: "%@ deleted"),
+                locale: Locale.current,
+                reference
+            )
             actionMessageScope = .image(reference)
             await load(appModel: appModel)
         } catch {
@@ -129,7 +144,11 @@ final class ImagesStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.deleteImageTag(imageTag: tag, environmentID: environmentID)
-            actionMessage = "\(tag) removed"
+            actionMessage = String(
+                format: String(localized: "%@ removed"),
+                locale: Locale.current,
+                tag
+            )
             actionMessageScope = .image(imageID)
             await load(appModel: appModel)
         } catch {

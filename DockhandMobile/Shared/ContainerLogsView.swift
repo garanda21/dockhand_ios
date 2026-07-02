@@ -16,7 +16,7 @@ final class ContainerLogsStore {
     var error: String?
     var tail = 200
     var follow = false
-    var streamStatus = "Idle"
+    var streamStatus = String(localized: "Idle")
 
     func run(target: ContainerLogTarget, appModel: AppModel) async {
         if follow {
@@ -35,7 +35,7 @@ final class ContainerLogsStore {
 
         isLoading = true
         error = nil
-        streamStatus = "Loading"
+        streamStatus = String(localized: "Loading")
         defer { isLoading = false }
 
         do {
@@ -46,10 +46,10 @@ final class ContainerLogsStore {
                 tail: tail
             )
             replaceLogs(loadedDocument.logs)
-            streamStatus = "Snapshot"
+            streamStatus = String(localized: "Snapshot")
         } catch {
             self.error = error.localizedDescription
-            streamStatus = "Error"
+            streamStatus = String(localized: "Error")
         }
     }
 
@@ -63,7 +63,7 @@ final class ContainerLogsStore {
         isLoading = true
         error = nil
         replaceLogs("")
-        streamStatus = "Connecting"
+        streamStatus = String(localized: "Connecting")
         defer { isLoading = false }
 
         do {
@@ -77,17 +77,17 @@ final class ContainerLogsStore {
                 await MainActor.run {
                     switch event {
                     case .connected:
-                        self.streamStatus = "Live"
+                        self.streamStatus = String(localized: "Live")
                     case .log(let line):
                         self.prependLiveLog(line)
                     }
                 }
             }
         } catch is CancellationError {
-            streamStatus = "Stopped"
+            streamStatus = String(localized: "Stopped")
         } catch {
             self.error = error.localizedDescription
-            streamStatus = "Error"
+            streamStatus = String(localized: "Error")
         }
     }
 
@@ -135,7 +135,7 @@ struct ContainerLogsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: taskKey) {
             guard isCurrentScope else {
-                store.streamStatus = "Context changed"
+                store.streamStatus = String(localized: "Context changed")
                 return
             }
             await store.run(target: target, appModel: appModel)

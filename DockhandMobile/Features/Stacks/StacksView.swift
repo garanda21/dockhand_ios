@@ -49,7 +49,11 @@ struct StacksView: View {
 
             Section("Stacks") {
                 if filteredStacks.isEmpty {
-                    Text(stateFilter == .all ? "No stacks" : "No stacks in \(stateFilter.title)")
+                    Text(
+                        stateFilter == .all
+                            ? String(localized: "No stacks")
+                            : String(format: String(localized: "No stacks in %@"), locale: Locale.current, stateFilter.title)
+                    )
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredStacks, id: \.name) { stack in
@@ -86,16 +90,16 @@ struct StacksView: View {
                         Button {
                             stateFilter = .all
                         } label: {
-                            selectionLabel("All states", isSelected: stateFilter == .all)
+                            selectionLabel(String(localized: "All states"), isSelected: stateFilter == .all)
                         }
 
                         ForEach(availableStates, id: \.self) { state in
-                            Button {
-                                stateFilter = DockhandStateFilter.state(state)
-                            } label: {
-                                selectionLabel(state.capitalized, isSelected: stateFilter == DockhandStateFilter.state(state))
-                            }
+                        Button {
+                            stateFilter = DockhandStateFilter.state(state)
+                        } label: {
+                            selectionLabel(state.localizedDockhandStateLabel, isSelected: stateFilter == DockhandStateFilter.state(state))
                         }
+                    }
                     }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
@@ -135,8 +139,8 @@ private enum StackListSort: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .name: return "Name"
-        case .state: return "State"
+        case .name: return String(localized: "Name")
+        case .state: return String(localized: "State")
         }
     }
 }
@@ -150,11 +154,11 @@ private struct StackRow: View {
                 Text(stack.name)
                     .font(.headline)
                 Spacer()
-                Text(stack.status.uppercased())
+                Text(stack.localizedStatusText.uppercased())
                     .font(.caption.weight(.bold))
                     .foregroundStyle(stack.status == "running" ? .green : .secondary)
             }
-            Text("\(stack.servicesCount) services")
+            Text(stack.servicesCount.localizedServicesCountText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -196,7 +200,7 @@ private struct StackEditorView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(liveStack.name)
                         .font(.title2.weight(.semibold))
-                    Text(liveStack.status)
+                    Text(liveStack.localizedStatusText)
                         .foregroundStyle(.secondary)
                     if let composePath = document.composePath, !composePath.isEmpty {
                         Text(composePath)
@@ -283,10 +287,10 @@ private struct StackEditorView: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
                 spacing: 10
             ) {
-                stackActionButton(.start, "play.fill", "Start")
-                stackActionButton(.stop, "stop.fill", "Stop")
-                stackActionButton(.restart, "arrow.clockwise", "Restart")
-                stackActionButton(.down, "arrow.down.to.line.compact", "Down")
+                stackActionButton(.start, "play.fill", String(localized: "Start"))
+                stackActionButton(.stop, "stop.fill", String(localized: "Stop"))
+                stackActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
+                stackActionButton(.down, "arrow.down.to.line.compact", String(localized: "Down"))
                 if liveStack.supportsRedeploy {
                     redeployButton
                 }
@@ -304,7 +308,7 @@ private struct StackEditorView: View {
                 Text("Containers")
                     .font(.headline)
                 Spacer()
-                Text("\(liveStack.servicesCount) services")
+                Text(liveStack.servicesCount.localizedServicesCountText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -370,13 +374,13 @@ private struct StackEditorView: View {
 
             if activePane == .compose {
                 editorBlock(
-                    title: "Compose file",
+                    title: String(localized: "Compose file"),
                     text: $document.composeContent,
                     kind: .yaml
                 )
             } else {
                 editorBlock(
-                    title: "Environment file",
+                    title: String(localized: "Environment file"),
                     text: $document.envContent,
                     kind: .env
                 )
@@ -445,14 +449,16 @@ private struct StackEditorView: View {
                     composePath: document.composePath,
                     envPath: document.envPath ?? document.suggestedEnvPath
                 )
-                saveMessage = "Compose saved"
+                saveMessage = String(localized: "Compose saved")
             } else {
                 try await service.updateStackEnvFile(
                     name: stack.name,
                     environmentID: environmentID,
                     content: document.envContent
                 )
-                saveMessage = document.envContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? ".env removed" : ".env saved"
+                saveMessage = document.envContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? String(localized: ".env removed")
+                    : String(localized: ".env saved")
             }
             saveMessageIsError = false
             await store.load(appModel: appModel)
@@ -592,16 +598,16 @@ private struct StackContainerCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(container.name)
-                        .font(.headline)
-                    Text(container.service)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                Text(container.name)
+                    .font(.headline)
+                Text(container.service)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Text(container.state.uppercased())
+                Text(container.state.localizedDockhandStateLabel.uppercased())
                     .font(.caption.weight(.bold))
                     .foregroundStyle(container.state == "running" ? .green : .secondary)
             }
@@ -621,7 +627,7 @@ private struct StackContainerCard: View {
             .foregroundStyle(.secondary)
             .lineLimit(2)
 
-            Text(container.status)
+            Text(container.status.localizedDockhandStateLabel)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -629,11 +635,11 @@ private struct StackContainerCard: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
                 spacing: 8
             ) {
-                stackContainerActionButton(.start, "play.fill", "Start")
-                stackContainerActionButton(.stop, "stop.fill", "Stop")
-                stackContainerActionButton(.restart, "arrow.clockwise", "Restart")
-                stackContainerActionButton(.pause, "pause.fill", "Pause")
-                stackContainerActionButton(.unpause, "playpause.fill", "Resume")
+                stackContainerActionButton(.start, "play.fill", String(localized: "Start"))
+                stackContainerActionButton(.stop, "stop.fill", String(localized: "Stop"))
+                stackContainerActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
+                stackContainerActionButton(.pause, "pause.fill", String(localized: "Pause"))
+                stackContainerActionButton(.unpause, "playpause.fill", String(localized: "Resume"))
             }
 
             HStack(spacing: 10) {
@@ -764,5 +770,5 @@ private enum EditorPane: String, CaseIterable, Identifiable {
     case env
 
     var id: String { rawValue }
-    var title: String { self == .compose ? "Compose" : ".env" }
+    var title: String { self == .compose ? String(localized: "Compose") : ".env" }
 }

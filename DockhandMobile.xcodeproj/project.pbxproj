@@ -30,6 +30,8 @@
 		D701C4AC0D3E16F8C32BFEC4 /* ContainerShellStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */; };
 		D81EF90DB2E1C18AA9B1D46C /* ContainerShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */; };
 		DC17580525152C8C828E703B /* ContainerShellModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A92E116DFB84B69D12240A /* ContainerShellModels.swift */; };
+		DD1BA613F8CBF3C67B34A862 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 498DB08A39D3F486DE12FAF5 /* Localizable.xcstrings */; };
+		DF33CE477876CC44B55FBB57 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = DC7935A747A89C9F23582DBC /* InfoPlist.xcstrings */; };
 		E250B753CFA89B5B4699A38B /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 6C73308032173B848E282173 /* SwiftTerm */; };
 		E882AE90D8FD0104F7520724 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 125F5F1A04A3D953027B8DB4 /* Yams */; };
 		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
@@ -56,23 +58,27 @@
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
-		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		498DB08A39D3F486DE12FAF5 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
 		65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainersView.swift; sourceTree = "<group>"; };
 		6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DockhandService+Decoding.swift"; sourceTree = "<group>"; };
 		6ED8574F1769840BE2533DA4 /* StacksStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksStore.swift; sourceTree = "<group>"; };
 		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
 		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
-		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
+		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DockhandAPI; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
 		C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesStore.swift; sourceTree = "<group>"; };
 		D4F56858EF25CC073EFD0846 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		DC7935A747A89C9F23582DBC /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
-		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E5CB4D3D92232BD7A7E04370 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E88C67A91A207F8EBE7A121C /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
 		EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellView.swift; sourceTree = "<group>"; };
+		F0976C1D3ECF9207F9267361 /* .gitkeep */ = {isa = PBXFileReference; name = .gitkeep; path = es.lproj/.gitkeep; sourceTree = "<group>"; };
 		FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -104,6 +110,10 @@
 		44165C81445DAED68DC41951 /* DockhandMobile */ = {
 			isa = PBXGroup;
 			children = (
+				F0976C1D3ECF9207F9267361 /* .gitkeep */,
+				E5CB4D3D92232BD7A7E04370 /* Info.plist */,
+				DC7935A747A89C9F23582DBC /* InfoPlist.xcstrings */,
+				498DB08A39D3F486DE12FAF5 /* Localizable.xcstrings */,
 				7F95D938C11C7EE7B3CC35B0 /* App */,
 				9C4F11BDBB66979A36E86A23 /* Features */,
 				D7E4F1B99D5D427D7EABFF78 /* Services */,
@@ -293,6 +303,7 @@
 			knownRegions = (
 				Base,
 				en,
+				es,
 			);
 			mainGroup = 554C3B6E0D257A607369986D;
 			minimizedProjectReferenceProxies = 1;
@@ -317,6 +328,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DF33CE477876CC44B55FBB57 /* InfoPlist.xcstrings in Resources */,
+				DD1BA613F8CBF3C67B34A862 /* Localizable.xcstrings in Resources */,
 				77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -382,8 +395,10 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				LOCALIZED_STRING_SWIFTUI_SUPPORT = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile.tests;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DockhandMobile.app/DockhandMobile";
@@ -400,8 +415,10 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				LOCALIZED_STRING_SWIFTUI_SUPPORT = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile.tests;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DockhandMobile.app/DockhandMobile";
@@ -470,19 +487,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = dockhand_glass;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DockhandMobile/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LOCALIZED_STRING_SWIFTUI_SUPPORT = YES;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -494,19 +510,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = dockhand_glass;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Dockhand;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DockhandMobile/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LOCALIZED_STRING_SWIFTUI_SUPPORT = YES;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.dockhand.mobile;
 				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

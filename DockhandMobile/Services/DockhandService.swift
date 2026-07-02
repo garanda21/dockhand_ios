@@ -127,11 +127,15 @@ enum DockhandServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
-            return "Invalid response from Dockhand"
+            return String(localized: "Invalid response from Dockhand")
         case .message(let message):
             return message
         case .unexpectedStatus(let code):
-            return "Dockhand returned status \(code)"
+            return String(
+                format: String(localized: "Dockhand returned status %lld"),
+                locale: Locale.current,
+                Int64(code)
+            )
         }
     }
 }
@@ -874,6 +878,21 @@ enum ContainerAction: String, CaseIterable, Identifiable {
     case unpause
 
     var id: String { rawValue }
+
+    var completedLabel: String {
+        switch self {
+        case .start:
+            return String(localized: "started")
+        case .stop:
+            return String(localized: "stopped")
+        case .restart:
+            return String(localized: "restarted")
+        case .pause:
+            return String(localized: "paused")
+        case .unpause:
+            return String(localized: "resumed")
+        }
+    }
 }
 
 enum StackAction: String, CaseIterable, Identifiable {

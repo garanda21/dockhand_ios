@@ -107,20 +107,20 @@ extension DockhandService {
 
         return DashboardHostSnapshot(
             docker: .init(
-                version: dockerObject["version"] as? String ?? "Unknown",
-                apiVersion: dockerObject["apiVersion"] as? String ?? "Unknown",
-                os: dockerObject["os"] as? String ?? "Unknown",
-                arch: dockerObject["arch"] as? String ?? "Unknown",
-                kernelVersion: dockerObject["kernelVersion"] as? String ?? "Unknown",
-                serverVersion: dockerObject["serverVersion"] as? String ?? "Unknown",
+                version: dockerObject["version"] as? String ?? String(localized: "Unknown"),
+                apiVersion: dockerObject["apiVersion"] as? String ?? String(localized: "Unknown"),
+                os: dockerObject["os"] as? String ?? String(localized: "Unknown"),
+                arch: dockerObject["arch"] as? String ?? String(localized: "Unknown"),
+                kernelVersion: dockerObject["kernelVersion"] as? String ?? String(localized: "Unknown"),
+                serverVersion: dockerObject["serverVersion"] as? String ?? String(localized: "Unknown"),
                 connectionType: dockerConnection["type"] as? String ?? "unknown",
                 socketPath: dockerConnection["socketPath"] as? String
             ),
             host: .init(
-                name: hostObject["name"] as? String ?? "Unknown",
+                name: hostObject["name"] as? String ?? String(localized: "Unknown"),
                 cpus: intValue(hostObject["cpus"]) ?? 0,
                 memory: intValue(hostObject["memory"]) ?? 0,
-                storageDriver: hostObject["storageDriver"] as? String ?? "Unknown"
+                storageDriver: hostObject["storageDriver"] as? String ?? String(localized: "Unknown")
             )
         )
     }

@@ -42,7 +42,12 @@ final class ContainersStore {
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
-            actionMessage = "\(container.name) \(action.rawValue)d"
+            actionMessage = String(
+                format: String(localized: "%@ %@"),
+                locale: Locale.current,
+                container.name,
+                action.completedLabel
+            )
             await load(appModel: appModel)
         } catch {
             self.error = error.localizedDescription
@@ -110,7 +115,11 @@ struct ContainersView: View {
 
             Section("Containers") {
                 if filteredContainers.isEmpty {
-                    Text(stateFilter == .all ? "No containers" : "No containers in \(stateFilter.title)")
+                    Text(
+                        stateFilter == .all
+                            ? String(localized: "No containers")
+                            : String(format: String(localized: "No containers in %@"), locale: Locale.current, stateFilter.title)
+                    )
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredContainers, id: \.id) { container in
@@ -147,16 +156,16 @@ struct ContainersView: View {
                         Button {
                             stateFilter = .all
                         } label: {
-                            selectionLabel("All states", isSelected: stateFilter == .all)
+                            selectionLabel(String(localized: "All states"), isSelected: stateFilter == .all)
                         }
 
                         ForEach(availableStates, id: \.self) { state in
-                            Button {
-                                stateFilter = DockhandStateFilter.state(state)
-                            } label: {
-                                selectionLabel(state.capitalized, isSelected: stateFilter == DockhandStateFilter.state(state))
-                            }
+                        Button {
+                            stateFilter = DockhandStateFilter.state(state)
+                        } label: {
+                            selectionLabel(state.localizedDockhandStateLabel, isSelected: stateFilter == DockhandStateFilter.state(state))
                         }
+                    }
                     }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
@@ -196,8 +205,8 @@ private enum ContainerListSort: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .name: return "Name"
-        case .state: return "State"
+        case .name: return String(localized: "Name")
+        case .state: return String(localized: "State")
         }
     }
 }
@@ -211,7 +220,7 @@ private struct ContainerRow: View {
                 Text(container.name)
                     .font(.headline)
                 Spacer()
-                Text(container.state.uppercased())
+                Text(container.state.localizedDockhandStateLabel.uppercased())
                     .font(.caption.weight(.bold))
                     .foregroundStyle(container.state == "running" ? .green : .secondary)
             }
@@ -256,7 +265,7 @@ private struct ContainerDetailView: View {
                         .font(.title2.weight(.semibold))
                     Text(liveContainer.image)
                         .foregroundStyle(.secondary)
-                    Text(liveContainer.status)
+                    Text(liveContainer.status.localizedDockerRuntimeText)
                         .font(.subheadline)
                 }
                 .padding(20)
@@ -269,9 +278,9 @@ private struct ContainerDetailView: View {
                 actionBar
                 quickLinks
 
-                detailsBlock("Networks", liveContainer.networkSummary.isEmpty ? "No networks" : liveContainer.networkSummary)
-                detailsBlock("Command", liveContainer.command ?? "No command")
-                detailsBlock("System Container", liveContainer.systemContainer ?? "No")
+                detailsBlock(String(localized: "Networks"), liveContainer.networkSummary.isEmpty ? String(localized: "No networks") : liveContainer.networkSummary)
+                detailsBlock(String(localized: "Command"), liveContainer.command ?? String(localized: "No command"))
+                detailsBlock(String(localized: "System Container"), liveContainer.systemContainer ?? String(localized: "No"))
             }
             .padding()
         }
@@ -305,11 +314,11 @@ private struct ContainerDetailView: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
                 spacing: 10
             ) {
-                actionButton(.start, "play.fill", "Start")
-                actionButton(.stop, "stop.fill", "Stop")
-                actionButton(.restart, "arrow.clockwise", "Restart")
-                actionButton(.pause, "pause.fill", "Pause")
-                actionButton(.unpause, "playpause.fill", "Resume")
+                actionButton(.start, "play.fill", String(localized: "Start"))
+                actionButton(.stop, "stop.fill", String(localized: "Stop"))
+                actionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
+                actionButton(.pause, "pause.fill", String(localized: "Pause"))
+                actionButton(.unpause, "playpause.fill", String(localized: "Resume"))
             }
         }
         .padding(20)

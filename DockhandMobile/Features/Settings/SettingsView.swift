@@ -17,7 +17,7 @@ struct SettingsView: View {
             }
             .padding()
         }
-        .navigationTitle("Settings")
+        .navigationTitle(String(localized: "Settings"))
         .navigationBarTitleDisplayMode(.large)
     }
 
@@ -25,16 +25,16 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Active server")
+                    Text(String(localized: "Active server"))
                         .font(.headline.weight(.semibold))
-                    Text("Quick context and switching.")
+                    Text(String(localized: "Quick context and switching."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 12)
                 if let health = appModel.lastHealthStatus {
-                    infoChip("Status", health.uppercased(), systemImage: "heart.text.square", tint: health == "ok" ? .green : .secondary)
+                    infoChip(String(localized: "Status"), health.uppercased(), systemImage: "heart.text.square", tint: health == "ok" ? .green : .secondary)
                         .frame(maxWidth: 120)
                 }
 
@@ -71,7 +71,7 @@ struct SettingsView: View {
                         Button {
                             Task {
                                 await appModel.refreshEnvironments(forceEnvironmentReset: false)
-                                statusMessage = appModel.environmentError ?? "Active server refreshed"
+                                statusMessage = appModel.environmentError ?? String(localized: "Active server refreshed")
                             }
                         } label: {
                             Image(systemName: "arrow.clockwise")
@@ -86,15 +86,15 @@ struct SettingsView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "No server configured",
+                    String(localized: "No server configured"),
                     systemImage: "server.rack",
-                    description: Text("Add a Dockhand server to start switching environments.")
+                    description: Text(String(localized: "Add a Dockhand server to start switching environments."))
                 )
 
                 NavigationLink {
                     ServerProfileDetailView(appModel: appModel, profileID: nil)
                 } label: {
-                    Label("Add server", systemImage: "plus")
+                    Label(String(localized: "Add server"), systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
@@ -110,7 +110,7 @@ struct SettingsView: View {
                 Button {
                     Task {
                         await appModel.selectServerProfile(profile.id, forceEnvironmentReset: true)
-                        statusMessage = appModel.environmentError ?? "Server changed"
+                        statusMessage = appModel.environmentError ?? String(localized: "Server changed")
                     }
                 } label: {
                     Label(
@@ -124,7 +124,7 @@ struct SettingsView: View {
                 Image(systemName: "arrow.left.arrow.right.circle.fill")
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Switch server")
+                        Text(String(localized: "Switch server"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(appModel.selectedProfileName)
@@ -148,9 +148,9 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Server library")
+                    Text(String(localized: "Server library"))
                         .font(.headline.weight(.semibold))
-                    Text("Each server keeps its own details, token and selected environment.")
+                    Text(String(localized: "Each server keeps its own details, token and selected environment."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -160,7 +160,7 @@ struct SettingsView: View {
                 NavigationLink {
                     ServerProfileDetailView(appModel: appModel, profileID: nil)
                 } label: {
-                    Label("New", systemImage: "plus")
+                    Label(String(localized: "New"), systemImage: "plus")
                         .labelStyle(.iconOnly)
                         .frame(width: 36, height: 36)
                 }
@@ -239,7 +239,7 @@ private struct ServerProfileRow: View {
                         .foregroundStyle(.primary)
 
                     if isActive {
-                        Text("ACTIVE")
+                        Text(String(localized: "ACTIVE"))
                             .font(.caption2.weight(.bold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -254,7 +254,7 @@ private struct ServerProfileRow: View {
                     .lineLimit(1)
 
                 if let environmentName, isActive {
-                    Text("Environment: \(environmentName)")
+                    Text(String(format: String(localized: "Environment: %@"), locale: Locale.current, environmentName))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -319,7 +319,7 @@ private struct ServerProfileDetailView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle(editingProfile == nil ? "New Server" : "Server Details")
+        .navigationTitle(editingProfile == nil ? String(localized: "New Server") : String(localized: "Server Details"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -330,7 +330,7 @@ private struct ServerProfileDetailView: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text(editingProfile == nil ? "Create" : "Save")
+                        Text(editingProfile == nil ? String(localized: "Create") : String(localized: "Save"))
                     }
                 }
                 .disabled(!canSave)
@@ -339,23 +339,23 @@ private struct ServerProfileDetailView: View {
         .task(id: profileID) {
             loadDraft()
         }
-        .confirmationDialog("Delete server?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
+        .confirmationDialog(String(localized: "Delete server?"), isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button(String(localized: "Delete"), role: .destructive) {
                 Task { await deleteProfile() }
             }
         } message: {
-            Text("This removes the saved URL, token and per-server environment selection.")
+            Text(String(localized: "This removes the saved URL, token and per-server environment selection."))
         }
     }
 
     private func detailsCard(_ profile: DockhandServerProfile) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            detailRow("Server ID", value: profile.id, monospaced: true)
+            detailRow(String(localized: "Server ID"), value: profile.id, monospaced: true)
             divider
-            detailRow("Active", value: isActive ? "Yes" : "No")
+            detailRow(String(localized: "Active"), value: isActive ? String(localized: "Yes") : String(localized: "No"))
             if isActive {
                 divider
-                detailRow("Environment", value: appModel.selectedEnvironmentName)
+                detailRow(String(localized: "Environment"), value: appModel.selectedEnvironmentName)
             }
         }
         .padding(18)
@@ -364,17 +364,17 @@ private struct ServerProfileDetailView: View {
 
     private var connectionCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            cardSectionTitle("Connection")
+            cardSectionTitle(String(localized: "Connection"))
 
-            editorField("Name", text: $draftName)
+            editorField(String(localized: "Name"), text: $draftName)
                 .textInputAutocapitalization(.words)
 
-            editorField("Base URL", text: $draftBaseURL)
+            editorField(String(localized: "Base URL"), text: $draftBaseURL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
 
-            secureEditorField("Bearer token (optional)", text: $draftToken)
+            secureEditorField(String(localized: "Bearer token (optional)"), text: $draftToken)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
         }
@@ -397,12 +397,12 @@ private struct ServerProfileDetailView: View {
                 Button {
                     Task {
                         await appModel.selectServerProfile(profileID, forceEnvironmentReset: true)
-                        statusMessage = appModel.environmentError ?? "Server changed"
+                        statusMessage = appModel.environmentError ?? String(localized: "Server changed")
                     }
                 } label: {
                     HStack {
                         Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-                        Text("Use this server")
+                        Text(String(localized: "Use this server"))
                         Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity)
@@ -418,7 +418,7 @@ private struct ServerProfileDetailView: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash")
-                        Text("Delete server")
+                        Text(String(localized: "Delete server"))
                         Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity)
@@ -509,7 +509,7 @@ private struct ServerProfileDetailView: View {
             token: draftToken,
             makeActive: true
         )
-        statusMessage = appModel.environmentError ?? "Server saved"
+        statusMessage = appModel.environmentError ?? String(localized: "Server saved")
         dismiss()
     }
 

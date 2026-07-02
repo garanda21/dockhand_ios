@@ -49,7 +49,11 @@ struct ImagesView: View {
 
             Section("Images") {
                 if filteredImages.isEmpty {
-                    Text(stateFilter == .all ? "No images" : "No images in \(stateFilter.title)")
+                    Text(
+                        stateFilter == .all
+                            ? String(localized: "No images")
+                            : String(format: String(localized: "No images in %@"), locale: Locale.current, stateFilter.title)
+                    )
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredImages, id: \.id) { image in
@@ -138,16 +142,17 @@ struct ImagesView: View {
             }
 
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    pruneButton(.danglingOnly, title: "Prune", systemImage: "wand.and.stars.inverse", tint: .primary, isRunning: store.activeActionID == "prune")
+                VStack(spacing: 12) {
+                    pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
 
-                    pruneButton(.allUnused, title: "Prune unused", systemImage: "wand.and.stars", tint: .orange, isRunning: store.activeActionID == "prune-unused")
+                    pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
 
                     toolButton(
-                        title: "Pull",
+                        title: String(localized: "Pull"),
                         systemImage: "arrow.down.circle",
                         tint: .blue,
-                        isProminent: true
+                        isProminent: true,
+                        height: 20
                     ) {
                         pullSheetPresented = true
                     }
@@ -155,16 +160,17 @@ struct ImagesView: View {
 
                 VStack(spacing: 10) {
                     HStack(spacing: 10) {
-                        pruneButton(.danglingOnly, title: "Prune", systemImage: "wand.and.stars.inverse", tint: .primary, isRunning: store.activeActionID == "prune")
+                        pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
 
-                        pruneButton(.allUnused, title: "Prune unused", systemImage: "wand.and.stars", tint: .orange, isRunning: store.activeActionID == "prune-unused")
+                        pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
                     }
 
                     toolButton(
-                        title: "Pull image",
+                        title: String(localized: "Pull image"),
                         systemImage: "arrow.down.circle",
                         tint: .blue,
-                        isProminent: true
+                        isProminent: true,
+                        height: 20
                     ) {
                         pullSheetPresented = true
                     }
@@ -191,6 +197,7 @@ struct ImagesView: View {
         tint: Color,
         isProminent: Bool = false,
         isRunning: Bool = false,
+        height: CGFloat = 44,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -206,7 +213,7 @@ struct ImagesView: View {
             }
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(height: height)
         }
         .buttonStyle(isProminent ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.bordered))
         .tint(tint)
@@ -218,13 +225,15 @@ struct ImagesView: View {
         title: String,
         systemImage: String,
         tint: Color,
+        height: CGFloat,
         isRunning: Bool
     ) -> some View {
         toolButton(
             title: title,
             systemImage: systemImage,
             tint: tint,
-            isRunning: isRunning
+            isRunning: isRunning,
+            height: height
         ) {
             pruneConfirmation = mode
         }
@@ -280,7 +289,7 @@ private struct ImageRow: View {
             HStack {
                 Text(image.size.dockhandByteCount)
                 Text(image.createdAtText)
-                Text("\(image.containers) containers")
+                Text(image.containers.localizedContainersCountText)
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -310,13 +319,13 @@ private enum ImageStateFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all:
-            return "All"
+            return String(localized: "All")
         case .inUse:
-            return "In use"
+            return String(localized: "In use")
         case .someUnused:
-            return "Some unused"
+            return String(localized: "Some unused")
         case .unused:
-            return "Unused"
+            return String(localized: "Unused")
         }
     }
 
@@ -341,27 +350,27 @@ private enum ImagePruneMode {
     var title: String {
         switch self {
         case .danglingOnly:
-            return "Prune dangling images"
+            return String(localized: "Prune dangling images")
         case .allUnused:
-            return "Prune unused images"
+            return String(localized: "Prune unused images")
         }
     }
 
     var confirmTitle: String {
         switch self {
         case .danglingOnly:
-            return "Prune"
+            return String(localized: "Prune")
         case .allUnused:
-            return "Prune unused"
+            return String(localized: "Prune unused")
         }
     }
 
     var message: String {
         switch self {
         case .danglingOnly:
-            return "This removes untagged intermediate layers in the selected Dockhand environment."
+            return String(localized: "This removes untagged intermediate layers in the selected Dockhand environment.")
         case .allUnused:
-            return "This removes every image not used by any container in the selected Dockhand environment."
+            return String(localized: "This removes every image not used by any container in the selected Dockhand environment.")
         }
     }
 }
@@ -488,10 +497,10 @@ private struct ImageDetailView: View {
                 .textSelection(.enabled)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
-                metric("Size", liveImage.size.dockhandByteCount)
-                metric("Virtual", liveImage.virtualSize.dockhandByteCount)
-                metric("Created", liveImage.createdAtText)
-                metric("Used by", "\(liveImage.containers) containers")
+                metric(String(localized: "Size"), liveImage.size.dockhandByteCount)
+                metric(String(localized: "Virtual"), liveImage.virtualSize.dockhandByteCount)
+                metric(String(localized: "Created"), liveImage.createdAtText)
+                metric(String(localized: "Used by"), liveImage.containers.localizedContainersCountText)
             }
         }
         .padding(20)
@@ -505,7 +514,7 @@ private struct ImageDetailView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
                 actionButton(
-                    title: "Scan",
+                    title: String(localized: "Scan"),
                     systemImage: "shield.checkered",
                     isRunning: store.isRunning("scan", reference: liveImage.id)
                 ) {
@@ -519,17 +528,17 @@ private struct ImageDetailView: View {
                     }
                 }
 
-                actionButton(title: "Tag", systemImage: "tag") {
+                actionButton(title: String(localized: "Tag"), systemImage: "tag") {
                     guard isCurrentScope else { return }
                     tagSheetPresented = true
                 }
 
-                actionButton(title: "Pull", systemImage: "arrow.down.circle") {
+                actionButton(title: String(localized: "Pull"), systemImage: "arrow.down.circle") {
                     guard isCurrentScope else { return }
                     pullSheetPresented = true
                 }
 
-                actionButton(title: "Delete", systemImage: "trash", role: .destructive) {
+                actionButton(title: String(localized: "Delete"), systemImage: "trash", role: .destructive) {
                     guard isCurrentScope else { return }
                     deleteConfirmationPresented = true
                 }
@@ -695,7 +704,11 @@ private struct ImageTagDeletionTarget: Equatable {
     let reference: String
 
     var message: String {
-        "Remove tag \(reference)?"
+        String(
+            format: String(localized: "Remove tag %@?"),
+            locale: Locale.current,
+            reference
+        )
     }
 }
 
