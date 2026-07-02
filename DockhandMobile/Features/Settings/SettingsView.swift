@@ -74,11 +74,12 @@ struct SettingsView: View {
                                 statusMessage = appModel.environmentError ?? "Active server refreshed"
                             }
                         } label: {
-                            Label("Refresh server", systemImage: "arrow.clockwise")
-                                .frame(maxWidth: .infinity)
+                            Image(systemName: "arrow.clockwise")
+                                .font(.title3)
+                                .frame(maxWidth: 60, maxHeight: 50)
                         }
                         .buttonStyle(.glass)
-                            .frame(maxWidth: 120)
+                            
                     }
 
                     
@@ -178,6 +179,7 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -266,6 +268,8 @@ private struct ServerProfileRow: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 20))
     }
 }
@@ -292,72 +296,46 @@ private struct ServerProfileDetailView: View {
         appModel.selectedProfileID == profileID
     }
 
+    private var canSave: Bool {
+        !isSaving && !draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
-        Form {
-            if let editingProfile {
-                Section {
-                    LabeledContent("Server ID", value: editingProfile.id)
-                        .font(.footnote.monospaced())
-                    LabeledContent("Active", value: isActive ? "Yes" : "No")
-                    if isActive {
-                        LabeledContent("Environment", value: appModel.selectedEnvironmentName)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let editingProfile {
+                    detailsCard(editingProfile)
                 }
+
+                connectionCard
+
+                if let statusMessage {
+                    statusCard(statusMessage)
+                }
+
+                actionPanel
             }
-
-            Section("Connection") {
-                TextField("Name", text: $draftName)
-                    .textInputAutocapitalization(.words)
-
-                TextField("Base URL", text: $draftBaseURL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-
-                SecureField("Bearer token (optional)", text: $draftToken)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            Section {
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(editingProfile == nil ? "New Server" : "Server Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await saveProfile() }
                 } label: {
                     if isSaving {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
+                            .controlSize(.small)
                     } else {
-                        Text(editingProfile == nil ? "Create server" : "Save changes")
-                            .frame(maxWidth: .infinity)
+                        Text(editingProfile == nil ? "Create" : "Save")
                     }
                 }
-                .disabled(isSaving || draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                if let profileID, !isActive {
-                    Button("Use this server") {
-                        Task {
-                            await appModel.selectServerProfile(profileID, forceEnvironmentReset: true)
-                            statusMessage = appModel.environmentError ?? "Server changed"
-                        }
-                    }
-                }
-
-                if profileID != nil {
-                    Button("Delete server", role: .destructive) {
-                        showDeleteConfirmation = true
-                    }
-                    .disabled(appModel.serverProfiles.count <= 1 && isActive)
-                }
-            }
-
-            if let statusMessage {
-                Section("Status") {
-                    Text(statusMessage)
-                }
+                .disabled(!canSave)
             }
         }
-        .navigationTitle(editingProfile == nil ? "New Server" : "Server Details")
-        .navigationBarTitleDisplayMode(.inline)
         .task(id: profileID) {
             loadDraft()
         }
@@ -368,6 +346,142 @@ private struct ServerProfileDetailView: View {
         } message: {
             Text("This removes the saved URL, token and per-server environment selection.")
         }
+    }
+
+    private func detailsCard(_ profile: DockhandServerProfile) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            detailRow("Server ID", value: profile.id, monospaced: true)
+            divider
+            detailRow("Active", value: isActive ? "Yes" : "No")
+            if isActive {
+                divider
+                detailRow("Environment", value: appModel.selectedEnvironmentName)
+            }
+        }
+        .padding(18)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
+    }
+
+    private var connectionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            cardSectionTitle("Connection")
+
+            editorField("Name", text: $draftName)
+                .textInputAutocapitalization(.words)
+
+            editorField("Base URL", text: $draftBaseURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+
+            secureEditorField("Bearer token (optional)", text: $draftToken)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+        .padding(18)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
+    }
+
+    private func statusCard(_ message: String) -> some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+    }
+
+    private var actionPanel: some View {
+        VStack(spacing: 12) {
+            if let profileID, !isActive {
+                Button {
+                    Task {
+                        await appModel.selectServerProfile(profileID, forceEnvironmentReset: true)
+                        statusMessage = appModel.environmentError ?? "Server changed"
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                        Text("Use this server")
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
+                .buttonStyle(.glass)
+            }
+
+            if profileID != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Delete server")
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
+                .foregroundStyle(.red)
+                .disabled(appModel.serverProfiles.count <= 1 && isActive)
+            }
+        }
+    }
+
+    private func cardSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+
+    private func detailRow(_ title: String, value: String, monospaced: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Text(value)
+                .font(monospaced ? .footnote.monospaced() : .body)
+                .foregroundStyle(.primary)
+                .lineLimit(monospaced ? 2 : 1)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func editorField(_ title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            TextField(title, text: text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private func secureEditorField(_ title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            SecureField(title, text: text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(.white.opacity(0.08))
+            .frame(height: 1)
     }
 
     private func loadDraft() {
