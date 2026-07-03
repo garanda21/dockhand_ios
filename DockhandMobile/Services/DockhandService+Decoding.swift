@@ -104,8 +104,18 @@ extension DockhandService {
         }
 
         let dockerConnection = dockerObject["connection"] as? [String: Any] ?? [:]
+        let dockhandObject = (object["dockhand"] as? [String: Any])
+            ?? (object["app"] as? [String: Any])
+            ?? (object["server"] as? [String: Any])
 
         return DashboardHostSnapshot(
+            dockhand: .init(
+                version: stringValue(dockhandObject?["version"]) ?? stringValue(object["dockhandVersion"]) ?? stringValue(object["version"]),
+                build: stringValue(dockhandObject?["build"]) ?? stringValue(object["build"]),
+                commit: stringValue(dockhandObject?["commit"]) ?? stringValue(dockhandObject?["gitCommit"]) ?? stringValue(object["commit"]),
+                runtime: stringValue(dockhandObject?["runtime"]) ?? stringValue(object["runtime"]),
+                database: stringValue(dockhandObject?["database"]) ?? stringValue(object["database"])
+            ),
             docker: .init(
                 version: dockerObject["version"] as? String ?? String(localized: "Unknown"),
                 apiVersion: dockerObject["apiVersion"] as? String ?? String(localized: "Unknown"),
@@ -131,6 +141,17 @@ extension DockhandService {
         }
         if let value = value as? NSNumber {
             return value.intValue
+        }
+        return nil
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        if let value = value as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if let value = value as? NSNumber {
+            return value.stringValue
         }
         return nil
     }

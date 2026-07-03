@@ -523,7 +523,8 @@ private struct ImageDetailView: View {
                         do {
                             scanResult = try await store.scanImage(liveImage, appModel: appModel)
                         } catch {
-                            store.error = error.localizedDescription
+                            guard !error.isDockhandCancellation else { return }
+                            store.error = error.dockhandUserFacingMessage
                         }
                     }
                 }

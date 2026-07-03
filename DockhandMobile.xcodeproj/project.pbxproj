@@ -15,6 +15,7 @@
 		40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F56858EF25CC073EFD0846 /* Formatting.swift */; };
 		4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88C67A91A207F8EBE7A121C /* ImagesView.swift */; };
 		5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A1342B619AADBFCAF7582E /* DockhandService.swift */; };
+		5A61D922AE56DD3A6F893216 /* UserFacingError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AC0A8828C781207C5F87EA /* UserFacingError.swift */; };
 		64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F846090140816C679D138A /* StackEditorSupport.swift */; };
 		77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */; };
 		7B369144D2CEB78771441943 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3266A680155F8775A56868 /* AppModel.swift */; };
@@ -55,18 +56,19 @@
 		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		24A92E116DFB84B69D12240A /* ContainerShellModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellModels.swift; sourceTree = "<group>"; };
+		35AC0A8828C781207C5F87EA /* UserFacingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFacingError.swift; sourceTree = "<group>"; };
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
 		498DB08A39D3F486DE12FAF5 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
 		65F4A20BB877A7AFF902E7C5 /* ContainersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainersView.swift; sourceTree = "<group>"; };
 		6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DockhandService+Decoding.swift"; sourceTree = "<group>"; };
 		6ED8574F1769840BE2533DA4 /* StacksStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksStore.swift; sourceTree = "<group>"; };
 		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
 		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
-		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DockhandAPI; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
+		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
@@ -75,10 +77,10 @@
 		DC7935A747A89C9F23582DBC /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		E5A1342B619AADBFCAF7582E /* DockhandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandService.swift; sourceTree = "<group>"; };
 		E5CB4D3D92232BD7A7E04370 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E6C29A6716520FE1D8EA61C8 /* DockhandMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockhandMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E88C67A91A207F8EBE7A121C /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
 		EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellView.swift; sourceTree = "<group>"; };
-		F0976C1D3ECF9207F9267361 /* .gitkeep */ = {isa = PBXFileReference; name = .gitkeep; path = es.lproj/.gitkeep; sourceTree = "<group>"; };
+		F0976C1D3ECF9207F9267361 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; name = .gitkeep; path = es.lproj/.gitkeep; sourceTree = "<group>"; };
 		FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -212,6 +214,7 @@
 				87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */,
 				D4F56858EF25CC073EFD0846 /* Formatting.swift */,
 				4235237EFC10FBEF71895994 /* Shell */,
+				35AC0A8828C781207C5F87EA /* UserFacingError.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -363,6 +366,7 @@
 				17795D5F56F0735052BAF912 /* StacksStore.swift in Sources */,
 				B388C775A10358DC31C430CD /* StacksView.swift in Sources */,
 				A8F9039D7C41A72D87FFE6C8 /* SwiftTermContainerView.swift in Sources */,
+				5A61D922AE56DD3A6F893216 /* UserFacingError.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

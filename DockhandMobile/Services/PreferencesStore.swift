@@ -12,12 +12,19 @@ struct DockhandServerProfile: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+struct CachedDashboardSnapshot: Codable, Hashable, Sendable {
+    var snapshot: DashboardEnvironmentSnapshot
+    var host: DashboardHostSnapshot?
+    var lastUpdated: Date
+}
+
 @MainActor
 enum PreferencesStore {
     private static let defaults = UserDefaults.standard
     private static let profilesKey = "dockhand.serverProfiles"
     private static let selectedProfileKey = "dockhand.selectedProfileID"
     private static let selectedEnvironmentsKey = "dockhand.selectedEnvironmentIDsByProfile"
+    private static let dashboardSnapshotsKey = "dockhand.dashboardSnapshotsByScope"
 
     private static let legacyBaseURLKey = "dockhand.baseURL"
     private static let legacySelectedEnvironmentKey = "dockhand.selectedEnvironmentID"
@@ -65,6 +72,22 @@ enum PreferencesStore {
         selectedEnvironmentIDsByProfile = values
     }
 
+    static func cachedDashboardSnapshot(profileID: String, environmentID: Int) -> CachedDashboardSnapshot? {
+        cachedDashboardSnapshots[dashboardCacheKey(profileID: profileID, environmentID: environmentID)]
+    }
+
+    static func setCachedDashboardSnapshot(_ snapshot: CachedDashboardSnapshot?, profileID: String, environmentID: Int) {
+        var values = cachedDashboardSnapshots
+        values[dashboardCacheKey(profileID: profileID, environmentID: environmentID)] = snapshot
+        cachedDashboardSnapshots = values
+    }
+
+    static func removeCachedDashboardSnapshots(for profileID: String) {
+        var values = cachedDashboardSnapshots
+        values = values.filter { key, _ in !key.hasPrefix("\(profileID):") }
+        cachedDashboardSnapshots = values
+    }
+
     private static var selectedEnvironmentIDsByProfile: [String: Int] {
         get {
             guard let data = defaults.data(forKey: selectedEnvironmentsKey),
@@ -80,10 +103,29 @@ enum PreferencesStore {
         }
     }
 
+    private static var cachedDashboardSnapshots: [String: CachedDashboardSnapshot] {
+        get {
+            guard let data = defaults.data(forKey: dashboardSnapshotsKey),
+                  let decoded = try? JSONDecoder().decode([String: CachedDashboardSnapshot].self, from: data) else {
+                return [:]
+            }
+            return decoded
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: dashboardSnapshotsKey)
+            }
+        }
+    }
+
     private static func saveProfiles(_ profiles: [DockhandServerProfile]) {
         if let data = try? JSONEncoder().encode(profiles) {
             defaults.set(data, forKey: profilesKey)
         }
+    }
+
+    private static func dashboardCacheKey(profileID: String, environmentID: Int) -> String {
+        "\(profileID):\(environmentID)"
     }
 
     private static func migratedLegacyProfiles() -> [DockhandServerProfile] {

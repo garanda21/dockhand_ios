@@ -416,7 +416,8 @@ private struct StackEditorView: View {
             saveMessage = nil
             saveMessageIsError = false
         } catch {
-            saveMessage = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            saveMessage = error.dockhandUserFacingMessage
             saveMessageIsError = true
         }
     }
@@ -463,7 +464,8 @@ private struct StackEditorView: View {
             saveMessageIsError = false
             await store.load(appModel: appModel)
         } catch {
-            saveMessage = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            saveMessage = error.dockhandUserFacingMessage
             saveMessageIsError = true
         }
     }

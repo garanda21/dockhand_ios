@@ -23,8 +23,8 @@ struct ImageScanDocument: Sendable, Hashable {
     var results: [String]
 }
 
-struct DashboardEnvironmentSnapshot: Sendable, Hashable {
-    struct Containers: Sendable, Hashable {
+struct DashboardEnvironmentSnapshot: Codable, Sendable, Hashable {
+    struct Containers: Codable, Sendable, Hashable {
         var total: Int
         var running: Int
         var stopped: Int
@@ -34,35 +34,35 @@ struct DashboardEnvironmentSnapshot: Sendable, Hashable {
         var pendingUpdates: Int
     }
 
-    struct Images: Sendable, Hashable {
+    struct Images: Codable, Sendable, Hashable {
         var total: Int
         var totalSize: Int
     }
 
-    struct Volumes: Sendable, Hashable {
+    struct Volumes: Codable, Sendable, Hashable {
         var total: Int
         var totalSize: Int
     }
 
-    struct Networks: Sendable, Hashable {
+    struct Networks: Codable, Sendable, Hashable {
         var total: Int
     }
 
-    struct Stacks: Sendable, Hashable {
+    struct Stacks: Codable, Sendable, Hashable {
         var total: Int
         var running: Int
         var partial: Int
         var stopped: Int
     }
 
-    struct Metrics: Sendable, Hashable {
+    struct Metrics: Codable, Sendable, Hashable {
         var cpuPercent: Double
         var memoryPercent: Double
         var memoryUsed: Int
         var memoryTotal: Int
     }
 
-    struct Events: Sendable, Hashable {
+    struct Events: Codable, Sendable, Hashable {
         var total: Int
         var today: Int
     }
@@ -90,8 +90,16 @@ struct DashboardEnvironmentSnapshot: Sendable, Hashable {
     var events: Events
 }
 
-struct DashboardHostSnapshot: Sendable, Hashable {
-    struct Docker: Sendable, Hashable {
+struct DashboardHostSnapshot: Codable, Sendable, Hashable {
+    struct Dockhand: Codable, Sendable, Hashable {
+        var version: String?
+        var build: String?
+        var commit: String?
+        var runtime: String?
+        var database: String?
+    }
+
+    struct Docker: Codable, Sendable, Hashable {
         var version: String
         var apiVersion: String
         var os: String
@@ -102,13 +110,14 @@ struct DashboardHostSnapshot: Sendable, Hashable {
         var socketPath: String?
     }
 
-    struct Host: Sendable, Hashable {
+    struct Host: Codable, Sendable, Hashable {
         var name: String
         var cpus: Int
         var memory: Int
         var storageDriver: String
     }
 
+    var dockhand: Dockhand?
     var docker: Docker
     var host: Host
 }

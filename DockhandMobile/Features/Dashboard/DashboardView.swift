@@ -10,18 +10,39 @@ final class DashboardStore {
     var isLoading = false
     var error: String?
     var lastUpdated: Date?
+    var isShowingCachedSnapshot = false
+
+    func restoreCachedSnapshot(appModel: AppModel) {
+        guard let profileID = appModel.selectedProfileID,
+              let environmentID = appModel.selectedEnvironment?.id,
+              let cached = PreferencesStore.cachedDashboardSnapshot(profileID: profileID, environmentID: environmentID) else {
+            snapshot = nil
+            host = nil
+            lastUpdated = nil
+            isShowingCachedSnapshot = false
+            return
+        }
+
+        snapshot = cached.snapshot
+        host = cached.host
+        lastUpdated = cached.lastUpdated
+        error = nil
+        isShowingCachedSnapshot = true
+    }
 
     func load(appModel: AppModel, showLoading: Bool = true) async {
         guard let baseURL = appModel.normalizedBaseURL,
+              let profileID = appModel.selectedProfileID,
               let environmentID = appModel.selectedEnvironment?.id else {
             snapshot = nil
             host = nil
             error = nil
             lastUpdated = nil
+            isShowingCachedSnapshot = false
             return
         }
 
-        if showLoading {
+        if showLoading && snapshot == nil {
             isLoading = true
         }
         error = nil
@@ -35,10 +56,15 @@ final class DashboardStore {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
             snapshot = try await service.fetchDashboardStats(environmentID: environmentID)
             lastUpdated = .now
+            isShowingCachedSnapshot = false
         } catch {
-            self.error = error.localizedDescription
-            snapshot = nil
-            host = nil
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+            if snapshot == nil {
+                host = nil
+                lastUpdated = nil
+                isShowingCachedSnapshot = false
+            }
             return
         }
 
@@ -47,6 +73,14 @@ final class DashboardStore {
             host = try await service.fetchDashboardHost(environmentID: environmentID)
         } catch {
             host = nil
+        }
+
+        if let snapshot, let lastUpdated {
+            PreferencesStore.setCachedDashboardSnapshot(
+                CachedDashboardSnapshot(snapshot: snapshot, host: host, lastUpdated: lastUpdated),
+                profileID: profileID,
+                environmentID: environmentID
+            )
         }
     }
 }
@@ -95,7 +129,8 @@ struct DashboardView: View {
     }
 
     private func runDashboardLoop() async {
-        await store.load(appModel: appModel)
+        store.restoreCachedSnapshot(appModel: appModel)
+        await store.load(appModel: appModel, showLoading: store.snapshot == nil)
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(15))
             guard !Task.isCancelled else { break }
@@ -188,7 +223,7 @@ struct DashboardView: View {
                         .lineLimit(2)
 
                     if let lastUpdated = store.lastUpdated {
-                        Text("Live refresh every 15s · \(lastUpdated.formatted(date: .omitted, time: .standard))")
+                        Text("\(store.isShowingCachedSnapshot ? "Cached snapshot" : "Live refresh every 15s") · \(lastUpdated.formatted(date: .omitted, time: .standard))")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

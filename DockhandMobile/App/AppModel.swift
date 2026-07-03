@@ -85,7 +85,7 @@ final class AppModel {
     }
 
     func bootstrap() async {
-        await refreshEnvironments(forceEnvironmentReset: true)
+        await refreshEnvironments(forceEnvironmentReset: false)
     }
 
     func saveServerProfile(profileID: String?, name: String, baseURLText: String, token: String, makeActive: Bool = true) async {
@@ -115,6 +115,7 @@ final class AppModel {
         serverProfiles.removeAll { $0.id == profileID }
         PreferencesStore.serverProfiles = serverProfiles
         PreferencesStore.removeSelectedEnvironmentID(for: profileID)
+        PreferencesStore.removeCachedDashboardSnapshots(for: profileID)
         KeychainStore.deleteToken(profileID: profileID)
 
         if selectedProfileID == profileID {
@@ -164,13 +165,23 @@ final class AppModel {
             let loaded = try await service.fetchEnvironments()
             environments = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-            if forceEnvironmentReset || !environments.contains(where: { $0.id == selectedEnvironmentID }) {
+            let preferredEnvironmentID = if forceEnvironmentReset {
+                PreferencesStore.selectedEnvironmentID(for: profileID) ?? selectedEnvironmentID
+            } else {
+                selectedEnvironmentID
+            }
+
+            if let preferredEnvironmentID,
+               environments.contains(where: { $0.id == preferredEnvironmentID }) {
+                selectedEnvironmentID = preferredEnvironmentID
+            } else {
                 selectedEnvironmentID = environments.first?.id
             }
 
             PreferencesStore.setSelectedEnvironmentID(selectedEnvironmentID, for: profileID)
         } catch {
-            environmentError = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            environmentError = error.dockhandUserFacingMessage
             environments = []
         }
     }

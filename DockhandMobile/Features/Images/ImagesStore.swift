@@ -28,7 +28,8 @@ final class ImagesStore {
             images = try await service.fetchImages(environmentID: environmentID)
                 .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -53,7 +54,8 @@ final class ImagesStore {
             actionMessageScope = scope
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -76,7 +78,8 @@ final class ImagesStore {
             actionMessageScope = .list
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -102,7 +105,8 @@ final class ImagesStore {
             actionMessageScope = .image(image.id)
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -127,7 +131,8 @@ final class ImagesStore {
             actionMessageScope = .image(reference)
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -152,7 +157,8 @@ final class ImagesStore {
             actionMessageScope = .image(imageID)
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 

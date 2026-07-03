@@ -29,7 +29,8 @@ final class StacksStore {
             stacks = try await service.fetchStacks(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -48,7 +49,8 @@ final class StacksStore {
             actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -75,7 +77,8 @@ final class StacksStore {
             actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -110,7 +113,8 @@ final class StacksStore {
             self.error = String(localized: "Dockhand reported success, but the stack is still present.")
             return false
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return false }
+            self.error = error.dockhandUserFacingMessage
             return false
         }
     }
@@ -135,7 +139,8 @@ final class StacksStore {
             actionMessageOwner = stackName
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 

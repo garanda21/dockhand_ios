@@ -48,7 +48,11 @@ final class ContainerLogsStore {
             replaceLogs(loadedDocument.logs)
             streamStatus = String(localized: "Snapshot")
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else {
+                streamStatus = String(localized: "Stopped")
+                return
+            }
+            self.error = error.dockhandUserFacingMessage
             streamStatus = String(localized: "Error")
         }
     }
@@ -86,7 +90,11 @@ final class ContainerLogsStore {
         } catch is CancellationError {
             streamStatus = String(localized: "Stopped")
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else {
+                streamStatus = String(localized: "Stopped")
+                return
+            }
+            self.error = error.dockhandUserFacingMessage
             streamStatus = String(localized: "Error")
         }
     }

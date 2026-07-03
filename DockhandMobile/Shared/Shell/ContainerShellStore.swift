@@ -54,7 +54,11 @@ final class ContainerShellStore {
                 status = .idle
             }
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else {
+                status = .idle
+                return
+            }
+            self.error = error.dockhandUserFacingMessage
             status = .error
         }
     }
@@ -87,10 +91,15 @@ final class ContainerShellStore {
                 await self?.receiveLoop()
             }
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else {
+                status = .disconnected
+                isConnected = false
+                return
+            }
+            self.error = error.dockhandUserFacingMessage
             status = .error
             isConnected = false
-            appendErrorLine(error.localizedDescription)
+            appendErrorLine(error.dockhandUserFacingMessage)
         }
     }
 
@@ -115,9 +124,10 @@ final class ContainerShellStore {
                 try await webSocketTask.sendInput(input)
             } catch {
                 await MainActor.run {
-                    self.error = error.localizedDescription
+                    guard !error.isDockhandCancellation else { return }
+                    self.error = error.dockhandUserFacingMessage
                     self.status = .error
-                    self.appendErrorLine(error.localizedDescription)
+                    self.appendErrorLine(error.dockhandUserFacingMessage)
                 }
             }
         }
@@ -172,9 +182,13 @@ final class ContainerShellStore {
         } catch {
             isConnected = false
             if status != .ended {
-                self.error = error.localizedDescription
+                guard !error.isDockhandCancellation else {
+                    status = .disconnected
+                    return
+                }
+                self.error = error.dockhandUserFacingMessage
                 status = .error
-                appendErrorLine(error.localizedDescription)
+                appendErrorLine(error.dockhandUserFacingMessage)
             }
         }
     }

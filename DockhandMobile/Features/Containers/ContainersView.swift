@@ -27,7 +27,8 @@ final class ContainersStore {
             containers = try await service.fetchContainers(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 
@@ -50,7 +51,8 @@ final class ContainersStore {
             )
             await load(appModel: appModel)
         } catch {
-            self.error = error.localizedDescription
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
         }
     }
 

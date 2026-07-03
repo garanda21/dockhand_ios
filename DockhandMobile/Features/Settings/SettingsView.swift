@@ -1,14 +1,46 @@
+import Observation
 import SwiftUI
+
+@MainActor
+@Observable
+final class ServerDetailsStore {
+    var host: DashboardHostSnapshot?
+    var isLoading = false
+    var error: String?
+
+    func load(appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id else {
+            host = nil
+            error = nil
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            host = try await service.fetchDashboardHost(environmentID: environmentID)
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+}
 
 struct SettingsView: View {
     let appModel: AppModel
 
     @State private var statusMessage: String?
+    @State private var detailsStore = ServerDetailsStore()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 activeServerCard
+                serverDetailsCard
                 serverLibraryCard
 
                 if let statusMessage {
@@ -19,6 +51,9 @@ struct SettingsView: View {
         }
         .navigationTitle(String(localized: "Settings"))
         .navigationBarTitleDisplayMode(.large)
+        .task(id: appModel.connectionScopeID) {
+            await detailsStore.load(appModel: appModel)
+        }
     }
 
     private var activeServerCard: some View {
@@ -71,6 +106,7 @@ struct SettingsView: View {
                         Button {
                             Task {
                                 await appModel.refreshEnvironments(forceEnvironmentReset: false)
+                                await detailsStore.load(appModel: appModel)
                                 statusMessage = appModel.environmentError ?? String(localized: "Active server refreshed")
                             }
                         } label: {
@@ -142,6 +178,79 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .disabled(appModel.serverProfiles.isEmpty)
+    }
+
+    private var serverDetailsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Server details"))
+                        .font(.headline.weight(.semibold))
+                    Text(String(localized: "Dockhand, Docker and host information for the active environment."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                if detailsStore.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            if let host = detailsStore.host {
+                VStack(alignment: .leading, spacing: 14) {
+                    let dockhandRows = host.dockhand.map(dockhandDetailRows) ?? []
+                    if !dockhandRows.isEmpty {
+                        detailGroup(
+                            String(localized: "Dockhand"),
+                            systemImage: "server.rack",
+                            rows: dockhandRows
+                        )
+                        divider
+                    }
+
+                    detailGroup(
+                        String(localized: "Docker"),
+                        systemImage: "shippingbox",
+                        rows: [
+                            (String(localized: "Server"), host.docker.serverVersion),
+                            (String(localized: "Client"), host.docker.version),
+                            (String(localized: "API"), host.docker.apiVersion),
+                            (String(localized: "OS"), "\(host.docker.os) / \(host.docker.arch)"),
+                            (String(localized: "Kernel"), host.docker.kernelVersion),
+                            (String(localized: "Connection"), host.docker.connectionType.localizedConnectionTypeLabel)
+                        ]
+                    )
+
+                    divider
+
+                    detailGroup(
+                        String(localized: "Host"),
+                        systemImage: "desktopcomputer",
+                        rows: [
+                            (String(localized: "Name"), host.host.name),
+                            (String(localized: "CPU"), host.host.cpus.localizedCoresCountText),
+                            (String(localized: "Memory"), host.host.memory.dockhandByteCount),
+                            (String(localized: "Storage"), host.host.storageDriver)
+                        ]
+                    )
+                }
+            } else if let error = detailsStore.error {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(String(localized: "Select an environment to load server details."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(16)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
     }
 
     private var serverLibraryCard: some View {
@@ -216,6 +325,47 @@ struct SettingsView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+    }
+
+    private func dockhandDetailRows(_ dockhand: DashboardHostSnapshot.Dockhand) -> [(String, String)] {
+        [
+            (String(localized: "Version"), dockhand.version),
+            (String(localized: "Build"), dockhand.build),
+            (String(localized: "Commit"), dockhand.commit),
+            (String(localized: "Runtime"), dockhand.runtime),
+            (String(localized: "Database"), dockhand.database)
+        ].compactMap { title, value in
+            guard let value, !value.isEmpty else { return nil }
+            return (title, value)
+        }
+    }
+
+    private func detailGroup(_ title: String, systemImage: String, rows: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            ForEach(rows, id: \.0) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(row.0)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 12)
+                    Text(row.1)
+                        .font(.footnote.weight(.medium))
+                        .multilineTextAlignment(.trailing)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(.white.opacity(0.08))
+            .frame(height: 1)
     }
 }
 
