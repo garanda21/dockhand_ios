@@ -6,13 +6,17 @@ It is built for people who run containers across multiple Dockhand environments 
 
 > This project is independent and community-driven. It is not an official [Dockhand](https://github.com/Finsys/dockhand) app.
 
-## Screenshots
+## TestFlight
 
-Screenshots will be added as the UI stabilizes.
+You can try the latest beta build on TestFlight here:
+
+[Join Dockhand iOS on TestFlight](https://testflight.apple.com/join/FFE3aDxR)
+
+## Screenshots
 
 | Dashboard | Containers | Stacks | Images |
 | --- | --- | --- | --- |
-| _Coming soon_ | _Coming soon_ | _Coming soon_ | _Coming soon_ |
+| ![Dashboard](docs/images/dashboard.png) | ![Containers](docs/images/containers.png) | ![Stacks](docs/images/stacks.png) | ![Images](docs/images/images.png) |
 
 ## What It Can Do
 
