@@ -8,6 +8,7 @@ final class DashboardStore {
     var snapshot: DashboardEnvironmentSnapshot?
     var host: DashboardHostSnapshot?
     var isLoading = false
+    var isRefreshingCachedSnapshot = false
     var error: String?
     var lastUpdated: Date?
     var isShowingCachedSnapshot = false
@@ -45,11 +46,15 @@ final class DashboardStore {
         if showLoading && snapshot == nil {
             isLoading = true
         }
+        if snapshot != nil && isShowingCachedSnapshot {
+            isRefreshingCachedSnapshot = true
+        }
         error = nil
         defer {
             if showLoading {
                 isLoading = false
             }
+            isRefreshingCachedSnapshot = false
         }
 
         do {
@@ -229,6 +234,14 @@ struct DashboardView: View {
                     }
                 }
                 Spacer(minLength: 0)
+
+                if store.isRefreshingCachedSnapshot {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.secondary)
+                        .padding(.top, 4)
+                        .accessibilityLabel("Refreshing snapshot")
+                }
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
