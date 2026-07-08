@@ -352,9 +352,13 @@ private struct StackEditorView: View {
                             .controlSize(.small)
                             .frame(width: 22, height: 22)
                     } else {
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 22, height: 22)
+                        VStack(spacing: 2) {                            
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 16, weight: .semibold))
+                               
+                            Text("Save")
+                                .font(.caption.weight(.semibold))
+                        }
                     }
                 }
                 .buttonStyle(.glassProminent)

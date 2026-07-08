@@ -395,6 +395,21 @@ private struct ImageDetailView: View {
         appModel.isCurrentScope(scope)
     }
 
+    private var relatedImages: [Components.Schemas.ImageSummary] {
+        let matches = store.images
+            .filter { $0.repositoryKey == liveImage.repositoryKey }
+            .sorted { first, second in
+                if first.id == liveImage.id { return true }
+                if second.id == liveImage.id { return false }
+                if first.isUnused != second.isUnused {
+                    return !first.isUnused
+                }
+                return first.created > second.created
+            }
+
+        return matches.isEmpty ? [liveImage] : matches
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -404,6 +419,7 @@ private struct ImageDetailView: View {
                 statusCard
                 summaryCard
                 actionsCard
+                imageVariantsCard
                 tagsCard
                 digestsCard
                 labelsCard
@@ -556,6 +572,26 @@ private struct ImageDetailView: View {
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
     }
 
+    @ViewBuilder
+    private var imageVariantsCard: some View {
+        if relatedImages.count > 1 || liveImage.isUnused {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Image variants")
+                    .font(.headline)
+
+                ForEach(relatedImages, id: \.id) { image in
+                    ImageVariantRow(image: image, isCurrent: image.id == liveImage.id)
+
+                    if image.id != relatedImages.last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .padding(20)
+            .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        }
+    }
+
     private var tagsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tags")
@@ -698,6 +734,68 @@ private struct ImageDetailView: View {
         }
         .buttonStyle(.glass)
         .disabled(!isCurrentScope)
+    }
+}
+
+private struct ImageVariantRow: View {
+    let image: Components.Schemas.ImageSummary
+    let isCurrent: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: image.isUnused ? "circle.dashed" : "cube.box")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(image.isUnused ? .orange : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(image.variantTagText)
+                    .font(.footnote.monospaced())
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+
+                HStack(spacing: 8) {
+                    if isCurrent {
+                        Text("Current")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.secondary.opacity(0.10), in: Capsule())
+                    }
+
+                    if image.isUnused {
+                        Text("Unused")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.orange.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                Text(image.shortID)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+
+                HStack(spacing: 8) {
+                    Text(image.size.dockhandByteCount)
+                    Text(image.createdAtText)
+                    Text(image.containers.localizedContainersCountText)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private extension Components.Schemas.ImageSummary {
+    var variantTagText: String {
+        allTags.first ?? "<none>"
     }
 }
 

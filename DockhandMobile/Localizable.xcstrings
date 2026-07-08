@@ -913,6 +913,16 @@
         }
       }
     },
+    "Current" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actual"
+          }
+        }
+      }
+    },
     "Dangling images pruned" : {
       "localizations" : {
         "es" : {
@@ -1339,6 +1349,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Imágenes"
+          }
+        }
+      }
+    },
+    "Image variants" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variantes"
           }
         }
       }
