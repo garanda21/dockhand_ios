@@ -16,6 +16,15 @@ private enum DockhandRuntimeState: String {
     }
 }
 
+struct PublishedPortAccess: Hashable, Identifiable {
+    let label: String
+    let destinationURL: URL?
+
+    var id: String {
+        "\(label)|\(destinationURL?.absoluteString ?? "plain")"
+    }
+}
+
 extension String {
     var normalizedDockhandState: String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -190,6 +199,22 @@ extension Int {
 }
 
 extension Components.Schemas.Environment {
+    private var trimmedPublicIP: String? {
+        guard let publicIp else { return nil }
+        let trimmed = publicIp.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func publishedPortURL(port: Int) -> URL? {
+        guard let trimmedPublicIP else { return nil }
+
+        var components = URLComponents()
+        components.scheme = [443, 8443, 9443].contains(port) ? "https" : "http"
+        components.host = trimmedPublicIP.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        components.port = port
+        return components.url
+    }
+
     var hostSummary: String {
         if connectionType == "socket" {
             return socketPath
@@ -248,11 +273,18 @@ extension Components.Schemas.Container {
     }
 
     var primaryPortLabel: String {
-        let labels: [String] = ports.compactMap { (port: Components.Schemas.ContainerPort) -> String? in
-                guard let publicPort = port.publicPort else { return nil }
-                return "\(publicPort):\(port.privatePort)"
-            }
+        let labels = publishedPortAccesses(in: nil).map(\.label)
         return labels.first ?? String(localized: "No ports")
+    }
+
+    func publishedPortAccesses(in environment: Components.Schemas.Environment?) -> [PublishedPortAccess] {
+        ports.compactMap { port in
+            guard let publicPort = port.publicPort else { return nil }
+            return PublishedPortAccess(
+                label: "\(publicPort):\(port.privatePort)",
+                destinationURL: environment?.publishedPortURL(port: publicPort)
+            )
+        }
     }
 
     var networkSummary: String {
@@ -351,16 +383,28 @@ extension Components.Schemas.StackContainerDetail {
     }
 
     var primaryPortLabel: String {
-        let labels = ports.compactMap { port -> String? in
-            if let display = port.display, !display.isEmpty {
-                return display
-            }
-            guard let publicPort = port.publicPort, let privatePort = port.privatePort else {
-                return nil
-            }
-                return "\(publicPort):\(privatePort)"
-        }
+        let labels = publishedPortAccesses(in: nil).map(\.label)
         return labels.first ?? String(localized: "No ports")
+    }
+
+    func publishedPortAccesses(in environment: Components.Schemas.Environment?) -> [PublishedPortAccess] {
+        ports.compactMap { port in
+            guard let publicPort = port.publicPort else { return nil }
+
+            let label: String
+            if let display = port.display?.trimmingCharacters(in: .whitespacesAndNewlines), !display.isEmpty {
+                label = display
+            } else if let privatePort = port.privatePort {
+                label = "\(publicPort):\(privatePort)"
+            } else {
+                label = String(publicPort)
+            }
+
+            return PublishedPortAccess(
+                label: label,
+                destinationURL: environment?.publishedPortURL(port: publicPort)
+            )
+        }
     }
 
     var networkSummary: String {

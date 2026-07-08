@@ -259,6 +259,14 @@ private struct ContainerDetailView: View {
         isCurrentScope ? (store.container(id: container.id) ?? container) : container
     }
 
+    private var environmentForPorts: Components.Schemas.Environment? {
+        appModel.environment(for: scope)
+    }
+
+    private var portAccesses: [PublishedPortAccess] {
+        liveContainer.publishedPortAccesses(in: environmentForPorts)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -279,6 +287,7 @@ private struct ContainerDetailView: View {
 
                 actionBar
                 quickLinks
+                portsBlock
 
                 detailsBlock(String(localized: "Networks"), liveContainer.networkSummary.isEmpty ? String(localized: "No networks") : liveContainer.networkSummary)
                 detailsBlock(String(localized: "Command"), liveContainer.command ?? String(localized: "No command"))
@@ -288,6 +297,16 @@ private struct ContainerDetailView: View {
         }
         .navigationTitle(liveContainer.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var portsBlock: some View {
+        detailsBlock("Ports") {
+            ExposedPortsGrid(
+                accesses: portAccesses,
+                emptyText: String(localized: "No ports"),
+                minimumItemWidth: 112
+            )
+        }
     }
 
     private var staleScopeWarning: some View {
@@ -399,12 +418,18 @@ private struct ContainerDetailView: View {
     }
 
     private func detailsBlock(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
+        detailsBlock(title) {
             Text(value)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
+        }
+    }
+
+    private func detailsBlock<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            content()
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)

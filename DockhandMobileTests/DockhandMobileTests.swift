@@ -1,5 +1,6 @@
 import XCTest
 @testable import DockhandMobile
+import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
     func testByteFormattingUsesBinaryUnits() {
@@ -73,5 +74,57 @@ final class DockhandMobileTests: XCTestCase {
         }
 
         XCTAssertTrue(WrappedCancellationError().isDockhandCancellation)
+    }
+
+    func testPublishedPortURLUsesEnvironmentPublicIP() {
+        let environment = makeEnvironment(publicIP: "10.0.0.24")
+
+        XCTAssertEqual(environment.publishedPortURL(port: 8080)?.absoluteString, "http://10.0.0.24:8080")
+    }
+
+    func testPublishedPortURLSupportsIPv6AndTLSPorts() {
+        let environment = makeEnvironment(publicIP: "[2001:db8::20]")
+
+        XCTAssertEqual(environment.publishedPortURL(port: 8443)?.absoluteString, "https://[2001:db8::20]:8443")
+    }
+
+    func testContainerPortAccessUsesPublishedPortAndPublicIP() {
+        let environment = makeEnvironment(publicIP: "192.168.1.50")
+        let container = Components.Schemas.Container(
+            id: "abc",
+            name: "web",
+            image: "nginx:latest",
+            state: "running",
+            status: "Up",
+            created: 0,
+            ports: [
+                .init(ip: "0.0.0.0", privatePort: 80, publicPort: 8080, _type: "tcp")
+            ],
+            networks: .init(),
+            labels: .init()
+        )
+
+        let accesses = container.publishedPortAccesses(in: environment)
+
+        XCTAssertEqual(accesses.map(\.label), ["8080:80"])
+        XCTAssertEqual(accesses.first?.destinationURL?.absoluteString, "http://192.168.1.50:8080")
+    }
+
+    private func makeEnvironment(publicIP: String?) -> Components.Schemas.Environment {
+        Components.Schemas.Environment(
+            id: 1,
+            name: "Lab",
+            port: 2375,
+            _protocol: "tcp",
+            icon: "server",
+            collectActivity: false,
+            collectMetrics: false,
+            highlightChanges: false,
+            labels: [],
+            connectionType: "socket",
+            socketPath: "/var/run/docker.sock",
+            publicIp: publicIP,
+            createdAt: "2026-07-05T00:00:00Z"
+        )
     }
 }

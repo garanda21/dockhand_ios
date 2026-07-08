@@ -596,6 +596,14 @@ private struct StackContainerCard: View {
     let store: StacksStore
     @Environment(\.colorScheme) private var colorScheme
 
+    private var environmentForPorts: Components.Schemas.Environment? {
+        appModel.environment(for: scope)
+    }
+
+    private var portAccesses: [PublishedPortAccess] {
+        container.publishedPortAccesses(in: environmentForPorts)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
@@ -619,15 +627,18 @@ private struct StackContainerCard: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            HStack {
-                Text(container.primaryPortLabel)
-                if !container.networkSummary.isEmpty {
-                    Text(container.networkSummary)
-                }
+            ExposedPortsGrid(
+                accesses: portAccesses,
+                emptyText: String(localized: "No ports"),
+                minimumItemWidth: 104
+            )
+
+            if !container.networkSummary.isEmpty {
+                Text(container.networkSummary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
 
             Text(container.status.localizedDockhandStateLabel)
                 .font(.footnote)

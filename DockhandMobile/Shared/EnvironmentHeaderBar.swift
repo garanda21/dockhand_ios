@@ -102,3 +102,49 @@ struct EnvironmentHeaderBar: View {
         return "\(appModel.selectedProfileID ?? "none")|\(environmentIDs)"
     }
 }
+
+struct ExposedPortsGrid: View {
+    let accesses: [PublishedPortAccess]
+    let emptyText: String
+    var minimumItemWidth: CGFloat = 120
+
+    var body: some View {
+        if accesses.isEmpty {
+            Text(emptyText)
+                .foregroundStyle(.secondary)
+        } else {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: minimumItemWidth), spacing: 8, alignment: .leading)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(accesses) { access in
+                    if let destinationURL = access.destinationURL {
+                        Link(destination: destinationURL) {
+                            portChip(access.label, isInteractive: true)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        portChip(access.label, isInteractive: false)
+                    }
+                }
+            }
+        }
+    }
+
+    private func portChip(_ label: String, isInteractive: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: isInteractive ? "safari" : "network")
+                .font(.caption.weight(.semibold))
+            Text(label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(isInteractive ? .primary : .secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .glassEffect(.regular.tint(.white.opacity(isInteractive ? 0.08 : 0.04)).interactive(), in: .capsule)
+    }
+}

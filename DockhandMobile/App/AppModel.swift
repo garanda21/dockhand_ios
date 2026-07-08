@@ -84,6 +84,11 @@ final class AppModel {
         connectionScope == scope
     }
 
+    func environment(for scope: DockhandConnectionScope) -> Components.Schemas.Environment? {
+        guard scope.profileID == selectedProfileID else { return nil }
+        return environments.first(where: { $0.id == scope.environmentID })
+    }
+
     func bootstrap() async {
         await refreshEnvironments(forceEnvironmentReset: false)
     }
