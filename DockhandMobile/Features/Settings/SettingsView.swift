@@ -40,8 +40,11 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 activeServerCard
-                serverDetailsCard
-                serverLibraryCard
+
+                if !appModel.serverProfiles.isEmpty {
+                    serverDetailsCard
+                    serverLibraryCard
+                }
 
                 if let statusMessage {
                     statusCard(statusMessage)

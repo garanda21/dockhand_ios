@@ -149,6 +149,13 @@ final class AppModel {
     }
 
     func refreshEnvironments(forceEnvironmentReset: Bool = false) async {
+        guard selectedProfile != nil else {
+            environmentError = nil
+            environments = []
+            lastHealthStatus = nil
+            return
+        }
+
         guard let baseURL = normalizedBaseURL,
               let profileID = selectedProfile?.id else {
             environmentError = String(localized: "Invalid Dockhand URL")

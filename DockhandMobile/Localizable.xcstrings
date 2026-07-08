@@ -41,16 +41,6 @@
         }
       }
     },
-    "%@ · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$@"
-          }
-        }
-      }
-    },
     "%@ %@" : {
       "localizations" : {
         "en" : {
@@ -703,6 +693,16 @@
         }
       }
     },
+    "Cached snapshot · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshot cacheado · %@"
+          }
+        }
+      }
+    },
     "Choose how Dockhand should redeploy this compose stack." : {
       "localizations" : {
         "es" : {
@@ -1343,22 +1343,22 @@
         }
       }
     },
-    "Images" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Imágenes"
-          }
-        }
-      }
-    },
     "Image variants" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Variantes"
+          }
+        }
+      }
+    },
+    "Images" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imágenes"
           }
         }
       }
@@ -1500,7 +1500,6 @@
       }
     },
     "Live refresh every 15s · %@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {

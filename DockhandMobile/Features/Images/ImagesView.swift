@@ -260,25 +260,16 @@ private struct ImageRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(image.displayName)
                     .font(.headline)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if image.isUnused {
-                    Text("Unused")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.orange.opacity(0.12), in: Capsule())
+                    usageBadge("Unused")
                 } else if usage?.isPartiallyUnused == true {
-                    Text("Some unused")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.orange.opacity(0.12), in: Capsule())
+                    usageBadge("Some unused")
                 }
             }
 
@@ -296,6 +287,16 @@ private struct ImageRow: View {
             .lineLimit(1)
         }
         .padding(.vertical, 4)
+    }
+
+    private func usageBadge(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.orange)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.orange.opacity(0.12), in: Capsule())
     }
 }
 

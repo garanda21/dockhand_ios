@@ -92,6 +92,8 @@ final class DashboardStore {
 
 struct DashboardView: View {
     let appModel: AppModel
+    var onOpenSettings: () -> Void = {}
+
     @Environment(\.colorScheme) private var colorScheme
     @State private var store = DashboardStore()
 
@@ -228,20 +230,26 @@ struct DashboardView: View {
                         .lineLimit(2)
 
                     if let lastUpdated = store.lastUpdated {
-                        Text("\(store.isShowingCachedSnapshot ? "Cached snapshot" : "Live refresh every 15s") · \(lastUpdated.formatted(date: .omitted, time: .standard))")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        let updatedTime = lastUpdated.formatted(date: .omitted, time: .standard)
+                        let updateLabel = store.isShowingCachedSnapshot
+                            ? String(format: String(localized: "Cached snapshot · %@"), locale: Locale.current, updatedTime)
+                            : String(format: String(localized: "Live refresh every 15s · %@"), locale: Locale.current, updatedTime)
+
+                        HStack(spacing: 6) {
+                            if store.isRefreshingCachedSnapshot {
+                                ProgressView()
+                                    .controlSize(.mini)
+                                    .tint(.secondary)
+                                    .accessibilityLabel(String(localized: "Refresh"))
+                            }
+
+                            Text(updateLabel)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Spacer(minLength: 0)
-
-                if store.isRefreshingCachedSnapshot {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(.secondary)
-                        .padding(.top, 4)
-                        .accessibilityLabel("Refreshing snapshot")
-                }
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -453,11 +461,27 @@ struct DashboardView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No environment selected",
-            systemImage: "globe.badge.chevron.backward",
-            description: Text("Configure Dockhand in Settings or refresh the environment list.")
-        )
+        VStack(spacing: 14) {
+            ContentUnavailableView(
+                appModel.serverProfiles.isEmpty ? String(localized: "No server configured") : String(localized: "No environment selected"),
+                systemImage: appModel.serverProfiles.isEmpty ? "server.rack" : "globe.badge.chevron.backward",
+                description: Text(
+                    appModel.serverProfiles.isEmpty
+                        ? String(localized: "Add a Dockhand server to start switching environments.")
+                        : String(localized: "Configure Dockhand in Settings or refresh the environment list.")
+                )
+            )
+
+            if appModel.serverProfiles.isEmpty {
+                Button {
+                    onOpenSettings()
+                } label: {
+                    Label(String(localized: "Settings"), systemImage: "gearshape")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+            }
+        }
     }
 
     private var backgroundGradient: some View {
