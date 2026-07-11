@@ -234,12 +234,12 @@ private struct StackEditorView: View {
         .sheet(isPresented: $showsRedeploySheet) {
             StackRedeploySheet(
                 options: $deployOptions,
+                store: store,
+                stackName: liveStack.name,
                 isRunning: store.isRunning(.redeploy, stackName: liveStack.name)
             ) {
-                showsRedeploySheet = false
-                Task { await runRedeploy() }
+                await runRedeploy()
             }
-            .presentationDetents([.height(380)])
             .presentationDragIndicator(.visible)
         }
         .confirmationDialog("Bring stack down", isPresented: $showsDownConfirmation, titleVisibility: .visible) {
@@ -732,52 +732,196 @@ private struct StackContainerCard: View {
 
 private struct StackRedeploySheet: View {
     @Binding var options: StackDeployOptions
+    let store: StacksStore
+    let stackName: String
     let isRunning: Bool
-    let onDeploy: () -> Void
+    let onDeploy: () async -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var deployTask: Task<Void, Never>?
+    @State private var selectedDetent: PresentationDetent = .height(380)
+
+    private var showsProgress: Bool {
+        options.pull && store.redeployStatus != .idle
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Redeploy stack")
-                        .font(.title3.weight(.semibold))
-                    Text("Choose how Dockhand should redeploy this compose stack.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if showsProgress {
+                    redeployProgress
+                } else {
+                    redeployConfiguration
                 }
-
-                VStack(spacing: 12) {
-                    Toggle("Pull images", isOn: $options.pull)
-                    Toggle("Build images", isOn: $options.build)
-                    Toggle("Force recreate", isOn: $options.forceRecreate)
-                }
-                .toggleStyle(.switch)
-                .padding(18)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
-
-                Button {
-                    dismiss()
-                    onDeploy()
-                } label: {
-                    if isRunning {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label("Deploy", systemImage: "paperplane.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(isRunning)
-
-                Spacer(minLength: 0)
             }
             .padding()
             .navigationTitle("Redeploy")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if showsProgress && store.redeployStatus != .deploying {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Close") { dismiss() }
+                    }
+                }
+            }
+        }
+        .presentationDetents([.height(380), .large], selection: $selectedDetent)
+        .interactiveDismissDisabled(store.redeployStatus == .deploying)
+        .onAppear {
+            guard store.redeployStatus != .deploying else { return }
+            store.resetRedeployProgress()
+            selectedDetent = .height(380)
+        }
+        .onDisappear { deployTask?.cancel() }
+    }
+
+    private var redeployConfiguration: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Redeploy stack")
+                    .font(.title3.weight(.semibold))
+                Text("Choose how Dockhand should redeploy this compose stack.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 12) {
+                Toggle("Pull images", isOn: $options.pull)
+                Toggle("Build images", isOn: $options.build)
+                Toggle("Force recreate", isOn: $options.forceRecreate)
+            }
+            .toggleStyle(.switch)
+            .padding(18)
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+
+            Button(action: startDeploy) {
+                if isRunning {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Deploy", systemImage: "paperplane.fill")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(isRunning)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var redeployProgress: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                redeployStatusIcon
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(redeployStatusTitle)
+                        .font(.headline)
+                    Text(stackName)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            if store.redeployStatus == .deploying {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(store.redeploySteps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 10) {
+                        if store.redeployStatus == .deploying && index == store.redeploySteps.indices.last {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        Text(step)
+                            .font(.subheadline)
+                    }
+                }
+            }
+
+            if let error = store.redeployError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            if !store.redeployOutput.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Compose output (\(store.redeployOutput.count) lines)", systemImage: "terminal")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 5) {
+                            ForEach(Array(store.redeployOutput.enumerated()), id: \.offset) { _, line in
+                                Text(line)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(12)
+                    .background(.black, in: .rect(cornerRadius: 12))
+                }
+                .frame(maxHeight: 300)
+            }
+
+            Spacer(minLength: 0)
+
+            if store.redeployStatus == .failed || store.redeployStatus == .cancelled {
+                Button(action: startDeploy) {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var redeployStatusIcon: some View {
+        switch store.redeployStatus {
+        case .deploying:
+            ProgressView()
+        case .complete:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+        case .cancelled:
+            Image(systemName: "pause.circle.fill")
+                .foregroundStyle(.orange)
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    private var redeployStatusTitle: String {
+        switch store.redeployStatus {
+        case .idle: return String(localized: "Redeploy")
+        case .deploying: return String(localized: "Pulling images and redeploying…")
+        case .complete: return String(localized: "Redeploy completed")
+        case .failed: return String(localized: "Redeploy failed")
+        case .cancelled: return String(localized: "Monitoring cancelled")
+        }
+    }
+
+    private func startDeploy() {
+        if options.pull {
+            selectedDetent = .large
+            deployTask = Task { await onDeploy() }
+        } else {
+            dismiss()
+            Task { await onDeploy() }
         }
     }
 }

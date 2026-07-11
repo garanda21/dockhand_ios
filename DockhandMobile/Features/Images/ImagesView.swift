@@ -93,7 +93,7 @@ struct ImagesView: View {
         }
         .sheet(isPresented: $pullSheetPresented) {
             PullImageSheet(appModel: appModel, scope: appModel.connectionScope, store: store, actionScope: .list)
-                .presentationDetents([.medium])
+                .presentationDetents([.large])
         }
         .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
             get: { pruneConfirmation != nil },
@@ -438,7 +438,7 @@ private struct ImageDetailView: View {
                 suggestedName: liveImage.displayName,
                 actionScope: .image(liveImage.id)
             )
-                .presentationDetents([.medium])
+                .presentationDetents([.large])
         }
         .sheet(isPresented: $tagSheetPresented) {
             TagImageSheet(image: liveImage, scope: scope, appModel: appModel, store: store)
@@ -821,37 +821,287 @@ private struct PullImageSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var imageName = ""
+    @State private var pullTask: Task<Void, Never>?
+
+    private var effectiveImageName: String {
+        (imageName.isEmpty ? suggestedName : imageName).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("nginx:latest", text: $imageName)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    imageField
+
+                    if store.pullStatus != .idle {
+                        pullSummary
+
+                        if !store.pullLayers.isEmpty {
+                            layersPanel
+                        }
+
+                        outputPanel
+                    }
+                }
+                .padding()
             }
             .navigationTitle("Pull image")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Pull") {
-                        Task {
-                            guard appModel.isCurrentScope(scope) else { return }
-                            await store.pullImage(named: imageName.isEmpty ? suggestedName : imageName, scope: actionScope, appModel: appModel)
+                    Button(store.pullStatus == .pulling ? String(localized: "Cancel") : String(localized: "Close")) {
+                        if store.pullStatus == .pulling {
+                            pullTask?.cancel()
+                        } else {
                             dismiss()
                         }
                     }
-                    .disabled((imageName.isEmpty ? suggestedName : imageName).isEmpty || store.activeActionID == "pull")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if store.pullStatus != .complete && store.pullStatus != .pulling {
+                        Button(store.pullStatus == .idle ? String(localized: "Pull") : String(localized: "Retry")) {
+                            startPull()
+                        }
+                        .disabled(effectiveImageName.isEmpty || !appModel.isCurrentScope(scope))
+                    }
                 }
             }
         }
+        .interactiveDismissDisabled(store.pullStatus == .pulling)
         .onAppear {
             if imageName.isEmpty {
                 imageName = suggestedName
             }
+            store.resetPullProgress()
         }
+        .onDisappear {
+            pullTask?.cancel()
+        }
+    }
+
+    private var imageField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Image name")
+                .font(.headline)
+            TextField("nginx:latest", text: $imageName)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+                .disabled(store.pullStatus == .pulling)
+                .onSubmit { startPull() }
+        }
+    }
+
+    private var pullSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                summaryIcon
+
+                Text(summaryTitle)
+                    .font(.headline)
+                    .foregroundStyle(summaryColor)
+
+                Spacer()
+
+                if !store.pullLayers.isEmpty {
+                    Text("\(store.completedPullLayerCount) / \(store.pullLayers.count) layers")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.quaternary, in: .capsule)
+                }
+            }
+
+            if store.pullStatus == .pulling, !store.pullLayers.isEmpty {
+                ProgressView(value: store.pullProgress)
+                    .tint(.blue)
+            }
+
+            if store.pullTotalBytes > 0 {
+                Text(
+                    String(
+                        format: String(localized: "Downloaded: %@ / %@"),
+                        locale: .current,
+                        formattedBytes(store.pullDownloadedBytes),
+                        formattedBytes(store.pullTotalBytes)
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            if let message = store.pullStatusMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let error = store.pullError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var layersPanel: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Layer ID")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Status")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Progress")
+                    .frame(width: 72, alignment: .trailing)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(12)
+            .background(.quaternary)
+
+            ForEach(store.pullLayers.sorted(using: KeyPathComparator(\.order))) { layer in
+                PullImageLayerRow(layer: layer)
+                if layer.id != store.pullLayers.last?.id {
+                    Divider()
+                }
+            }
+        }
+        .clipShape(.rect(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.quaternary)
+        }
+    }
+
+    private var outputPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Output (\(store.pullOutput.count) lines)", systemImage: "terminal")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 5) {
+                    ForEach(Array(store.pullOutput.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .frame(minHeight: 100, maxHeight: 180)
+            .font(.caption.monospaced())
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(12)
+            .background(.black, in: .rect(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var summaryIcon: some View {
+        switch store.pullStatus {
+        case .pulling:
+            ProgressView()
+                .controlSize(.small)
+        case .complete:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+        case .cancelled:
+            Image(systemName: "pause.circle.fill")
+                .foregroundStyle(.orange)
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    private var summaryTitle: String {
+        switch store.pullStatus {
+        case .idle: return ""
+        case .pulling: return String(localized: "Pulling layers…")
+        case .complete:
+            return store.isPulledImageUpToDate
+                ? String(localized: "Image is already up to date")
+                : String(localized: "Pull completed")
+        case .failed: return String(localized: "Pull failed")
+        case .cancelled: return String(localized: "Monitoring cancelled")
+        }
+    }
+
+    private var summaryColor: Color {
+        switch store.pullStatus {
+        case .complete: .green
+        case .failed: .red
+        case .cancelled: .orange
+        default: .primary
+        }
+    }
+
+    private func startPull() {
+        guard !effectiveImageName.isEmpty,
+              store.pullStatus != .pulling,
+              appModel.isCurrentScope(scope) else { return }
+
+        pullTask = Task {
+            await store.pullImage(
+                named: effectiveImageName,
+                scope: actionScope,
+                appModel: appModel
+            )
+        }
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary)
+    }
+}
+
+private struct PullImageLayerRow: View {
+    let layer: ImagePullLayer
+
+    private var statusLower: String { layer.status.lowercased() }
+    private var isExtracting: Bool { statusLower.contains("extracting") }
+    private var isActive: Bool { statusLower.contains("downloading") || isExtracting }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(layer.id)
+                .font(.caption2.monospaced())
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Label {
+                Text(layer.status)
+                    .lineLimit(2)
+            } icon: {
+                if layer.isComplete {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(isExtracting ? .orange : .blue)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(layer.isComplete ? .green : isExtracting ? .orange : .primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Group {
+                if layer.isComplete {
+                    Text("Done")
+                        .foregroundStyle(.green)
+                } else if isActive, let percentage = layer.percentage {
+                    Text(percentage, format: .percent.precision(.fractionLength(0)))
+                } else {
+                    Text("—")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.caption)
+            .frame(width: 72, alignment: .trailing)
+        }
+        .padding(12)
     }
 }
 

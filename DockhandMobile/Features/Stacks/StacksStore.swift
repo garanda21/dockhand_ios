@@ -2,6 +2,14 @@ import DockhandAPI
 import Observation
 import SwiftUI
 
+enum StackRedeployStatus: Equatable {
+    case idle
+    case deploying
+    case complete
+    case failed
+    case cancelled
+}
+
 @MainActor
 @Observable
 final class StacksStore {
@@ -12,6 +20,10 @@ final class StacksStore {
     var actionMessageOwner: String?
     var activeStackActionID: String?
     var activeContainerActionID: String?
+    var redeployStatus = StackRedeployStatus.idle
+    var redeploySteps: [String] = []
+    var redeployOutput: [String] = []
+    var redeployError: String?
 
     func load(appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
@@ -60,15 +72,38 @@ final class StacksStore {
 
         activeStackActionID = stackActionID(for: .redeploy, stackName: stack.name)
         error = nil
+        resetRedeployProgress()
+        if options.pull {
+            redeployStatus = .deploying
+            redeploySteps.append(String(localized: "Starting redeploy…"))
+        }
         defer { activeStackActionID = nil }
 
         do {
             let service = DockhandService(baseURL: baseURL, token: appModel.token)
-            try await service.redeployStack(
-                stackName: stack.name,
-                environmentID: environmentID,
-                options: options
-            )
+            if options.pull {
+                let result: StackRedeployResult
+                switch try await service.startStackRedeploy(
+                    stackName: stack.name,
+                    environmentID: environmentID,
+                    options: options
+                ) {
+                case .completed(let completed):
+                    result = completed
+                case .job(let jobID):
+                    result = try await watchStackRedeployJob(jobID, service: service)
+                }
+                try Task.checkCancellation()
+                applyRedeployResult(result)
+                redeployStatus = .complete
+                redeploySteps.append(String(localized: "Redeploy completed"))
+            } else {
+                try await service.redeployStack(
+                    stackName: stack.name,
+                    environmentID: environmentID,
+                    options: options
+                )
+            }
             actionMessage = String(
                 format: String(localized: "%@ redeployed"),
                 locale: Locale.current,
@@ -77,9 +112,69 @@ final class StacksStore {
             actionMessageOwner = stack.name
             await load(appModel: appModel)
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            if error.isDockhandCancellation {
+                if options.pull {
+                    redeployStatus = .cancelled
+                    redeploySteps.append(String(localized: "Progress monitoring cancelled"))
+                }
+                return
+            }
+            if options.pull {
+                redeployStatus = .failed
+                redeployError = error.dockhandUserFacingMessage
+            }
             self.error = error.dockhandUserFacingMessage
         }
+    }
+
+    func resetRedeployProgress() {
+        redeployStatus = .idle
+        redeploySteps = []
+        redeployOutput = []
+        redeployError = nil
+    }
+
+    private func watchStackRedeployJob(
+        _ jobID: String,
+        service: DockhandService
+    ) async throws -> StackRedeployResult {
+        var cursor = 0
+
+        while true {
+            try Task.checkCancellation()
+            let snapshot = try await service.fetchStackRedeployJob(id: jobID)
+
+            if cursor < snapshot.lines.count {
+                for line in snapshot.lines[cursor...] where line.event != "result" {
+                    if let status = line.data.status, !status.isEmpty,
+                       redeploySteps.last != status {
+                        redeploySteps.append(status)
+                    }
+                }
+                cursor = snapshot.lines.count
+            }
+
+            if snapshot.status != "running" {
+                guard let result = snapshot.result else {
+                    throw DockhandServiceError.invalidResponse
+                }
+                if snapshot.status == "error" || result.success == false || result.error != nil {
+                    throw DockhandServiceError.message(result.error ?? String(localized: "Stack redeploy failed"))
+                }
+                return result
+            }
+
+            try await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
+    private func applyRedeployResult(_ result: StackRedeployResult) {
+        guard let output = result.output, !output.isEmpty else { return }
+        let ansiPattern = "\u{001B}\\[[0-?]*[ -/]*[@-~]"
+        redeployOutput = output
+            .components(separatedBy: .newlines)
+            .map { $0.replacingOccurrences(of: ansiPattern, with: "", options: .regularExpression) }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     func deleteStack(

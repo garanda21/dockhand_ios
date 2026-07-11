@@ -23,6 +23,35 @@ struct ImageScanDocument: Sendable, Hashable {
     var results: [String]
 }
 
+struct ImagePullProgressDetail: Decodable, Sendable, Hashable {
+    let current: Int64?
+    let total: Int64?
+}
+
+struct ImagePullProgressEvent: Decodable, Sendable, Hashable {
+    let id: String?
+    let status: String?
+    let progress: String?
+    let progressDetail: ImagePullProgressDetail?
+    let error: String?
+}
+
+struct ImagePullJobLine: Decodable, Sendable, Hashable {
+    let event: String?
+    let data: ImagePullProgressEvent
+}
+
+struct ImagePullJobSnapshot: Decodable, Sendable, Hashable {
+    let status: String
+    let lines: [ImagePullJobLine]
+    let result: ImagePullProgressEvent?
+}
+
+enum ImagePullStartResult: Sendable, Hashable {
+    case job(String)
+    case completed(ImagePullProgressEvent)
+}
+
 struct DashboardEnvironmentSnapshot: Codable, Sendable, Hashable {
     struct Containers: Codable, Sendable, Hashable {
         var total: Int
@@ -126,6 +155,33 @@ struct StackDeployOptions: Sendable, Hashable {
     var pull = true
     var build = false
     var forceRecreate = false
+}
+
+struct StackRedeployProgressEvent: Decodable, Sendable, Hashable {
+    let status: String?
+}
+
+struct StackRedeployJobLine: Decodable, Sendable, Hashable {
+    let event: String?
+    let data: StackRedeployProgressEvent
+}
+
+struct StackRedeployResult: Decodable, Sendable, Hashable {
+    let success: Bool?
+    let status: String?
+    let output: String?
+    let error: String?
+}
+
+struct StackRedeployJobSnapshot: Decodable, Sendable, Hashable {
+    let status: String
+    let lines: [StackRedeployJobLine]
+    let result: StackRedeployResult?
+}
+
+enum StackRedeployStartResult: Sendable, Hashable {
+    case job(String)
+    case completed(StackRedeployResult)
 }
 
 enum DockhandServiceError: LocalizedError {
@@ -501,32 +557,63 @@ struct DockhandService {
         }
     }
 
-    func pullImage(
+    func startImagePull(
         imageName: String,
         environmentID: Int
-    ) async throws {
-        let body = ["image": imageName]
-        let response = try await performJSONRequest(
-            path: "/api/images/pull",
-            method: "POST",
-            environmentID: environmentID,
-            body: body
-        )
-
-        let status = response["status"] as? String
-        let success = response["success"] as? Bool
-        let error = response["error"] as? String
-
-        if success == false {
-            throw DockhandServiceError.message(error ?? "Image pull failed")
+    ) async throws -> ImagePullStartResult {
+        guard var components = URLComponents(
+            url: baseURL.appending(path: "/api/images/pull"),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw DockhandServiceError.invalidResponse
         }
-        if let error, !error.isEmpty {
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "image": imageName,
+            "scanAfterPull": false
+        ])
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        try Self.validateResponse(response, data: data)
+
+        if let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
+           let jobID = payload.jobId,
+           !jobID.isEmpty {
+            return .job(jobID)
+        }
+
+        let completed = try JSONDecoder().decode(ImagePullProgressEvent.self, from: data)
+        if let error = completed.error, !error.isEmpty {
             throw DockhandServiceError.message(error)
         }
-        if status == "complete" || success == true {
-            return
+        if completed.status == "complete" {
+            return .completed(completed)
         }
         throw DockhandServiceError.invalidResponse
+    }
+
+    func fetchImagePullJob(id: String) async throws -> ImagePullJobSnapshot {
+        let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        try Self.validateResponse(response, data: data)
+        return try JSONDecoder().decode(ImagePullJobSnapshot.self, from: data)
     }
 
     func pruneImages(
@@ -720,6 +807,65 @@ struct DockhandService {
         throw DockhandServiceError.invalidResponse
     }
 
+    func startStackRedeploy(
+        stackName: String,
+        environmentID: Int,
+        options: StackDeployOptions
+    ) async throws -> StackRedeployStartResult {
+        let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
+        guard var components = URLComponents(
+            url: baseURL.appending(path: "/api/stacks/\(encodedName)/deploy"),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "pull": options.pull,
+            "build": options.build,
+            "forceRecreate": options.forceRecreate
+        ])
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        try Self.validateResponse(response, data: data)
+
+        if let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
+           let jobID = payload.jobId,
+           !jobID.isEmpty {
+            return .job(jobID)
+        }
+
+        let result = try JSONDecoder().decode(StackRedeployResult.self, from: data)
+        if result.success == false || result.error != nil {
+            throw DockhandServiceError.message(result.error ?? "Stack redeploy failed")
+        }
+        return .completed(result)
+    }
+
+    func fetchStackRedeployJob(id: String) async throws -> StackRedeployJobSnapshot {
+        let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        try Self.validateResponse(response, data: data)
+        return try JSONDecoder().decode(StackRedeployJobSnapshot.self, from: data)
+    }
+
     func deleteStack(
         stackName: String,
         environmentID: Int,
@@ -840,6 +986,23 @@ struct DockhandService {
         }
         return json
     }
+
+    private static func validateResponse(_ response: URLResponse, data: Data) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DockhandServiceError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            if let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+               let error = json["error"] as? String {
+                throw DockhandServiceError.message(error)
+            }
+            throw DockhandServiceError.unexpectedStatus(httpResponse.statusCode)
+        }
+    }
+}
+
+private struct ImagePullJobStartPayload: Decodable {
+    let jobId: String?
 }
 
 private struct ContainerLogsResponse: Decodable {
