@@ -4,7 +4,10 @@ Dockhand iOS is an open-source SwiftUI client for managing [Dockhand](https://gi
 
 It is built for people who run containers across multiple Dockhand environments and want a native, focused mobile app for the daily operations: checking status, switching environments, viewing logs, editing stacks, pulling images, pruning unused resources and running safe actions against the selected server.
 
-> This project is independent and community-driven. It is not an official [Dockhand](https://github.com/Finsys/dockhand) app.
+> [!IMPORTANT]
+> Dockhand iOS is an independent, community-developed, unofficial client for
+> [Dockhand](https://github.com/Finsys/dockhand). It is not affiliated with,
+> endorsed by, or maintained by the official Dockhand project or its maintainers.
 
 ## TestFlight
 
