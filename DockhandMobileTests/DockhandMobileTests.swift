@@ -146,6 +146,80 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(volumes.first?.usedBy.first?.containerName, "web")
     }
 
+    func testContainerLogSSEParserDecodesConnectedAndLogEvents() throws {
+        var parser = ContainerLogSSEParser()
+
+        XCTAssertNil(try parser.consume(line: "event: connected"))
+        XCTAssertNil(try parser.consume(line: "data: {\"containerId\":\"container-1\"}"))
+        guard case .connected? = try parser.consume(line: "") else {
+            return XCTFail("Expected a connected event")
+        }
+
+        XCTAssertNil(try parser.consume(line: "event: log"))
+        XCTAssertNil(try parser.consume(line: "data: {\"text\":\"first\\nsecond\\n\"}"))
+        guard case .log(let text)? = try parser.consume(line: "") else {
+            return XCTFail("Expected a log event")
+        }
+        XCTAssertEqual(text, "first\nsecond\n")
+    }
+
+    func testContainerLogSSEParserHandlesHeartbeatErrorAndEnd() throws {
+        var parser = ContainerLogSSEParser()
+
+        XCTAssertNil(try parser.consume(line: ": keepalive"))
+        XCTAssertNil(try parser.consume(line: ""))
+
+        XCTAssertNil(try parser.consume(line: "event: error"))
+        XCTAssertNil(try parser.consume(line: "data: {\"error\":\"Docker API error: 500\"}"))
+        guard case .serverError(let message)? = try parser.consume(line: "") else {
+            return XCTFail("Expected a server error event")
+        }
+        XCTAssertEqual(message, "Docker API error: 500")
+
+        XCTAssertNil(try parser.consume(line: "event: end"))
+        XCTAssertNil(try parser.consume(line: "data: {\"reason\":\"stream ended\"}"))
+        guard case .ended? = try parser.consume(line: "") else {
+            return XCTFail("Expected an end event")
+        }
+    }
+
+    func testContainerLogFormatterOrdersMixedBatchesByTimestampDescending() {
+        let logs = """
+        2026-07-17T16:06:24.806084337Z timeout
+        continuation for timeout
+        2026-07-17T15:56:51.539909159Z cancelled
+        2026-07-17T13:52:54.527709448Z older
+        2026-07-17T17:43:17.961867978Z newest
+        2026-07-17T17:43:17.750902313Z second newest
+        """
+
+        XCTAssertEqual(
+            ContainerLogFormatter.orderedLatestFirst(from: logs),
+            """
+            2026-07-17T17:43:17.961867978Z newest
+            2026-07-17T17:43:17.750902313Z second newest
+            2026-07-17T16:06:24.806084337Z timeout
+            continuation for timeout
+            2026-07-17T15:56:51.539909159Z cancelled
+            2026-07-17T13:52:54.527709448Z older
+            """
+        )
+    }
+
+    @MainActor
+    func testContainerLogsStorePausesCleanlyWhenAppLeavesForeground() {
+        let store = ContainerLogsStore()
+        store.isLoading = true
+        store.error = "A stale stream error"
+        store.streamStatus = "Connecting"
+
+        store.pauseForBackground()
+
+        XCTAssertFalse(store.isLoading)
+        XCTAssertNil(store.error)
+        XCTAssertEqual(store.streamStatus, String(localized: "Paused"))
+    }
+
     private func makeEnvironment(publicIP: String?) -> Components.Schemas.Environment {
         Components.Schemas.Environment(
             id: 1,

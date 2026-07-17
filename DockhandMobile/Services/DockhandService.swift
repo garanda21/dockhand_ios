@@ -507,6 +507,7 @@ struct DockhandService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.timeoutInterval = 20
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         if !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -520,31 +521,17 @@ struct DockhandService {
             throw DockhandServiceError.unexpectedStatus(httpResponse.statusCode)
         }
 
-        var currentEvent: String?
-        var payloadLines: [String] = []
+        // URLSession has already established and validated the SSE response here.
+        // Do not keep the UI in "Connecting" while AsyncBytes waits to yield the
+        // server's first complete line (the server also sends a connected event).
+        await onEvent(.connected)
+
+        var parser = ContainerLogSSEParser()
 
         for try await line in bytes.lines {
             try Task.checkCancellation()
-
-            if line.isEmpty {
-                let payload = payloadLines.joined(separator: "\n")
-                if currentEvent == "log",
-                   let data = payload.data(using: .utf8) {
-                    let decoded = try JSONDecoder().decode(StreamedLogPayload.self, from: data)
-                    await onEvent(.log(decoded.text))
-                } else if currentEvent == "connected" {
-                    await onEvent(.connected)
-                }
-
-                currentEvent = nil
-                payloadLines = []
-                continue
-            }
-
-            if line.hasPrefix("event:") {
-                currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("data:") {
-                payloadLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+            if let event = try parser.consume(line: line) {
+                await onEvent(event)
             }
         }
     }
@@ -1114,9 +1101,62 @@ private struct StreamedLogPayload: Decodable {
     let text: String
 }
 
+private struct StreamedLogErrorPayload: Decodable {
+    let error: String?
+    let reason: String?
+}
+
 enum ContainerLogEvent: Sendable {
     case connected
     case log(String)
+    case serverError(String)
+    case ended
+}
+
+struct ContainerLogSSEParser {
+    private var currentEvent: String?
+    private var payloadLines: [String] = []
+
+    mutating func consume(line: String) throws -> ContainerLogEvent? {
+        let normalizedLine = line.trimmingCharacters(in: .newlines)
+
+        if normalizedLine.isEmpty {
+            defer {
+                currentEvent = nil
+                payloadLines = []
+            }
+
+            let payload = payloadLines.joined(separator: "\n")
+            switch currentEvent {
+            case "connected":
+                return .connected
+            case "log":
+                guard let data = payload.data(using: .utf8) else { return nil }
+                let decoded = try JSONDecoder().decode(StreamedLogPayload.self, from: data)
+                return .log(decoded.text)
+            case "error":
+                if let data = payload.data(using: .utf8),
+                   let decoded = try? JSONDecoder().decode(StreamedLogErrorPayload.self, from: data) {
+                    return .serverError(decoded.error ?? decoded.reason ?? payload)
+                }
+                return .serverError(payload)
+            case "end":
+                return .ended
+            default:
+                return nil
+            }
+        }
+
+        if normalizedLine.hasPrefix(":") {
+            return nil
+        }
+        if normalizedLine.hasPrefix("event:") {
+            currentEvent = String(normalizedLine.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+        } else if normalizedLine.hasPrefix("data:") {
+            payloadLines.append(String(normalizedLine.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+        }
+        return nil
+    }
 }
 
 enum ContainerAction: String, CaseIterable, Identifiable {
