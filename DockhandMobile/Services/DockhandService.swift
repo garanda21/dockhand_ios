@@ -151,6 +151,25 @@ struct DashboardHostSnapshot: Codable, Sendable, Hashable {
     var host: Host
 }
 
+struct PendingContainerUpdate: Sendable, Hashable {
+    var containerID: String
+    var containerName: String
+    var currentImage: String
+    var checkedAt: String?
+}
+
+struct VolumeUsageSnapshot: Sendable, Hashable {
+    var containerID: String
+    var containerName: String
+}
+
+struct VolumeSnapshot: Sendable, Hashable {
+    var name: String
+    var driver: String
+    var scope: String
+    var usedBy: [VolumeUsageSnapshot]
+}
+
 struct StackDeployOptions: Sendable, Hashable {
     var pull = true
     var build = false
@@ -291,6 +310,36 @@ struct DockhandService {
             environmentID: environmentID
         )
         return try Self.decodeDashboardHost(response)
+    }
+
+    func fetchPendingContainerUpdates(environmentID: Int) async throws -> [PendingContainerUpdate] {
+        let response = try await performJSONRequest(
+            path: "/api/containers/pending-updates",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return Self.decodePendingContainerUpdates(response)
+    }
+
+    func fetchVolumes(environmentID: Int) async throws -> [VolumeSnapshot] {
+        let response = try await performJSONArrayRequest(
+            path: "/api/volumes",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return Self.decodeVolumes(response)
+    }
+
+    func clearPendingContainerUpdate(containerID: String, environmentID: Int) async throws {
+        let response = try await performJSONRequest(
+            path: "/api/containers/pending-updates",
+            method: "DELETE",
+            environmentID: environmentID,
+            additionalQueryItems: [URLQueryItem(name: "containerId", value: containerID)]
+        )
+        guard response["success"] as? Bool == true else {
+            throw DockhandServiceError.invalidResponse
+        }
     }
 
     func fetchStackEditorDocument(name: String, environmentID: Int) async throws -> StackEditorDocument {
@@ -983,6 +1032,34 @@ struct DockhandService {
         }
         guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return [:]
+        }
+        return json
+    }
+
+    private func performJSONArrayRequest(
+        path: String,
+        method: String,
+        environmentID: Int
+    ) async throws -> [[String: Any]] {
+        guard var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        try Self.validateResponse(response, data: data)
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
+            throw DockhandServiceError.invalidResponse
         }
         return json
     }

@@ -49,6 +49,7 @@ final class ContainersStore {
                 container.name,
                 action.completedLabel
             )
+            appModel.requestDashboardRefresh()
             await load(appModel: appModel)
         } catch {
             guard !error.isDockhandCancellation else { return }

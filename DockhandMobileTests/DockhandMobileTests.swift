@@ -110,6 +110,42 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(accesses.first?.destinationURL?.absoluteString, "http://192.168.1.50:8080")
     }
 
+    func testPendingUpdateDecodingKeepsContainerIdentity() {
+        let updates = DockhandService.decodePendingContainerUpdates([
+            "pendingUpdates": [
+                [
+                    "containerId": "container-1",
+                    "containerName": "web",
+                    "currentImage": "nginx:latest",
+                    "checkedAt": "2026-07-17T10:00:00Z"
+                ]
+            ]
+        ])
+
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates.first?.containerID, "container-1")
+        XCTAssertEqual(updates.first?.containerName, "web")
+        XCTAssertEqual(updates.first?.currentImage, "nginx:latest")
+    }
+
+    func testVolumeDecodingKeepsContainerUsage() {
+        let volumes = DockhandService.decodeVolumes([
+            [
+                "name": "app-data",
+                "driver": "local",
+                "scope": "local",
+                "usedBy": [
+                    ["containerId": "container-1", "containerName": "web"]
+                ]
+            ]
+        ])
+
+        XCTAssertEqual(volumes.count, 1)
+        XCTAssertEqual(volumes.first?.name, "app-data")
+        XCTAssertEqual(volumes.first?.usedBy.first?.containerID, "container-1")
+        XCTAssertEqual(volumes.first?.usedBy.first?.containerName, "web")
+    }
+
     private func makeEnvironment(publicIP: String?) -> Components.Schemas.Environment {
         Components.Schemas.Environment(
             id: 1,

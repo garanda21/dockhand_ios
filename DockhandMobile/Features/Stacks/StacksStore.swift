@@ -59,6 +59,7 @@ final class StacksStore {
             try await service.stackAction(action, stackName: stack.name, environmentID: environmentID)
             actionMessage = actionMessage(for: action, stackName: stack.name)
             actionMessageOwner = stack.name
+            appModel.requestDashboardRefresh()
             await load(appModel: appModel)
         } catch {
             guard !error.isDockhandCancellation else { return }
@@ -110,6 +111,15 @@ final class StacksStore {
                 stack.name
             )
             actionMessageOwner = stack.name
+            if options.pull {
+                for containerID in stack.containerDetails.map(\.id) {
+                    try? await service.clearPendingContainerUpdate(
+                        containerID: containerID,
+                        environmentID: environmentID
+                    )
+                }
+            }
+            appModel.requestDashboardRefresh()
             await load(appModel: appModel)
         } catch {
             if error.isDockhandCancellation {
@@ -202,6 +212,7 @@ final class StacksStore {
                 appModel: appModel,
                 deleteVolumes: deleteVolumes
             ) {
+                appModel.requestDashboardRefresh()
                 return true
             }
 
@@ -232,6 +243,7 @@ final class StacksStore {
                 action.completedLabel
             )
             actionMessageOwner = stackName
+            appModel.requestDashboardRefresh()
             await load(appModel: appModel)
         } catch {
             guard !error.isDockhandCancellation else { return }

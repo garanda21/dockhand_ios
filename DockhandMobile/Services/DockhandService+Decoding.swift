@@ -135,6 +135,42 @@ extension DockhandService {
         )
     }
 
+    static func decodePendingContainerUpdates(_ object: [String: Any]) -> [PendingContainerUpdate] {
+        let updates = object["pendingUpdates"] as? [[String: Any]] ?? []
+        return updates.compactMap { update in
+            guard let containerID = update["containerId"] as? String,
+                  let containerName = update["containerName"] as? String else {
+                return nil
+            }
+            return PendingContainerUpdate(
+                containerID: containerID,
+                containerName: containerName,
+                currentImage: update["currentImage"] as? String ?? String(localized: "Unknown image"),
+                checkedAt: update["checkedAt"] as? String
+            )
+        }
+    }
+
+    static func decodeVolumes(_ objects: [[String: Any]]) -> [VolumeSnapshot] {
+        objects.compactMap { volume in
+            guard let name = volume["name"] as? String else { return nil }
+            let usageObjects = volume["usedBy"] as? [[String: Any]] ?? []
+            let usedBy = usageObjects.compactMap { usage -> VolumeUsageSnapshot? in
+                guard let containerID = usage["containerId"] as? String,
+                      let containerName = usage["containerName"] as? String else {
+                    return nil
+                }
+                return VolumeUsageSnapshot(containerID: containerID, containerName: containerName)
+            }
+            return VolumeSnapshot(
+                name: name,
+                driver: volume["driver"] as? String ?? String(localized: "Unknown"),
+                scope: volume["scope"] as? String ?? String(localized: "Unknown"),
+                usedBy: usedBy
+            )
+        }
+    }
+
     private static func intValue(_ value: Any?) -> Int? {
         if let value = value as? Int {
             return value

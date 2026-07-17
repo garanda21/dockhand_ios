@@ -90,6 +90,82 @@ final class DashboardStore {
     }
 }
 
+@MainActor
+@Observable
+private final class DashboardResourceDetailStore {
+    var pendingUpdates: [PendingContainerUpdate] = []
+    var volumes: [VolumeSnapshot] = []
+    var stacks: [Components.Schemas.StackSummary] = []
+    var isLoading = false
+    var error: String?
+
+    func loadUpdates(appModel: AppModel) async {
+        guard let service = service(for: appModel),
+              let environmentID = appModel.selectedEnvironment?.id else {
+            pendingUpdates = []
+            stacks = []
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            async let loadedUpdates = service.fetchPendingContainerUpdates(environmentID: environmentID)
+            async let loadedStacks = service.fetchStacks(environmentID: environmentID)
+            let (updates, stacks) = try await (loadedUpdates, loadedStacks)
+            pendingUpdates = updates.sorted {
+                $0.containerName.localizedCaseInsensitiveCompare($1.containerName) == .orderedAscending
+            }
+            self.stacks = stacks
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+
+    func loadVolumes(appModel: AppModel) async {
+        guard let service = service(for: appModel),
+              let environmentID = appModel.selectedEnvironment?.id else {
+            volumes = []
+            stacks = []
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            async let loadedVolumes = service.fetchVolumes(environmentID: environmentID)
+            async let loadedStacks = service.fetchStacks(environmentID: environmentID)
+            let (volumes, stacks) = try await (loadedVolumes, loadedStacks)
+            self.volumes = volumes.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            self.stacks = stacks
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+
+    func stackNames(for containerID: String) -> [String] {
+        stacks
+            .filter { stack in
+                stack.containerDetails.contains(where: { $0.id == containerID })
+            }
+            .map(\.name)
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    private func service(for appModel: AppModel) -> DockhandService? {
+        guard let baseURL = appModel.normalizedBaseURL else { return nil }
+        return DockhandService(baseURL: baseURL, token: appModel.token)
+    }
+}
+
 struct DashboardView: View {
     let appModel: AppModel
     var onOpenSettings: () -> Void = {}
@@ -98,7 +174,7 @@ struct DashboardView: View {
     @State private var store = DashboardStore()
 
     private var dashboardLoadID: String {
-        "\(appModel.selectedProfileID ?? "none"):\(appModel.selectedEnvironment?.id ?? -1):\(appModel.environments.count)"
+        "\(appModel.selectedProfileID ?? "none"):\(appModel.selectedEnvironment?.id ?? -1):\(appModel.environments.count):\(appModel.dashboardRefreshRevision)"
     }
 
     var body: some View {
@@ -361,7 +437,13 @@ struct DashboardView: View {
                 statusTile(String(localized: "Paused"), value: snapshot.containers.paused, systemImage: "pause.fill", tint: .orange)
                 statusTile(String(localized: "Restarting"), value: snapshot.containers.restarting, systemImage: "arrow.clockwise", tint: .green)
                 statusTile(String(localized: "Alerts"), value: snapshot.containers.unhealthy, systemImage: "exclamationmark.triangle", tint: snapshot.containers.unhealthy == 0 ? .green : .orange)
-                statusTile(String(localized: "Updates"), value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: .secondary)
+                NavigationLink {
+                    DashboardUpdatesDetailView(appModel: appModel)
+                } label: {
+                    statusTile(String(localized: "Updates"), value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: .secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows the containers and stacks with pending updates")
             }
 
             HStack {
@@ -409,7 +491,13 @@ struct DashboardView: View {
                     ),
                     systemImage: "square.3.layers.3d"
                 )
-                inventoryTile(String(localized: "Volumes"), value: "\(snapshot.volumes.total)", detail: snapshot.volumes.totalSize > 0 ? snapshot.volumes.totalSize.dockhandByteCount : String(localized: "No size data"), systemImage: "internaldrive")
+                NavigationLink {
+                    DashboardVolumesDetailView(appModel: appModel)
+                } label: {
+                    inventoryTile(String(localized: "Volumes"), value: "\(snapshot.volumes.total)", detail: snapshot.volumes.totalSize > 0 ? snapshot.volumes.totalSize.dockhandByteCount : String(localized: "No size data"), systemImage: "internaldrive")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows each volume and the containers and stacks using it")
                 inventoryTile(String(localized: "Networks"), value: "\(snapshot.networks.total)", detail: host?.host.storageDriver ?? String(localized: "Ready"), systemImage: "point.3.connected.trianglepath.dotted")
                 inventoryTile(
                     String(localized: "Events"),
@@ -500,6 +588,154 @@ struct DashboardView: View {
             endPoint: .bottomTrailing
         )
         .ignoresSafeArea()
+    }
+}
+
+private struct DashboardUpdatesDetailView: View {
+    let appModel: AppModel
+    @State private var store = DashboardResourceDetailStore()
+
+    var body: some View {
+        List {
+            Section {
+                EnvironmentHeaderBar(appModel: appModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
+            if let error = store.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section("Pending updates") {
+                if store.isLoading && store.pendingUpdates.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if store.pendingUpdates.isEmpty && store.error == nil {
+                    ContentUnavailableView(
+                        "No pending updates",
+                        systemImage: "checkmark.circle",
+                        description: Text("All checked containers are up to date.")
+                    )
+                } else {
+                    ForEach(store.pendingUpdates, id: \.containerID) { update in
+                        VStack(alignment: .leading, spacing: 7) {
+                            Label(update.containerName, systemImage: "shippingbox")
+                                .font(.headline)
+                            Text(update.currentImage)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                            associationLabel(for: update.containerID)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Available Updates")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: appModel.connectionScopeID) {
+            await store.loadUpdates(appModel: appModel)
+        }
+        .refreshable {
+            await store.loadUpdates(appModel: appModel)
+        }
+    }
+
+    private func associationLabel(for containerID: String) -> some View {
+        let stackNames = store.stackNames(for: containerID)
+        return Label(
+            stackNames.isEmpty ? String(localized: "Standalone container") : stackNames.joined(separator: ", "),
+            systemImage: stackNames.isEmpty ? "shippingbox" : "square.3.layers.3d"
+        )
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+}
+
+private struct DashboardVolumesDetailView: View {
+    let appModel: AppModel
+    @State private var store = DashboardResourceDetailStore()
+
+    var body: some View {
+        List {
+            Section {
+                EnvironmentHeaderBar(appModel: appModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
+            if let error = store.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section("Volumes") {
+                if store.isLoading && store.volumes.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if store.volumes.isEmpty && store.error == nil {
+                    ContentUnavailableView("No volumes", systemImage: "internaldrive")
+                } else {
+                    ForEach(store.volumes, id: \.name) { volume in
+                        volumeRow(volume)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Volumes")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: appModel.connectionScopeID) {
+            await store.loadVolumes(appModel: appModel)
+        }
+        .refreshable {
+            await store.loadVolumes(appModel: appModel)
+        }
+    }
+
+    private func volumeRow(_ volume: VolumeSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(volume.name, systemImage: "internaldrive")
+                .font(.headline)
+            Text("\(volume.driver) · \(volume.scope)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if volume.usedBy.isEmpty {
+                Label("Not attached to a container", systemImage: "minus.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(volume.usedBy, id: \.containerID) { usage in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(usage.containerName, systemImage: "shippingbox")
+                            .font(.subheadline.weight(.medium))
+                        let stackNames = store.stackNames(for: usage.containerID)
+                        if !stackNames.isEmpty {
+                            Label(stackNames.joined(separator: ", "), systemImage: "square.3.layers.3d")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.leading, 4)
+                }
+            }
+        }
+        .padding(.vertical, 5)
     }
 }
 

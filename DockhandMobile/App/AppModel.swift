@@ -18,6 +18,7 @@ final class AppModel {
     var isLoadingEnvironments = false
     var environmentError: String?
     var lastHealthStatus: String?
+    private(set) var dashboardRefreshRevision = 0
 
     init() {
         let storedProfiles = PreferencesStore.serverProfiles
@@ -204,5 +205,9 @@ final class AppModel {
         if let profileID = selectedProfile?.id {
             PreferencesStore.setSelectedEnvironmentID(environmentID, for: profileID)
         }
+    }
+
+    func requestDashboardRefresh() {
+        dashboardRefreshRevision &+= 1
     }
 }
