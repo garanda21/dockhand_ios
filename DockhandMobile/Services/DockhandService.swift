@@ -170,6 +170,36 @@ struct VolumeSnapshot: Sendable, Hashable {
     var usedBy: [VolumeUsageSnapshot]
 }
 
+struct NetworkUsageSnapshot: Sendable, Hashable {
+    var containerID: String
+    var containerName: String
+    var ipv4Address: String
+}
+
+struct NetworkSnapshot: Sendable, Hashable {
+    var id: String
+    var name: String
+    var driver: String
+    var scope: String
+    var isInternal: Bool
+    var subnets: [String]
+    var containers: [NetworkUsageSnapshot]
+}
+
+struct ContainerEventSnapshot: Sendable, Hashable {
+    var id: Int
+    var containerID: String
+    var containerName: String?
+    var image: String?
+    var action: String
+    var timestamp: String
+}
+
+struct ContainerActivitySnapshot: Sendable, Hashable {
+    var events: [ContainerEventSnapshot]
+    var total: Int
+}
+
 struct StackDeployOptions: Sendable, Hashable {
     var pull = true
     var build = false
@@ -328,6 +358,28 @@ struct DockhandService {
             environmentID: environmentID
         )
         return Self.decodeVolumes(response)
+    }
+
+    func fetchNetworks(environmentID: Int) async throws -> [NetworkSnapshot] {
+        let response = try await performJSONArrayRequest(
+            path: "/api/networks",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return Self.decodeNetworks(response)
+    }
+
+    func fetchContainerActivity(environmentID: Int, limit: Int = 100) async throws -> ContainerActivitySnapshot {
+        let response = try await performJSONRequest(
+            path: "/api/activity",
+            method: "GET",
+            environmentID: environmentID,
+            additionalQueryItems: [
+                URLQueryItem(name: "environmentId", value: "\(environmentID)"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+        return Self.decodeContainerActivity(response)
     }
 
     func clearPendingContainerUpdate(containerID: String, environmentID: Int) async throws {

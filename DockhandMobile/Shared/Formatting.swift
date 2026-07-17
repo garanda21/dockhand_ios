@@ -177,6 +177,39 @@ enum DockhandStateFilter: Hashable {
     }
 }
 
+enum ContainerListFilter: Hashable {
+    case all
+    case state(String)
+    case stopped
+    case unhealthy
+
+    var title: String {
+        switch self {
+        case .all:
+            return String(localized: "All states")
+        case .state(let state):
+            return state.localizedDockhandStateLabel
+        case .stopped:
+            return String(localized: "Stopped")
+        case .unhealthy:
+            return String(localized: "Unhealthy")
+        }
+    }
+
+    func matches(_ container: Components.Schemas.Container) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .state(let value):
+            return container.state.normalizedDockhandState == value.normalizedDockhandState
+        case .stopped:
+            return ["exited", "stopped"].contains(container.state.normalizedDockhandState)
+        case .unhealthy:
+            return container.health?.normalizedDockhandState == "unhealthy"
+        }
+    }
+}
+
 extension Int {
     var dockhandByteCount: String {
         ByteCountFormatter.string(fromByteCount: Int64(self), countStyle: .binary)

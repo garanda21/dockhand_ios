@@ -95,6 +95,8 @@ final class DashboardStore {
 private final class DashboardResourceDetailStore {
     var pendingUpdates: [PendingContainerUpdate] = []
     var volumes: [VolumeSnapshot] = []
+    var networks: [NetworkSnapshot] = []
+    var activity = ContainerActivitySnapshot(events: [], total: 0)
     var stacks: [Components.Schemas.StackSummary] = []
     var isLoading = false
     var error: String?
@@ -151,6 +153,56 @@ private final class DashboardResourceDetailStore {
         }
     }
 
+    func loadNetworks(appModel: AppModel) async {
+        guard let service = service(for: appModel),
+              let environmentID = appModel.selectedEnvironment?.id else {
+            networks = []
+            stacks = []
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            async let loadedNetworks = service.fetchNetworks(environmentID: environmentID)
+            async let loadedStacks = service.fetchStacks(environmentID: environmentID)
+            let (networks, stacks) = try await (loadedNetworks, loadedStacks)
+            self.networks = networks.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            self.stacks = stacks
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+
+    func loadActivity(appModel: AppModel) async {
+        guard let service = service(for: appModel),
+              let environmentID = appModel.selectedEnvironment?.id else {
+            activity = ContainerActivitySnapshot(events: [], total: 0)
+            stacks = []
+            return
+        }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            async let loadedActivity = service.fetchContainerActivity(environmentID: environmentID)
+            async let loadedStacks = service.fetchStacks(environmentID: environmentID)
+            let (activity, stacks) = try await (loadedActivity, loadedStacks)
+            self.activity = activity
+            self.stacks = stacks
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+
     func stackNames(for containerID: String) -> [String] {
         stacks
             .filter { stack in
@@ -169,6 +221,9 @@ private final class DashboardResourceDetailStore {
 struct DashboardView: View {
     let appModel: AppModel
     var onOpenSettings: () -> Void = {}
+    var onOpenContainers: (ContainerListFilter) -> Void = { _ in }
+    var onOpenStacks: () -> Void = {}
+    var onOpenImages: () -> Void = {}
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var store = DashboardStore()
@@ -432,11 +487,11 @@ struct DashboardView: View {
                 .font(.headline)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                statusTile(String(localized: "Running"), value: snapshot.containers.running, systemImage: "play.fill", tint: .green)
-                statusTile(String(localized: "Stopped"), value: snapshot.containers.stopped, systemImage: "stop.fill", tint: .secondary)
-                statusTile(String(localized: "Paused"), value: snapshot.containers.paused, systemImage: "pause.fill", tint: .orange)
-                statusTile(String(localized: "Restarting"), value: snapshot.containers.restarting, systemImage: "arrow.clockwise", tint: .green)
-                statusTile(String(localized: "Alerts"), value: snapshot.containers.unhealthy, systemImage: "exclamationmark.triangle", tint: snapshot.containers.unhealthy == 0 ? .green : .orange)
+                containerStatusButton(String(localized: "Running"), value: snapshot.containers.running, systemImage: "play.fill", tint: .green, filter: .state("running"))
+                containerStatusButton(String(localized: "Stopped"), value: snapshot.containers.stopped, systemImage: "stop.fill", tint: .secondary, filter: .stopped)
+                containerStatusButton(String(localized: "Paused"), value: snapshot.containers.paused, systemImage: "pause.fill", tint: .orange, filter: .state("paused"))
+                containerStatusButton(String(localized: "Restarting"), value: snapshot.containers.restarting, systemImage: "arrow.clockwise", tint: .green, filter: .state("restarting"))
+                containerStatusButton(String(localized: "Alerts"), value: snapshot.containers.unhealthy, systemImage: "exclamationmark.triangle", tint: snapshot.containers.unhealthy == 0 ? .green : .orange, filter: .unhealthy)
                 NavigationLink {
                     DashboardUpdatesDetailView(appModel: appModel)
                 } label: {
@@ -446,15 +501,39 @@ struct DashboardView: View {
                 .accessibilityHint("Shows the containers and stacks with pending updates")
             }
 
-            HStack {
-                Text("Total containers")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(snapshot.containers.total)")
-                    .font(.title3.weight(.semibold))
+            Button {
+                onOpenContainers(.all)
+            } label: {
+                HStack {
+                    Text("Total containers")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(snapshot.containers.total)")
+                        .font(.title3.weight(.semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .buttonStyle(.plain)
         }
+    }
+
+    private func containerStatusButton(
+        _ title: String,
+        value: Int,
+        systemImage: String,
+        tint: Color,
+        filter: ContainerListFilter
+    ) -> some View {
+        Button {
+            onOpenContainers(filter)
+        } label: {
+            statusTile(title, value: value, systemImage: systemImage, tint: tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the matching containers")
     }
 
     private func statusTile(_ title: String, value: Int, systemImage: String, tint: Color) -> some View {
@@ -479,18 +558,26 @@ struct DashboardView: View {
                 .font(.headline)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                inventoryTile(String(localized: "Images"), value: "\(snapshot.images.total)", detail: snapshot.images.totalSize.dockhandByteCount, systemImage: "photo.stack")
-                inventoryTile(
-                    String(localized: "Stacks"),
-                    value: "\(snapshot.stacks.total)",
-                    detail: String(
-                        format: String(localized: "%1$d running · %2$d stopped"),
-                        locale: Locale.current,
-                        snapshot.stacks.running,
-                        snapshot.stacks.stopped
-                    ),
-                    systemImage: "square.3.layers.3d"
-                )
+                Button(action: onOpenImages) {
+                    inventoryTile(String(localized: "Images"), value: "\(snapshot.images.total)", detail: snapshot.images.totalSize.dockhandByteCount, systemImage: "photo.stack")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Images")
+                Button(action: onOpenStacks) {
+                    inventoryTile(
+                        String(localized: "Stacks"),
+                        value: "\(snapshot.stacks.total)",
+                        detail: String(
+                            format: String(localized: "%1$d running · %2$d stopped"),
+                            locale: Locale.current,
+                            snapshot.stacks.running,
+                            snapshot.stacks.stopped
+                        ),
+                        systemImage: "square.3.layers.3d"
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Stacks")
                 NavigationLink {
                     DashboardVolumesDetailView(appModel: appModel)
                 } label: {
@@ -498,13 +585,25 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Shows each volume and the containers and stacks using it")
-                inventoryTile(String(localized: "Networks"), value: "\(snapshot.networks.total)", detail: host?.host.storageDriver ?? String(localized: "Ready"), systemImage: "point.3.connected.trianglepath.dotted")
-                inventoryTile(
-                    String(localized: "Events"),
-                    value: "\(snapshot.events.today)",
-                    detail: String(format: String(localized: "%d total"), locale: Locale.current, snapshot.events.total),
-                    systemImage: "waveform.path.ecg"
-                )
+                NavigationLink {
+                    DashboardNetworksDetailView(appModel: appModel)
+                } label: {
+                    inventoryTile(String(localized: "Networks"), value: "\(snapshot.networks.total)", detail: host?.host.storageDriver ?? String(localized: "Ready"), systemImage: "point.3.connected.trianglepath.dotted")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows networks and connected containers")
+                NavigationLink {
+                    DashboardEventsDetailView(appModel: appModel)
+                } label: {
+                    inventoryTile(
+                        String(localized: "Events"),
+                        value: "\(snapshot.events.today)",
+                        detail: String(format: String(localized: "%d total"), locale: Locale.current, snapshot.events.total),
+                        systemImage: "waveform.path.ecg"
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows recent container activity")
                 inventoryTile(
                     String(localized: "Build cache"),
                     value: snapshot.buildCacheSize.dockhandByteCount,
@@ -736,6 +835,222 @@ private struct DashboardVolumesDetailView: View {
             }
         }
         .padding(.vertical, 5)
+    }
+}
+
+private struct DashboardNetworksDetailView: View {
+    let appModel: AppModel
+    @State private var store = DashboardResourceDetailStore()
+
+    var body: some View {
+        List {
+            Section {
+                EnvironmentHeaderBar(appModel: appModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
+            if let error = store.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section("Networks") {
+                if store.isLoading && store.networks.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if store.networks.isEmpty && store.error == nil {
+                    ContentUnavailableView("No networks", systemImage: "point.3.connected.trianglepath.dotted")
+                } else {
+                    ForEach(store.networks, id: \.id) { network in
+                        networkRow(network)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Networks")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: appModel.connectionScopeID) {
+            await store.loadNetworks(appModel: appModel)
+        }
+        .refreshable {
+            await store.loadNetworks(appModel: appModel)
+        }
+    }
+
+    private func networkRow(_ network: NetworkSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(network.name, systemImage: "point.3.connected.trianglepath.dotted")
+                .font(.headline)
+
+            HStack(spacing: 8) {
+                Text("\(network.driver) · \(network.scope)")
+                if network.isInternal {
+                    Text("Internal")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            if !network.subnets.isEmpty {
+                Label(network.subnets.joined(separator: ", "), systemImage: "number")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if network.containers.isEmpty {
+                Label("No connected containers", systemImage: "minus.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(network.containers, id: \.containerID) { usage in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Label(usage.containerName, systemImage: "shippingbox")
+                                .font(.subheadline.weight(.medium))
+                            Spacer()
+                            if !usage.ipv4Address.isEmpty {
+                                Text(usage.ipv4Address)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        let stackNames = store.stackNames(for: usage.containerID)
+                        if !stackNames.isEmpty {
+                            Label(stackNames.joined(separator: ", "), systemImage: "square.3.layers.3d")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.leading, 4)
+                }
+            }
+        }
+        .padding(.vertical, 5)
+    }
+}
+
+private struct DashboardEventsDetailView: View {
+    let appModel: AppModel
+    @State private var store = DashboardResourceDetailStore()
+
+    var body: some View {
+        List {
+            Section {
+                EnvironmentHeaderBar(appModel: appModel)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
+            if let error = store.error {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section {
+                if store.isLoading && store.activity.events.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if store.activity.events.isEmpty && store.error == nil {
+                    ContentUnavailableView(
+                        "No activity",
+                        systemImage: "waveform.path.ecg",
+                        description: Text("Enable activity collection for this environment to record container events.")
+                    )
+                } else {
+                    ForEach(store.activity.events, id: \.id) { event in
+                        eventRow(event)
+                    }
+                }
+            } header: {
+                Text(
+                    String(
+                        format: String(localized: "%1$d recent · %2$d total"),
+                        locale: .current,
+                        store.activity.events.count,
+                        store.activity.total
+                    )
+                )
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: appModel.connectionScopeID) {
+            await store.loadActivity(appModel: appModel)
+        }
+        .refreshable {
+            await store.loadActivity(appModel: appModel)
+        }
+    }
+
+    private func eventRow(_ event: ContainerEventSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Label(event.action.localizedEventAction, systemImage: event.action.eventSystemImage)
+                    .font(.headline)
+                Spacer()
+                Text(event.timestamp.localizedEventTimestamp)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Label(event.containerName ?? String(localized: "Unknown container"), systemImage: "shippingbox")
+                .font(.subheadline.weight(.medium))
+
+            if let image = event.image, !image.isEmpty {
+                Text(image)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            let stackNames = store.stackNames(for: event.containerID)
+            if !stackNames.isEmpty {
+                Label(stackNames.joined(separator: ", "), systemImage: "square.3.layers.3d")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private extension String {
+    var localizedEventAction: String {
+        replacingOccurrences(of: "_", with: " ")
+            .capitalized(with: .current)
+    }
+
+    var eventSystemImage: String {
+        switch lowercased() {
+        case "start", "unpause": "play.fill"
+        case "stop", "die", "kill", "destroy": "stop.fill"
+        case "restart": "arrow.clockwise"
+        case "pause": "pause.fill"
+        case "oom": "memorychip"
+        case "health_status": "heart.text.square"
+        case "create": "plus.circle"
+        default: "waveform.path.ecg"
+        }
+    }
+
+    var localizedEventTimestamp: String {
+        let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        let standard = Date.ISO8601FormatStyle()
+        let date = (try? fractional.parse(self)) ?? (try? standard.parse(self))
+        return date?.formatted(date: .abbreviated, time: .shortened) ?? self
     }
 }
 

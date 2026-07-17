@@ -171,6 +171,63 @@ extension DockhandService {
         }
     }
 
+    static func decodeNetworks(_ objects: [[String: Any]]) -> [NetworkSnapshot] {
+        objects.compactMap { network in
+            guard let id = network["id"] as? String,
+                  let name = network["name"] as? String else {
+                return nil
+            }
+
+            let containerObjects = network["containers"] as? [String: [String: Any]] ?? [:]
+            let containers = containerObjects.map { containerID, container in
+                NetworkUsageSnapshot(
+                    containerID: containerID,
+                    containerName: container["name"] as? String ?? String(localized: "Unknown container"),
+                    ipv4Address: container["ipv4Address"] as? String ?? ""
+                )
+            }
+            .sorted { $0.containerName.localizedCaseInsensitiveCompare($1.containerName) == .orderedAscending }
+
+            let ipam = network["ipam"] as? [String: Any]
+            let configurations = ipam?["config"] as? [[String: Any]] ?? []
+            let subnets = configurations.compactMap { $0["subnet"] as? String }
+
+            return NetworkSnapshot(
+                id: id,
+                name: name,
+                driver: network["driver"] as? String ?? String(localized: "Unknown"),
+                scope: network["scope"] as? String ?? String(localized: "Unknown"),
+                isInternal: network["internal"] as? Bool ?? false,
+                subnets: subnets,
+                containers: containers
+            )
+        }
+    }
+
+    static func decodeContainerActivity(_ object: [String: Any]) -> ContainerActivitySnapshot {
+        let eventObjects = object["events"] as? [[String: Any]] ?? []
+        let events = eventObjects.compactMap { event -> ContainerEventSnapshot? in
+            guard let id = intValue(event["id"]),
+                  let containerID = event["containerId"] as? String,
+                  let action = event["action"] as? String,
+                  let timestamp = event["timestamp"] as? String else {
+                return nil
+            }
+            return ContainerEventSnapshot(
+                id: id,
+                containerID: containerID,
+                containerName: event["containerName"] as? String,
+                image: event["image"] as? String,
+                action: action,
+                timestamp: timestamp
+            )
+        }
+        return ContainerActivitySnapshot(
+            events: events,
+            total: intValue(object["total"]) ?? events.count
+        )
+    }
+
     private static func intValue(_ value: Any?) -> Int? {
         if let value = value as? Int {
             return value

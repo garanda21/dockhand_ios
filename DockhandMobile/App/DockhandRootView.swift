@@ -11,13 +11,19 @@ private enum DockhandTab: Hashable {
 struct DockhandRootView: View {
     @State private var appModel = AppModel()
     @State private var selectedTab: DockhandTab = .dashboard
+    @State private var requestedContainerFilter = ContainerListFilter.all
+    @State private var containerFilterRequestRevision = 0
 
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                DashboardView(appModel: appModel) {
-                    selectedTab = .settings
-                }
+                DashboardView(
+                    appModel: appModel,
+                    onOpenSettings: { selectedTab = .settings },
+                    onOpenContainers: openContainers,
+                    onOpenStacks: { selectedTab = .stacks },
+                    onOpenImages: { selectedTab = .images }
+                )
             }
             .tabItem {
                 Label("Dashboard", systemImage: "gauge.with.dots.needle.67percent")
@@ -25,7 +31,11 @@ struct DockhandRootView: View {
             .tag(DockhandTab.dashboard)
 
             NavigationStack {
-                ContainersView(appModel: appModel)
+                ContainersView(
+                    appModel: appModel,
+                    requestedFilter: requestedContainerFilter,
+                    filterRequestRevision: containerFilterRequestRevision
+                )
             }
             .tabItem {
                 Label("Containers", systemImage: "shippingbox")
@@ -62,5 +72,11 @@ struct DockhandRootView: View {
             }
             await appModel.bootstrap()
         }
+    }
+
+    private func openContainers(filter: ContainerListFilter) {
+        requestedContainerFilter = filter
+        containerFilterRequestRevision &+= 1
+        selectedTab = .containers
     }
 }

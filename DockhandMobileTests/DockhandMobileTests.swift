@@ -146,6 +146,71 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(volumes.first?.usedBy.first?.containerName, "web")
     }
 
+    func testNetworkDecodingKeepsConnectedContainers() {
+        let networks = DockhandService.decodeNetworks([
+            [
+                "id": "network-1",
+                "name": "frontend",
+                "driver": "bridge",
+                "scope": "local",
+                "internal": false,
+                "ipam": ["config": [["subnet": "172.20.0.0/16"]]],
+                "containers": [
+                    "container-1": ["name": "web", "ipv4Address": "172.20.0.2"]
+                ]
+            ]
+        ])
+
+        XCTAssertEqual(networks.first?.name, "frontend")
+        XCTAssertEqual(networks.first?.subnets, ["172.20.0.0/16"])
+        XCTAssertEqual(networks.first?.containers.first?.containerID, "container-1")
+        XCTAssertEqual(networks.first?.containers.first?.containerName, "web")
+    }
+
+    func testActivityDecodingKeepsContainerAndAction() {
+        let activity = DockhandService.decodeContainerActivity([
+            "events": [
+                [
+                    "id": 7,
+                    "containerId": "container-1",
+                    "containerName": "web",
+                    "image": "nginx:latest",
+                    "action": "restart",
+                    "timestamp": "2026-07-17T10:00:00Z"
+                ]
+            ],
+            "total": 42
+        ])
+
+        XCTAssertEqual(activity.total, 42)
+        XCTAssertEqual(activity.events.first?.containerID, "container-1")
+        XCTAssertEqual(activity.events.first?.action, "restart")
+    }
+
+    func testContainerListFilterMatchesHealthAndState() {
+        let unhealthy = Components.Schemas.Container(
+            id: "abc",
+            name: "web",
+            image: "nginx:latest",
+            state: "running",
+            status: "Up",
+            created: 0,
+            health: "unhealthy",
+            ports: [],
+            networks: .init(),
+            labels: .init()
+        )
+
+        XCTAssertTrue(ContainerListFilter.state("running").matches(unhealthy))
+        XCTAssertTrue(ContainerListFilter.unhealthy.matches(unhealthy))
+        XCTAssertFalse(ContainerListFilter.stopped.matches(unhealthy))
+        XCTAssertFalse(ContainerListFilter.state("paused").matches(unhealthy))
+
+        var exited = unhealthy
+        exited.state = "exited"
+        XCTAssertTrue(ContainerListFilter.stopped.matches(exited))
+    }
+
     func testContainerLogSSEParserDecodesConnectedAndLogEvents() throws {
         var parser = ContainerLogSSEParser()
 

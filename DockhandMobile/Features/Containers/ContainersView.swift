@@ -72,12 +72,14 @@ final class ContainersStore {
 
 struct ContainersView: View {
     let appModel: AppModel
+    let requestedFilter: ContainerListFilter
+    let filterRequestRevision: Int
     @State private var store = ContainersStore()
     @State private var sort = ContainerListSort.name
-    @State private var stateFilter = DockhandStateFilter.all
+    @State private var stateFilter = ContainerListFilter.all
 
     private var filteredContainers: [Components.Schemas.Container] {
-        let filtered = store.containers.filter { stateFilter.matches($0.state) }
+        let filtered = store.containers.filter { stateFilter.matches($0) }
         switch sort {
         case .name:
             return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -92,7 +94,10 @@ struct ContainersView: View {
     }
 
     private var availableStates: [String] {
-        Array(Set(store.containers.map(\.state.normalizedDockhandState)))
+        Array(Set(store.containers.map {
+            let state = $0.state.normalizedDockhandState
+            return ["exited", "stopped"].contains(state) ? "stopped" : state
+        }))
             .sorted {
                 let lhsRank = $0.dockhandStateRank
                 let rhsRank = $1.dockhandStateRank
@@ -163,12 +168,19 @@ struct ContainersView: View {
                         }
 
                         ForEach(availableStates, id: \.self) { state in
-                        Button {
-                            stateFilter = DockhandStateFilter.state(state)
-                        } label: {
-                            selectionLabel(state.localizedDockhandStateLabel, isSelected: stateFilter == DockhandStateFilter.state(state))
+                            let filter = state == "stopped" ? ContainerListFilter.stopped : ContainerListFilter.state(state)
+                            Button {
+                                stateFilter = filter
+                            } label: {
+                                selectionLabel(filter.title, isSelected: stateFilter == filter)
+                            }
                         }
-                    }
+
+                        Button {
+                            stateFilter = .unhealthy
+                        } label: {
+                            selectionLabel(String(localized: "Unhealthy"), isSelected: stateFilter == .unhealthy)
+                        }
                     }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
@@ -182,6 +194,9 @@ struct ContainersView: View {
         }
         .task(id: appModel.connectionScopeID) {
             await store.load(appModel: appModel)
+        }
+        .onChange(of: filterRequestRevision, initial: true) {
+            stateFilter = requestedFilter
         }
         .refreshable {
             await store.load(appModel: appModel)
