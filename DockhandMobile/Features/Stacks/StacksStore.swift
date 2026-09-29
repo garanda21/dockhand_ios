@@ -38,7 +38,7 @@ final class StacksStore {
         defer { isLoading = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             stacks = try await service.fetchStacks(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
@@ -59,7 +59,7 @@ final class StacksStore {
         defer { activeStackActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.stackAction(action, stackName: stack.name, environmentID: environmentID)
             actionMessage = actionMessage(for: action, stackName: stack.name)
             actionMessageOwner = stack.name
@@ -85,7 +85,7 @@ final class StacksStore {
         defer { activeStackActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             if options.pull {
                 let result: StackRedeployResult
                 switch try await service.startStackRedeploy(
@@ -204,7 +204,7 @@ final class StacksStore {
         defer { activeStackActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.deleteStack(
                 stackName: stack.name,
                 environmentID: environmentID,
@@ -238,7 +238,7 @@ final class StacksStore {
         defer { activeContainerActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
             actionMessage = String(
                 format: String(localized: "%@ %@"),

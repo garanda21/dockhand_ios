@@ -312,14 +312,37 @@ enum DockhandServiceError: LocalizedError {
 struct DockhandService {
     let baseURL: URL
     let token: String
+    let customHeaders: [DockhandCustomHeader]
 
-    init(baseURL: URL, token: String) {
+    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = []) {
         self.baseURL = baseURL
         self.token = DockhandToken.normalized(token)
+        self.customHeaders = DockhandCustomHeaderValidator.sanitized(customHeaders)
     }
 
     private var client: Client {
-        DockhandAPIClientFactory.makeClient(baseURL: baseURL, token: token.isEmpty ? nil : token)
+        DockhandAPIClientFactory.makeClient(
+            baseURL: baseURL,
+            token: token.isEmpty ? nil : token,
+            customHeaders: customHeaders
+        )
+    }
+
+    /// Adds the Dockhand bearer token and the profile's custom headers. Every
+    /// hand-built request must go through here so none skips proxy auth.
+    func authorize(_ request: inout URLRequest) {
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.applyDockhandCustomHeaders(customHeaders)
+    }
+
+    private func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let (data, response) = try await DockhandHTTPSession.shared.data(for: request)
+        if let challenge = DockhandProxyChallenge.detect(response) {
+            throw challenge
+        }
+        return (data, response)
     }
 
     static func containerLogError(statusCode: Int, data: Data) -> DockhandServiceError {
@@ -350,11 +373,9 @@ struct DockhandService {
         var request = URLRequest(url: baseURL.appending(path: "/api/environments"))
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DockhandServiceError.invalidResponse
         }
@@ -443,11 +464,9 @@ struct DockhandService {
         var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
         return try JSONDecoder().decode(ContainerUpdateCheckJobSnapshot.self, from: data)
     }
@@ -568,11 +587,9 @@ struct DockhandService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DockhandServiceError.invalidResponse
         }
@@ -603,11 +620,9 @@ struct DockhandService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DockhandServiceError.invalidResponse
         }
@@ -642,9 +657,7 @@ struct DockhandService {
         }
 
         var request = URLRequest(url: url)
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
         return request
     }
 
@@ -674,9 +687,7 @@ struct DockhandService {
         request.httpMethod = "GET"
         request.timeoutInterval = 20
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
         let eventStream = ContainerLogEventStream(request: request)
         for try await event in eventStream.events {
@@ -760,15 +771,13 @@ struct DockhandService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "image": imageName,
             "scanAfterPull": false
         ])
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
 
         if let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
@@ -792,11 +801,9 @@ struct DockhandService {
         var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
         return try JSONDecoder().decode(ImagePullJobSnapshot.self, from: data)
     }
@@ -1012,16 +1019,14 @@ struct DockhandService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "pull": options.pull,
             "build": options.build,
             "forceRecreate": options.forceRecreate
         ])
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
 
         if let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
@@ -1042,11 +1047,9 @@ struct DockhandService {
         var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
         return try JSONDecoder().decode(StackRedeployJobSnapshot.self, from: data)
     }
@@ -1148,14 +1151,12 @@ struct DockhandService {
         if body != nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DockhandServiceError.invalidResponse
         }
@@ -1188,11 +1189,9 @@ struct DockhandService {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        authorize(&request)
 
-        let (data, response) = try await URLSession(configuration: .dockhandEphemeral).data(for: request)
+        let (data, response) = try await send(request)
         try Self.validateResponse(response, data: data)
         guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
             throw DockhandServiceError.invalidResponse
@@ -1339,11 +1338,28 @@ private final class ContainerLogEventStream: NSObject, URLSessionDataDelegate, @
             return
         }
 
+        if let challenge = DockhandProxyChallenge.detect(response) {
+            continuation?.finish(throwing: challenge)
+            completionHandler(.cancel)
+            return
+        }
+
         responseStatus = response.statusCode
         if response.statusCode == 200 {
             continuation?.yield(.connected)
         }
         completionHandler(.allow)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        let original = task.originalRequest?.url ?? response.url
+        completionHandler(DockhandRedirectPolicy.allows(from: original, to: request.url) ? request : nil)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

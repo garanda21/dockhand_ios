@@ -1,3 +1,4 @@
+import DockhandAPI
 import Observation
 import SwiftUI
 
@@ -21,7 +22,7 @@ final class ServerDetailsStore {
         defer { isLoading = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             host = try await service.fetchDashboardHost(environmentID: environmentID)
         } catch {
             guard !error.isDockhandCancellation else { return }
@@ -436,8 +437,10 @@ private struct ServerProfileDetailView: View {
     @State private var draftName = ""
     @State private var draftBaseURL = "http://"
     @State private var draftToken = ""
+    @State private var draftHeaders: [CustomHeaderDraft] = []
+    @State private var isTestingConnection = false
+    @State private var connectionTestResult: ConnectionTestOutcome?
     @State private var statusMessage: String?
-    @State private var isSaving = false
     @State private var showDeleteConfirmation = false
 
     private var editingProfile: DockhandServerProfile? {
@@ -450,7 +453,8 @@ private struct ServerProfileDetailView: View {
     }
 
     private var canSave: Bool {
-        !isSaving && !draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !draftBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && draftHeaders.issues.isEmpty
     }
 
     var body: some View {
@@ -461,6 +465,17 @@ private struct ServerProfileDetailView: View {
                 }
 
                 connectionCard
+
+                CustomHeadersCard(
+                    drafts: $draftHeaders,
+                    baseURLText: draftBaseURL,
+                    isTesting: isTestingConnection,
+                    testResult: connectionTestResult,
+                    onTest: { Task { await testConnection() } }
+                )
+                .onChange(of: draftBaseURL) { connectionTestResult = nil }
+                .onChange(of: draftToken) { connectionTestResult = nil }
+                .onChange(of: draftHeaders) { connectionTestResult = nil }
 
                 if let statusMessage {
                     statusCard(statusMessage)
@@ -477,14 +492,9 @@ private struct ServerProfileDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await saveProfile() }
+                    saveProfile()
                 } label: {
-                    if isSaving {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text(editingProfile == nil ? String(localized: "Create") : String(localized: "Save"))
-                    }
+                    Text(editingProfile == nil ? String(localized: "Create") : String(localized: "Save"))
                 }
                 .disabled(!canSave)
             }
@@ -497,7 +507,7 @@ private struct ServerProfileDetailView: View {
                 Task { await deleteProfile() }
             }
         } message: {
-            Text(String(localized: "This removes the saved URL, token and per-server environment selection."))
+            Text(String(localized: "This removes the saved URL, token, custom headers and per-server environment selection."))
         }
     }
 
@@ -642,28 +652,51 @@ private struct ServerProfileDetailView: View {
             draftName = editingProfile.name
             draftBaseURL = editingProfile.baseURL
             draftToken = KeychainStore.readToken(profileID: editingProfile.id) ?? ""
+            draftHeaders = KeychainStore.readCustomHeaders(profileID: editingProfile.id).map(CustomHeaderDraft.init(header:))
         } else {
             draftName = ""
             draftBaseURL = "http://"
             draftToken = ""
+            draftHeaders = []
         }
         statusMessage = nil
+        connectionTestResult = nil
     }
 
-    @MainActor
-    private func saveProfile() async {
-        isSaving = true
-        defer { isSaving = false }
-
-        await appModel.saveServerProfile(
+    private func saveProfile() {
+        appModel.saveServerProfile(
             profileID: profileID,
             name: draftName,
             baseURLText: draftBaseURL,
             token: draftToken,
+            customHeaders: draftHeaders.headers,
             makeActive: true
         )
-        statusMessage = appModel.environmentError ?? String(localized: "Server saved")
         dismiss()
+    }
+
+    @MainActor
+    private func testConnection() async {
+        isTestingConnection = true
+        connectionTestResult = nil
+        defer { isTestingConnection = false }
+
+        let result = await appModel.testConnection(
+            baseURLText: draftBaseURL,
+            token: draftToken,
+            customHeaders: draftHeaders.headers
+        )
+        switch result {
+        case .success(let environmentCount):
+            connectionTestResult = .success(String(
+                format: String(localized: "Connected. Dockhand returned %lld environments."),
+                locale: Locale.current,
+                Int64(environmentCount)
+            ))
+        case .failure(let error):
+            guard !error.isDockhandCancellation else { return }
+            connectionTestResult = .failure(error.dockhandUserFacingMessage)
+        }
     }
 
     @MainActor

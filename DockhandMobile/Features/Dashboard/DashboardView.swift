@@ -58,7 +58,7 @@ final class DashboardStore {
         }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             snapshot = try await service.fetchDashboardStats(environmentID: environmentID)
             lastUpdated = .now
             isShowingCachedSnapshot = false
@@ -74,7 +74,7 @@ final class DashboardStore {
         }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             host = try await service.fetchDashboardHost(environmentID: environmentID)
         } catch {
             host = nil
@@ -318,7 +318,7 @@ private final class DashboardResourceDetailStore {
 
     private func service(for appModel: AppModel) -> DockhandService? {
         guard let baseURL = appModel.normalizedBaseURL else { return nil }
-        return DockhandService(baseURL: baseURL, token: appModel.token)
+        return appModel.service(baseURL: baseURL)
     }
 }
 

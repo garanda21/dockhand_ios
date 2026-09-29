@@ -77,7 +77,7 @@ final class ImagesStore {
         defer { isLoading = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             images = try await service.fetchImages(environmentID: environmentID)
                 .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         } catch {
@@ -99,7 +99,7 @@ final class ImagesStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             pullOutput.append(String(format: String(localized: "Starting pull for %@"), locale: .current, name))
 
             switch try await service.startImagePull(imageName: name, environmentID: environmentID) {
@@ -222,7 +222,7 @@ final class ImagesStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.pruneImages(environmentID: environmentID, danglingOnly: danglingOnly)
             actionMessage = danglingOnly
                 ? String(localized: "Dangling images pruned")
@@ -246,7 +246,7 @@ final class ImagesStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.tagImage(imageID: image.id, environmentID: environmentID, repo: repo, tag: tag)
             actionMessage = String(
                 format: String(localized: "%@:%@ created"),
@@ -273,7 +273,7 @@ final class ImagesStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.deleteImage(imageReference: reference, environmentID: environmentID)
             actionMessage = String(
                 format: String(localized: "%@ deleted"),
@@ -299,7 +299,7 @@ final class ImagesStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.deleteImageTag(imageTag: tag, environmentID: environmentID)
             actionMessage = String(
                 format: String(localized: "%@ removed"),
@@ -326,7 +326,7 @@ final class ImagesStore {
         error = nil
         defer { activeActionID = nil }
 
-        let service = DockhandService(baseURL: baseURL, token: appModel.token)
+        let service = appModel.service(baseURL: baseURL)
         return try await service.scanImage(imageName: image.displayName, environmentID: environmentID)
     }
 

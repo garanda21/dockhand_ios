@@ -38,6 +38,7 @@ final class AppModel {
     var serverProfiles: [DockhandServerProfile]
     var selectedProfileID: String?
     var token: String
+    var customHeaders: [DockhandCustomHeader]
     var environments: [Components.Schemas.Environment] = []
     var selectedEnvironmentID: Int?
     var isLoadingEnvironments = false
@@ -58,11 +59,13 @@ final class AppModel {
             KeychainStore.migrateLegacyTokenIfNeeded(to: resolvedProfileID)
         }
         let resolvedToken = resolvedProfileID.flatMap { KeychainStore.readToken(profileID: $0) } ?? ""
+        let resolvedHeaders = resolvedProfileID.map { KeychainStore.readCustomHeaders(profileID: $0) } ?? []
         let resolvedEnvironmentID = resolvedProfileID.flatMap { PreferencesStore.selectedEnvironmentID(for: $0) }
 
         self.serverProfiles = storedProfiles
         self.selectedProfileID = resolvedProfileID
         self.token = resolvedToken
+        self.customHeaders = resolvedHeaders
         self.environments = []
         self.selectedEnvironmentID = resolvedEnvironmentID
         self.isLoadingEnvironments = false
@@ -106,6 +109,11 @@ final class AppModel {
         DockhandConnectionScope(profileID: selectedProfileID, environmentID: selectedEnvironmentID)
     }
 
+    /// Builds a service carrying the active profile's token and custom headers.
+    func service(baseURL: URL) -> DockhandService {
+        DockhandService(baseURL: baseURL, token: token, customHeaders: customHeaders)
+    }
+
     func isCurrentScope(_ scope: DockhandConnectionScope) -> Bool {
         connectionScope == scope
     }
@@ -119,7 +127,16 @@ final class AppModel {
         await refreshEnvironments(forceEnvironmentReset: false)
     }
 
-    func saveServerProfile(profileID: String?, name: String, baseURLText: String, token: String, makeActive: Bool = true) async {
+    /// Persists the profile immediately. Reconnecting runs in the background so
+    /// an unreachable server never blocks the editor.
+    func saveServerProfile(
+        profileID: String?,
+        name: String,
+        baseURLText: String,
+        token: String,
+        customHeaders: [DockhandCustomHeader] = [],
+        makeActive: Bool = true
+    ) {
         let cleanedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedURL = baseURLText.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = cleanedName.isEmpty ? cleanedURL : cleanedName
@@ -136,9 +153,10 @@ final class AppModel {
         serverProfiles.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         PreferencesStore.serverProfiles = serverProfiles
         KeychainStore.writeToken(token, profileID: targetID)
+        KeychainStore.writeCustomHeaders(DockhandCustomHeaderValidator.sanitized(customHeaders), profileID: targetID)
 
         if makeActive || selectedProfileID == nil {
-            await selectServerProfile(targetID, forceEnvironmentReset: true)
+            Task { await selectServerProfile(targetID, forceEnvironmentReset: true) }
         }
     }
 
@@ -148,11 +166,13 @@ final class AppModel {
         PreferencesStore.removeSelectedEnvironmentID(for: profileID)
         PreferencesStore.removeCachedDashboardSnapshots(for: profileID)
         KeychainStore.deleteToken(profileID: profileID)
+        KeychainStore.deleteCustomHeaders(profileID: profileID)
 
         if selectedProfileID == profileID {
             selectedProfileID = serverProfiles.first?.id
             PreferencesStore.selectedProfileID = selectedProfileID
             token = selectedProfileID.flatMap { KeychainStore.readToken(profileID: $0) } ?? ""
+            customHeaders = selectedProfileID.map { KeychainStore.readCustomHeaders(profileID: $0) } ?? []
             selectedEnvironmentID = selectedProfileID.flatMap { PreferencesStore.selectedEnvironmentID(for: $0) }
             environments = []
             lastHealthStatus = nil
@@ -167,6 +187,7 @@ final class AppModel {
         selectedProfileID = profileID
         PreferencesStore.selectedProfileID = profileID
         token = KeychainStore.readToken(profileID: profileID) ?? ""
+        customHeaders = KeychainStore.readCustomHeaders(profileID: profileID)
         selectedEnvironmentID = PreferencesStore.selectedEnvironmentID(for: profileID)
         environments = []
         environmentError = nil
@@ -198,7 +219,7 @@ final class AppModel {
         }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: token)
+            let service = self.service(baseURL: baseURL)
             do {
                 lastHealthStatus = try await service.fetchHealthStatus()
             } catch {
@@ -231,6 +252,51 @@ final class AppModel {
             guard !error.isDockhandCancellation else { return }
             environmentError = error.dockhandUserFacingMessage
             environments = []
+        }
+    }
+
+    /// Checks a draft configuration without saving it, so users can verify
+    /// proxy headers before committing them.
+    func testConnection(
+        baseURLText: String,
+        token: String,
+        customHeaders: [DockhandCustomHeader]
+    ) async -> Result<Int, Error> {
+        guard let baseURL = DockhandServerAddress.normalizedURL(from: baseURLText) else {
+            return .failure(DockhandServiceError.message(String(localized: "Invalid Dockhand URL")))
+        }
+
+        let service = DockhandService(baseURL: baseURL, token: token, customHeaders: customHeaders)
+        // Sessions wait for connectivity (needed for the local network prompt),
+        // so an unknown host would otherwise hang until the resource timeout.
+        return await withTaskGroup(of: Result<Int, Error>?.self) { group in
+            group.addTask { await Self.runConnectionTest(service) }
+            group.addTask {
+                try? await Task.sleep(for: Self.connectionTestTimeout)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first ?? .failure(DockhandConnectionStageError(stage: .health, underlying: URLError(.timedOut)))
+        }
+    }
+
+    static let connectionTestTimeout: Duration = .seconds(20)
+
+    private nonisolated static func runConnectionTest(_ service: DockhandService) async -> Result<Int, Error> {
+        do {
+            do {
+                _ = try await service.fetchHealthStatus()
+            } catch {
+                throw DockhandConnectionStageError(stage: .health, underlying: error)
+            }
+            do {
+                return .success(try await service.fetchEnvironments().count)
+            } catch {
+                throw DockhandConnectionStageError(stage: .environments, underlying: error)
+            }
+        } catch {
+            return .failure(error)
         }
     }
 

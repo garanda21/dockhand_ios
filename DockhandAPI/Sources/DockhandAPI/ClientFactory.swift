@@ -24,17 +24,14 @@ public struct BearerAuthMiddleware: ClientMiddleware {
 }
 
 public enum DockhandAPIClientFactory {
-    public static func makeClient(baseURL: URL, token: String?) -> Client {
+    public static func makeClient(
+        baseURL: URL,
+        token: String?,
+        customHeaders: [DockhandCustomHeader] = []
+    ) -> Client {
         let normalizedToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.waitsForConnectivity = true
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 120
-        configuration.httpAdditionalHeaders = ["Accept": "application/json"]
-
-        let session = URLSession(configuration: configuration)
         let transport = URLSessionTransport(
-            configuration: URLSessionTransport.Configuration(session: session)
+            configuration: URLSessionTransport.Configuration(session: DockhandHTTPSession.api)
         )
 
         let trimmedPath = baseURL.path.hasSuffix("/") ? String(baseURL.path.dropLast()) : baseURL.path
@@ -42,12 +39,16 @@ public enum DockhandAPIClientFactory {
             string: trimmedPath.isEmpty ? baseURL.absoluteString : baseURL.deletingLastPathComponent().appending(path: trimmedPath).absoluteString
         ) ?? baseURL
 
-        let middlewares: [any ClientMiddleware]
+        // Challenge detection runs closest to the transport so it sees the raw
+        // proxy response before any other middleware.
+        var middlewares: [any ClientMiddleware] = []
         if let normalizedToken, !normalizedToken.isEmpty {
-            middlewares = [BearerAuthMiddleware(bearerToken: normalizedToken)]
-        } else {
-            middlewares = []
+            middlewares.append(BearerAuthMiddleware(bearerToken: normalizedToken))
         }
+        if !customHeaders.isEmpty {
+            middlewares.append(CustomHeadersMiddleware(headers: customHeaders))
+        }
+        middlewares.append(ProxyChallengeMiddleware())
 
         return Client(
             serverURL: normalizedBaseURL,

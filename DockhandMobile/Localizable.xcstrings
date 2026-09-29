@@ -2711,16 +2711,6 @@
         }
       }
     },
-    "This removes the saved URL, token and per-server environment selection." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esto elimina la URL guardada, el token y la selección de entorno por servidor."
-          }
-        }
-      }
-    },
     "This removes the stack from the selected Dockhand environment. Deleting volumes also removes attached persistent data." : {
       "localizations" : {
         "es" : {
@@ -2937,6 +2927,256 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zsh"
+          }
+        }
+      }
+    },
+    "Add header" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir header"
+          }
+        }
+      }
+    },
+    "Cloudflare Access: create a service token in Zero Trust and add a Service Auth policy to the Dockhand application." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloudflare Access: crea un service token en Zero Trust y añade una política Service Auth a la aplicación de Dockhand."
+          }
+        }
+      }
+    },
+    "Connected. Dockhand returned %lld environments." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectado. Dockhand devolvió %lld entornos."
+          }
+        }
+      }
+    },
+    "Custom header" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otro header"
+          }
+        }
+      }
+    },
+    "Custom headers" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Headers personalizados"
+          }
+        }
+      }
+    },
+    "Enter a header name." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe el nombre del header."
+          }
+        }
+      }
+    },
+    "Enter a value." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe un valor."
+          }
+        }
+      }
+    },
+    "Header name" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre del header"
+          }
+        }
+      }
+    },
+    "Header name is too long." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre del header es demasiado largo."
+          }
+        }
+      }
+    },
+    "Header names can only use letters, numbers and - _ . ! # $ % & ' * + ^ ` | ~" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los nombres de header solo pueden usar letras, números y - _ . ! # $ % & ' * + ^ ` | ~"
+          }
+        }
+      }
+    },
+    "No custom headers." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin headers personalizados."
+          }
+        }
+      }
+    },
+    "Pangolin: create an access token for the Dockhand resource and paste its ID and token." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pangolin: crea un access token para el recurso de Dockhand y pega su ID y su token."
+          }
+        }
+      }
+    },
+    "Presets" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predefinidos"
+          }
+        }
+      }
+    },
+    "Remove header" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar header"
+          }
+        }
+      }
+    },
+    "Replace" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reemplazar"
+          }
+        }
+      }
+    },
+    "Sent with every request to this server, including logs and shell. Use them to authenticate with a reverse proxy. Values stay in this device's Keychain and are hidden after saving." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se envían en cada solicitud a este servidor, incluidos los logs y la shell. Úsalos para autenticarte ante un proxy inverso. Los valores se guardan en el Llavero de este dispositivo y se ocultan después de guardarlos."
+          }
+        }
+      }
+    },
+    "Test connection" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Probar conexión"
+          }
+        }
+      }
+    },
+    "This header is already in the list." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este header ya está en la lista."
+          }
+        }
+      }
+    },
+    "This header is managed by the app and cannot be overridden." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app gestiona este header y no se puede sobrescribir."
+          }
+        }
+      }
+    },
+    "This removes the saved URL, token, custom headers and per-server environment selection." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto elimina la URL, el token, los headers personalizados y el entorno seleccionado de este servidor."
+          }
+        }
+      }
+    },
+    "This server uses HTTP. Header values will travel unencrypted. Use HTTPS when sending credentials." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este servidor usa HTTP. Los valores de los headers viajarán sin cifrar. Usa HTTPS cuando envíes credenciales."
+          }
+        }
+      }
+    },
+    "Value" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor"
+          }
+        }
+      }
+    },
+    "Value is too long." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El valor es demasiado largo."
+          }
+        }
+      }
+    },
+    "Value saved in Keychain" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor guardado en el Llavero"
+          }
+        }
+      }
+    },
+    "Values cannot contain line breaks, control characters or emoji." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los valores no pueden contener saltos de línea, caracteres de control ni emojis."
           }
         }
       }
