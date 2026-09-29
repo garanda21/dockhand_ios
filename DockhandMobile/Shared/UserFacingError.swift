@@ -1,12 +1,9 @@
+import DockhandAPI
 import Foundation
 
 extension URLSessionConfiguration {
     static var dockhandEphemeral: URLSessionConfiguration {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.waitsForConnectivity = true
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 120
-        return configuration
+        DockhandHTTPSession.makeConfiguration()
     }
 }
 
@@ -35,6 +32,10 @@ enum DockhandUserFacingErrorFormatter {
     }
 
     static func message(for error: Error) -> String {
+        if let challenge = proxyChallenge(in: error) {
+            return message(for: challenge)
+        }
+
         if let connectionError = error as? DockhandConnectionStageError {
             let detail = message(for: connectionError.underlying)
             switch connectionError.stage {
@@ -86,6 +87,43 @@ enum DockhandUserFacingErrorFormatter {
         }
 
         return rawMessage
+    }
+
+    static func proxyChallenge(in error: Error) -> DockhandProxyChallengeError? {
+        if let connectionError = error as? DockhandConnectionStageError {
+            return proxyChallenge(in: connectionError.underlying)
+        }
+        return DockhandProxyChallenge.challenge(in: error)
+    }
+
+    private static func message(for challenge: DockhandProxyChallengeError) -> String {
+        switch challenge {
+        case .redirect(_, let host?):
+            return localized(
+                "A reverse proxy in front of Dockhand tried to redirect to a sign-in page (\(host)). Check this server's custom headers in Settings.",
+                spanish: "Un proxy inverso delante de Dockhand intentó redirigir a una página de inicio de sesión (\(host)). Revisa los headers personalizados de este servidor en Ajustes."
+            )
+        case .redirect:
+            return localized(
+                "A reverse proxy in front of Dockhand tried to redirect the request. Check the server address and this server's custom headers in Settings.",
+                spanish: "Un proxy inverso delante de Dockhand intentó redirigir la solicitud. Revisa la dirección y los headers personalizados de este servidor en Ajustes."
+            )
+        case .proxyAuthenticationRequired:
+            return localized(
+                "The proxy in front of Dockhand requires authentication. Check this server's custom headers in Settings.",
+                spanish: "El proxy delante de Dockhand requiere autenticación. Revisa los headers personalizados de este servidor en Ajustes."
+            )
+        case .accessDenied:
+            return localized(
+                "The reverse proxy in front of Dockhand rejected the request. The custom headers may be missing, wrong, expired or not allowed by the proxy policy. Check them in Settings.",
+                spanish: "El proxy inverso delante de Dockhand rechazó la solicitud. Puede que los headers personalizados falten, sean incorrectos, hayan caducado o la política del proxy no los permita. Revísalos en Ajustes."
+            )
+        case .webPage:
+            return localized(
+                "The server returned a web page instead of the Dockhand API. A reverse proxy may be asking you to sign in, or the address may be wrong. Check the address and custom headers in Settings.",
+                spanish: "El servidor devolvió una página web en lugar de la API de Dockhand. Puede que un proxy inverso esté pidiendo iniciar sesión o que la dirección sea incorrecta. Revisa la dirección y los headers personalizados en Ajustes."
+            )
+        }
     }
 
     private static func message(for error: DockhandServiceError) -> String {

@@ -1,3 +1,4 @@
+import DockhandAPI
 import Foundation
 import Security
 
@@ -20,7 +21,7 @@ enum KeychainStore {
     }
 
     static func deleteToken(profileID: String) {
-        deleteToken(account: account(for: profileID))
+        deleteItem(account: account(for: profileID))
     }
 
     static func migrateLegacyTokenIfNeeded(to profileID: String) {
@@ -32,7 +33,35 @@ enum KeychainStore {
         }
 
         writeToken(DockhandToken.normalized(legacyToken), account: targetAccount)
-        deleteToken(account: legacyAccount)
+        deleteItem(account: legacyAccount)
+    }
+
+    /// Custom header names and values are stored together as one JSON item per
+    /// profile. The item never leaves this device (no backups, no iCloud sync)
+    /// and stays readable after first unlock so background refresh keeps working.
+    static func readCustomHeaders(profileID: String) -> [DockhandCustomHeader] {
+        guard let data = readData(account: headersAccount(for: profileID)),
+              let headers = try? JSONDecoder().decode([DockhandCustomHeader].self, from: data) else {
+            return []
+        }
+        return headers
+    }
+
+    static func writeCustomHeaders(_ headers: [DockhandCustomHeader], profileID: String) {
+        let account = headersAccount(for: profileID)
+        guard !headers.isEmpty, let data = try? JSONEncoder().encode(headers) else {
+            deleteItem(account: account)
+            return
+        }
+        writeData(data, account: account, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+    }
+
+    static func deleteCustomHeaders(profileID: String) {
+        deleteItem(account: headersAccount(for: profileID))
+    }
+
+    private static func headersAccount(for profileID: String) -> String {
+        "dockhand-headers.\(profileID)"
     }
 
     private static func account(for profileID: String) -> String {
@@ -44,6 +73,10 @@ enum KeychainStore {
     }
 
     private static func readToken(account: String) -> String? {
+        readData(account: account).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    private static func readData(account: String) -> Data? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -54,12 +87,10 @@ enum KeychainStore {
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let string = String(data: data, encoding: .utf8) else {
+        guard status == errSecSuccess, let data = result as? Data else {
             return nil
         }
-        return string
+        return data
     }
 
     private static func writeToken(_ token: String, account: String) {
@@ -74,18 +105,29 @@ enum KeychainStore {
             return
         }
 
-        let data = Data(token.utf8)
-        let attributes: [CFString: Any] = [kSecValueData: data]
+        writeData(Data(token.utf8), account: account, accessibility: nil)
+    }
+
+    private static func writeData(_ data: Data, account: String, accessibility: CFString?) {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account
+        ]
+
+        var attributes: [CFString: Any] = [kSecValueData: data]
+        if let accessibility {
+            attributes[kSecAttrAccessible] = accessibility
+        }
         let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
 
         if updateStatus == errSecItemNotFound {
-            var item = query
-            item[kSecValueData] = data
+            let item = query.merging(attributes) { _, new in new }
             SecItemAdd(item as CFDictionary, nil)
         }
     }
 
-    private static func deleteToken(account: String) {
+    private static func deleteItem(account: String) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,

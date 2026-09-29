@@ -24,10 +24,12 @@
 		AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1F5D851E40D36A5154376B /* PreferencesStore.swift */; };
 		B388C775A10358DC31C430CD /* StacksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5FC6A2CB1B06506690B8E1E /* StacksView.swift */; };
 		B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E28C30131DD132BCF62665 /* SettingsView.swift */; };
+		C0A1B2C3D4E5F60718293A4B /* CustomHeadersEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1B2C3D4E5F60718293A4C /* CustomHeadersEditor.swift */; };
 		C98C9BD249BE376D06B0D029 /* ContainerLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658C94BF66735EF772455033 /* ContainerLogsView.swift */; };
 		CD1A5221D5DBD371587F7027 /* DockhandAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 51B7CD00CA402C86142567D7 /* DockhandAPI */; };
 		D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */; };
 		D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */; };
+		C0A1B2C3D4E5F60718293A4D /* CustomHeadersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A1B2C3D4E5F60718293A4E /* CustomHeadersTests.swift */; };
 		D701C4AC0D3E16F8C32BFEC4 /* ContainerShellStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */; };
 		D81EF90DB2E1C18AA9B1D46C /* ContainerShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */; };
 		DC17580525152C8C828E703B /* ContainerShellModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A92E116DFB84B69D12240A /* ContainerShellModels.swift */; };
@@ -55,11 +57,13 @@
 		08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		0D3266A680155F8775A56868 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		13E28C30131DD132BCF62665 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		C0A1B2C3D4E5F60718293A4C /* CustomHeadersEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeadersEditor.swift; sourceTree = "<group>"; };
 		24A92E116DFB84B69D12240A /* ContainerShellModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellModels.swift; sourceTree = "<group>"; };
 		35AC0A8828C781207C5F87EA /* UserFacingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFacingError.swift; sourceTree = "<group>"; };
 		36F846090140816C679D138A /* StackEditorSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackEditorSupport.swift; sourceTree = "<group>"; };
 		3A1F5D851E40D36A5154376B /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandMobileTests.swift; sourceTree = "<group>"; };
+		C0A1B2C3D4E5F60718293A4E /* CustomHeadersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeadersTests.swift; sourceTree = "<group>"; };
 		498DB08A39D3F486DE12FAF5 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		56B712631CB23E96021C59F0 /* DockhandMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockhandMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		658C94BF66735EF772455033 /* ContainerLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerLogsView.swift; sourceTree = "<group>"; };
@@ -146,6 +150,7 @@
 		6533012C87BA3BC0BD79B8DA /* DockhandMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				C0A1B2C3D4E5F60718293A4E /* CustomHeadersTests.swift */,
 				3BB5A8BFE20E01C33FD647EF /* DockhandMobileTests.swift */,
 			);
 			path = DockhandMobileTests;
@@ -243,6 +248,7 @@
 		FA8A81E4F1190EEB25E50E0D /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				C0A1B2C3D4E5F60718293A4C /* CustomHeadersEditor.swift */,
 				13E28C30131DD132BCF62665 /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -361,6 +367,7 @@
 				4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */,
 				D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */,
 				AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */,
+				C0A1B2C3D4E5F60718293A4B /* CustomHeadersEditor.swift in Sources */,
 				B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */,
 				64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */,
 				17795D5F56F0735052BAF912 /* StacksStore.swift in Sources */,
@@ -374,6 +381,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0A1B2C3D4E5F60718293A4D /* CustomHeadersTests.swift in Sources */,
 				D26BD96049C112E25D7504BE /* DockhandMobileTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

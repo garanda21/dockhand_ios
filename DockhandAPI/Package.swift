@@ -25,6 +25,11 @@ let package = Package(
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
             ],
             path: "Sources/DockhandAPI"
+        ),
+        .testTarget(
+            name: "DockhandAPITests",
+            dependencies: ["DockhandAPI"],
+            path: "Tests/DockhandAPITests"
         )
     ]
 )

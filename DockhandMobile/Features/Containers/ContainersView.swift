@@ -23,7 +23,7 @@ final class ContainersStore {
         defer { isLoading = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             containers = try await service.fetchContainers(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
@@ -41,7 +41,7 @@ final class ContainersStore {
         defer { activeActionID = nil }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.containerAction(action, containerID: container.id, environmentID: environmentID)
             actionMessage = String(
                 format: String(localized: "%@ %@"),

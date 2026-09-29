@@ -1,3 +1,4 @@
+import DockhandAPI
 import Foundation
 import Observation
 
@@ -38,7 +39,7 @@ final class ContainerShellStore {
         defer { isDetectingShells = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             let result = try await service.fetchContainerShells(
                 containerID: target.id,
                 environmentID: environmentID
@@ -75,14 +76,14 @@ final class ContainerShellStore {
         persistSelection()
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             let request = try service.makeContainerShellRequest(
                 containerID: target.id,
                 environmentID: environmentID,
                 shell: selectedShell,
                 user: selectedUser
             )
-            let task = URLSession(configuration: .dockhandEphemeral).webSocketTask(with: request)
+            let task = DockhandHTTPSession.shared.webSocketTask(with: request)
             webSocketTask = task
             task.resume()
             isConnected = true
@@ -186,9 +187,12 @@ final class ContainerShellStore {
                     status = .disconnected
                     return
                 }
-                self.error = error.dockhandUserFacingMessage
+                // A failed upgrade only surfaces as a generic socket error; the
+                // handshake response tells whether a proxy blocked it.
+                let resolvedError: Error = DockhandProxyChallenge.detect(webSocketTask.response) ?? error
+                self.error = resolvedError.dockhandUserFacingMessage
                 status = .error
-                appendErrorLine(error.dockhandUserFacingMessage)
+                appendErrorLine(resolvedError.dockhandUserFacingMessage)
             }
         }
     }

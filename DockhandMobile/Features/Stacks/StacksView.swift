@@ -415,7 +415,7 @@ private struct StackEditorView: View {
         defer { isLoading = false }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             document = try await service.fetchStackEditorDocument(name: stack.name, environmentID: environmentID)
             saveMessage = nil
             saveMessageIsError = false
@@ -445,7 +445,7 @@ private struct StackEditorView: View {
                 try StackEditorValidator.validateEnv(document.envContent)
             }
 
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             if activePane == .compose {
                 try await service.updateStackCompose(
                     name: stack.name,

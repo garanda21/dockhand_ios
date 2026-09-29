@@ -38,6 +38,7 @@ Pushing a `v*` tag that points to `main` creates the GitHub Release automaticall
 
 - Manage multiple [Dockhand](https://github.com/Finsys/dockhand) servers from one app.
 - Keep each server isolated with its own URL, token and selected environment.
+- Send per-server custom HTTP headers to authenticate with reverse proxies such as Pangolin or Cloudflare Access.
 - Switch quickly between Dockhand environments from the main header.
 - View environment dashboard data such as container health, CPU, memory, images, volumes, networks, stacks and events when the Dockhand API exposes it.
 - List containers, filter and sort them by state.
@@ -111,6 +112,24 @@ Authorization: Bearer <token>
 ```
 
 Use the least privileged token that fits your workflow. Read-only tokens are enough for browsing. Container, stack and image actions require a token with write/control permissions.
+
+### Reverse proxy headers
+
+If Dockhand sits behind an authenticating reverse proxy, add the proxy credentials as **Custom headers** in the server profile instead of creating a bypass rule. They are sent with every request to that server: API calls, polling, long-running jobs, live log streams and shell WebSockets. The Dockhand bearer token keeps working as before.
+
+Presets fill in the header names:
+
+| Proxy | Headers |
+| --- | --- |
+| Pangolin | `P-Access-Token-Id`, `P-Access-Token` |
+| Cloudflare Access (service token) | `CF-Access-Client-Id`, `CF-Access-Client-Secret` |
+
+Any other header can be added by name. How values are handled:
+
+- Values are stored in the iOS Keychain (this device only, never synced or backed up) and are hidden after saving. They can be replaced or removed individually.
+- Headers managed by the app or iOS (`Authorization`, `Host`, `Content-*`, `Accept`, `Connection`, `Upgrade`, `Proxy-*`, `Sec-*`, ...) cannot be overridden. Values with line breaks or control characters are rejected.
+- Redirects to a different host, port or scheme are never followed, so the token and headers are not forwarded to a sign-in page. When the proxy answers with a redirect or an HTML page, the app says the proxy is asking for authentication.
+- **Test connection** checks a draft configuration before saving it.
 
 ## Local Setup
 

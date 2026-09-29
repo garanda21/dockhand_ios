@@ -93,7 +93,7 @@ final class ContainerLogsStore {
         }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             let loadedDocument = try await service.fetchContainerLogs(
                 containerID: target.id,
                 environmentID: environmentID,
@@ -135,7 +135,7 @@ final class ContainerLogsStore {
         }
 
         do {
-            let service = DockhandService(baseURL: baseURL, token: appModel.token)
+            let service = appModel.service(baseURL: baseURL)
             try await service.streamContainerLogs(
                 containerID: target.id,
                 environmentID: environmentID,
