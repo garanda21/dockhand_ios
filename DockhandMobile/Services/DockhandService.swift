@@ -220,6 +220,38 @@ struct ContainerReleaseNotes: Decodable, Identifiable, Sendable {
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
         return url
     }
+    static func githubReleaseURL(changelog: String?) -> URL? {
+        guard let url = webURL(changelog), url.host?.lowercased() == "github.com" else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count >= 3, parts[2] == "releases",
+              parts.prefix(2).allSatisfy({ $0.allSatisfy { $0.isLetter || $0.isNumber || "_.-".contains($0) } }) else { return nil }
+        let base = URL(string: "https://api.github.com/repos/\(parts[0])/\(parts[1])/releases")!
+        if parts.count > 4, parts[3] == "tag" {
+            return base.appendingPathComponent("tags").appendingPathComponent(parts.dropFirst(4).joined(separator: "/"))
+        }
+        return base.appendingPathComponent("latest")
+    }
+
+    static func loadPublicRelease(changelog: String?) async throws -> Note? {
+        guard let url = githubReleaseURL(changelog: changelog) else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        // Public GitHub request: never attach Dockhand or proxy credentials.
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw DockhandServiceError.invalidResponse
+        }
+        struct Release: Decodable {
+            let tag_name: String
+            let name: String?
+            let body: String?
+            let html_url: String
+        }
+        let release = try JSONDecoder().decode(Release.self, from: data)
+        return Note(version: release.tag_name, name: release.name, body: release.body, url: release.html_url)
+    }
+
     var hasContent: Bool { Self.webURL(changelogUrl) != nil || !notes.isEmpty }
 }
 

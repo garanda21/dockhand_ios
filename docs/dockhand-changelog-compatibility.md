@@ -60,3 +60,12 @@ container name in the same environment. It does not change pending records or
 update-action targets, and does not retry authorization failures or empty notes.
 Live validation in Chuwi confirmed Cloudflare returns a changelog link by its
 current name while Postgres returns no link or notes.
+
+If Dockhand returns a GitHub release URL without note bodies, the notes sheet
+fetches that repository's public release through api.github.com when opened.
+Explicit /releases/tag URLs request that tag; generic /releases URLs request
+the latest published release, labelled as such rather than as the pending image
+update. Non-GitHub changelogs retain the external link. GitHub requests carry no
+Dockhand bearer token or custom proxy headers. The sheet has loading, failure,
+and retry states. Cloudflared's public release returned a non-empty body during
+verification on 2026-10-03.

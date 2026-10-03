@@ -1,6 +1,36 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Latest published release. It may differ from the pending image update." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última publicación. Puede diferir de la actualización pendiente de la imagen."
+          }
+        }
+      }
+    },
+    "Release notes could not be loaded. You can open the changelog." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar las notas. Puedes abrir el historial de cambios."
+          }
+        }
+      }
+    },
+    "Loading release notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando notas de versión"
+          }
+        }
+      }
+    },
     "Open release notes" : {
       "localizations" : {
         "es" : {

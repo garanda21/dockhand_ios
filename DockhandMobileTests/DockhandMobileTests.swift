@@ -140,6 +140,13 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testPublicReleaseURLsUseOnlyGitHubAndPreserveExplicitTag() {
+        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/latest")
+        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/tags/2026.9.1")
+        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://example.com/releases"))
+        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/owner/repo/issues"))
+    }
+
     @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in

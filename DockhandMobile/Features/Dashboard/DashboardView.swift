@@ -1292,7 +1292,14 @@ private struct ContainerChangesButton: View {
 private struct ContainerChangesView: View {
     let containerName: String
     let notes: ContainerReleaseNotes
+    @State private var publicNote: ContainerReleaseNotes.Note?
+    @State private var isLoading = false
+    @State private var loadFailed = false
     @Environment(\.dismiss) private var dismiss
+
+    private var displayedNotes: [ContainerReleaseNotes.Note] {
+        notes.notes.isEmpty ? publicNote.map { [$0] } ?? [] : notes.notes
+    }
 
     var body: some View {
         NavigationStack {
@@ -1302,10 +1309,24 @@ private struct ContainerChangesView: View {
                         Label(String(localized: "Open changelog"), systemImage: "arrow.up.right.square")
                     }
                 }
-                ForEach(Array(notes.notes.enumerated()), id: \.offset) { _, note in
+                if isLoading {
+                    ProgressView(String(localized: "Loading release notes"))
+                } else if notes.notes.isEmpty && publicNote == nil {
+                    Text(String(localized: "Release notes could not be loaded. You can open the changelog."))
+                        .foregroundStyle(.secondary)
+                    if loadFailed {
+                        Button(String(localized: "Retry")) { Task { await loadPublicNotes() } }
+                    }
+                }
+                if publicNote != nil, ContainerReleaseNotes.githubReleaseURL(changelog: notes.changelogUrl)?.lastPathComponent == "latest" {
+                    Text(String(localized: "Latest published release. It may differ from the pending image update."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Array(displayedNotes.enumerated()), id: \.offset) { _, note in
                     Section {
                         if let body = note.body, !body.isEmpty {
-                            Text(verbatim: body)
+                            Text(.init(body))
                                 .textSelection(.enabled)
                         }
                         if let url = ContainerReleaseNotes.webURL(note.url) {
@@ -1316,6 +1337,7 @@ private struct ContainerChangesView: View {
                     }
                 }
             }
+            .task { await loadPublicNotes() }
             .navigationTitle(containerName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1323,6 +1345,22 @@ private struct ContainerChangesView: View {
                     Button(String(localized: "Done")) { dismiss() }
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func loadPublicNotes() async {
+        guard notes.notes.isEmpty, publicNote == nil else { return }
+        isLoading = true
+        loadFailed = false
+        defer { isLoading = false }
+        do {
+            let result = try await ContainerReleaseNotes.loadPublicRelease(changelog: notes.changelogUrl)
+            guard !Task.isCancelled else { return }
+            publicNote = result
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            loadFailed = true
         }
     }
 
