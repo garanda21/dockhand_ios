@@ -67,6 +67,19 @@ final class DockhandMobileTests: XCTestCase {
     }
 
     @MainActor
+    func testServerDetailsReloadsWhenRememberedEnvironmentBecomesAvailable() {
+        let model = AppModel()
+        model.selectedEnvironmentID = 1
+        model.environments = []
+        let waitingID = ServerDetailsStore.loadID(appModel: model)
+        let scope = model.connectionScopeID
+        model.environments = [makeEnvironment(publicIP: nil)]
+        model.selectedEnvironmentID = model.environments[0].id
+        XCTAssertEqual(model.connectionScopeID, scope)
+        XCTAssertNotEqual(ServerDetailsStore.loadID(appModel: model), waitingID)
+    }
+
+    @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in
             let corruptData = Data("not-json".utf8)

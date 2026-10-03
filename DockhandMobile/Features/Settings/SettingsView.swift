@@ -10,8 +10,17 @@ final class ServerDetailsStore {
     var verifiedChangelog: [DockhandChangelogRelease]?
     var isLoading = false
     var error: String?
+    private var loadToken = UUID()
+
+    static func loadID(appModel: AppModel) -> String {
+        "\(appModel.connectionScopeID):\(appModel.selectedEnvironment?.id ?? -1)"
+    }
+
     func load(appModel: AppModel) async {
         let scope = appModel.connectionScopeID
+        let token = UUID()
+        loadToken = token
+        isLoading = false
         host = nil
         loadedScopeID = nil
         verifiedChangelog = nil
@@ -25,23 +34,23 @@ final class ServerDetailsStore {
         isLoading = true
         error = nil
         defer {
-            if scope == appModel.connectionScopeID { isLoading = false }
+            if token == loadToken { isLoading = false }
         }
 
         do {
             let service = appModel.service(baseURL: baseURL)
             let result = try await service.fetchDashboardHost(environmentID: environmentID)
-            guard scope == appModel.connectionScopeID, !Task.isCancelled else { return }
+            guard token == loadToken, scope == appModel.connectionScopeID, !Task.isCancelled else { return }
             host = result
             loadedScopeID = scope
             if result.dockhand?.version == nil {
                 let changelog = try? await service.fetchDockhandChangelog(environmentID: environmentID, serverVersion: nil)
-                guard scope == appModel.connectionScopeID, !Task.isCancelled else { return }
+                guard token == loadToken, scope == appModel.connectionScopeID, !Task.isCancelled else { return }
                 verifiedChangelog = changelog
                 host?.dockhand?.version = changelog?.first?.version
             }
         } catch {
-            guard scope == appModel.connectionScopeID, !error.isDockhandCancellation else { return }
+            guard token == loadToken, scope == appModel.connectionScopeID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
@@ -75,7 +84,7 @@ struct SettingsView: View {
         }
         .navigationTitle(String(localized: "Settings"))
         .navigationBarTitleDisplayMode(.large)
-        .task(id: appModel.connectionScopeID) {
+        .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
             await detailsStore.load(appModel: appModel)
         }
     }

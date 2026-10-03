@@ -25,7 +25,7 @@ on 2026-10-02 (source checkout `5fd44756fda92b780af6378c95e9e2a4cdc35274`):
   plain string changes and optional dates.
 
 The link and network method require a parseable server version >= 1.0.4.
-Known older or unparseable versions do not trigger a changelog request. When the API omits the version (for example, an official `:latest` container with empty OCI version labels), Settings verifies support with a read-only changelog request and caches the response for navigation. The UI uses the first published changelog version when available, and shows version unavailable only if both sources are empty. A server reporting
+Known older or unparseable versions do not trigger a changelog request. When the API omits the version (for example, an official `:latest` container with empty OCI version labels), Settings verifies support with a read-only changelog request and caches the response for navigation. The Settings task also observes actual environment availability, so reusing a remembered environment ID after switching servers triggers a reload. The UI uses the first published changelog version when available, and shows version unavailable only if both sources are empty. A server reporting
 an eligible version but lacking the endpoint shows an unavailable/error state.
 The changelog is bundled with the installed server, so it is not a live source of
 newer releases. No self-update endpoint is called by this feature.
