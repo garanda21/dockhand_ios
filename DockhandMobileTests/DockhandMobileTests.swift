@@ -109,6 +109,37 @@ final class DockhandMobileTests: XCTestCase {
         } catch { XCTFail("Unexpected error: \(error)") }
     }
 
+    func testContainerNotesRetryRecreatedContainerByName() async throws {
+        let update = PendingContainerUpdate(containerID: "old-id", containerName: "cloudflare_tunnel", currentImage: "cloudflare/cloudflared:latest")
+        var requested: [String] = []
+        let result = try await DockhandService.resolveContainerReleaseNotes(update: update) { identifier in
+            requested.append(identifier)
+            if identifier == "old-id" { throw DockhandServiceError.message("Failed to resolve release notes") }
+            return ContainerReleaseNotes(changelogUrl: "https://github.com/cloudflare/cloudflared/releases", notes: [])
+        }
+        XCTAssertEqual(requested, ["old-id", "cloudflare_tunnel"])
+        XCTAssertTrue(result.hasContent)
+    }
+
+    func testContainerNotesDoNotRetryPermissionsOrEmptyResults() async throws {
+        let update = PendingContainerUpdate(containerID: "id", containerName: "postgres", currentImage: "postgres:18")
+        var count = 0
+        _ = try await DockhandService.resolveContainerReleaseNotes(update: update) { _ in
+            count += 1
+            return ContainerReleaseNotes(changelogUrl: nil, notes: [])
+        }
+        XCTAssertEqual(count, 1)
+        count = 0
+        do {
+            _ = try await DockhandService.resolveContainerReleaseNotes(update: update) { _ in
+                count += 1
+                throw DockhandServiceError.unexpectedStatus(403)
+            }
+            XCTFail("Permission failure must propagate")
+        } catch {}
+        XCTAssertEqual(count, 1)
+    }
+
     @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in

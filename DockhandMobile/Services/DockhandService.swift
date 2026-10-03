@@ -524,11 +524,37 @@ struct DockhandService {
         guard DockhandChangelogRelease.supportsContainerNotes(version: serverVersion) else {
             throw DockhandServiceError.invalidResponse
         }
-        let response = try await performJSONRequest(
-            path: "/api/containers/\(update.containerID)/version-notes", method: "GET", environmentID: environmentID,
-            additionalQueryItems: [URLQueryItem(name: "versions", value: update.newerTags.joined(separator: ","))]
-        )
-        return try JSONDecoder().decode(ContainerReleaseNotes.self, from: JSONSerialization.data(withJSONObject: response))
+        return try await Self.resolveContainerReleaseNotes(update: update) { identifier in
+            let response = try await performJSONRequest(
+                path: "/api/containers/\(identifier)/version-notes", method: "GET", environmentID: environmentID,
+                additionalQueryItems: [URLQueryItem(name: "versions", value: update.newerTags.joined(separator: ","))]
+            )
+            return try JSONDecoder().decode(ContainerReleaseNotes.self, from: JSONSerialization.data(withJSONObject: response))
+        }
+    }
+
+    static func resolveContainerReleaseNotes(
+        update: PendingContainerUpdate,
+        fetch: (String) async throws -> ContainerReleaseNotes
+    ) async throws -> ContainerReleaseNotes {
+        do {
+            return try await fetch(update.containerID)
+        } catch {
+            // Pending-update records can outlive a recreated container. Docker
+            // accepts its name too; retry only resolution failures in the same env.
+            let resolutionFailed: Bool
+            switch error {
+            case DockhandServiceError.message("Failed to resolve release notes"),
+                 DockhandServiceError.unexpectedStatus(404),
+                 DockhandServiceError.unexpectedStatus(500): resolutionFailed = true
+            default: resolutionFailed = false
+            }
+            let name = update.containerName
+            guard resolutionFailed, name != update.containerID, !name.isEmpty,
+                  name.allSatisfy({ $0.isLetter || $0.isNumber || "_.-".contains($0) }),
+                  !Task.isCancelled else { throw error }
+            return try await fetch(name)
+        }
     }
 
     func fetchPendingContainerUpdates(environmentID: Int) async throws -> [PendingContainerUpdate] {

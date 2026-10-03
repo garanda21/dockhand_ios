@@ -54,3 +54,9 @@ the action. Results are scoped to the server/environment and cancelled on a
 scope change. Read-only validation on the Home server confirmed a link for an
 existing container; two stale pending IDs returned 500 and were absent from
 its current container list. No pending records were changed during validation.
+
+If a pending container ID no longer resolves, the notes request retries using its
+container name in the same environment. It does not change pending records or
+update-action targets, and does not retry authorization failures or empty notes.
+Live validation in Chuwi confirmed Cloudflare returns a changelog link by its
+current name while Postgres returns no link or notes.

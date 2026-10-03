@@ -1263,7 +1263,7 @@ private struct ContainerChangesButton: View {
     @State private var presentedNotes: ContainerReleaseNotes?
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 0) {
             if let notes, notes.hasContent {
                 Button {
                     presentedNotes = notes
@@ -1272,6 +1272,8 @@ private struct ContainerChangesButton: View {
                         .font(.footnote)
                 }
                 .buttonStyle(.borderless)
+            } else {
+                Color.clear.frame(width: 0, height: 0)
             }
         }
         .task(id: update) {
