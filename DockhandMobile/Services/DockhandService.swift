@@ -151,6 +151,55 @@ struct DashboardHostSnapshot: Codable, Sendable, Hashable {
     var host: Host
 }
 
+struct DockhandChangelogRelease: Identifiable, Sendable, Equatable {
+    struct Change: Sendable, Equatable {
+        let type: String?
+        let text: String
+    }
+
+    var id: String { version }
+    let version: String
+    let date: String?
+    let changes: [Change]
+
+    // /api/changelog and runtime.ownContainer.labels.version are verified in
+    // official release tags from 1.0.4 through 1.0.50. Unknown builds are gated.
+    static func supportsChangelog(version: String?) -> Bool {
+        supports(version: version, minimumPatch: 4)
+    }
+
+    private static func supports(version: String?, minimumPatch: Int) -> Bool {
+        guard let version else { return false }
+        let value = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unprefixed = value.hasPrefix("v") ? String(value.dropFirst()) : value
+        guard let withoutSuffix = unprefixed.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).first,
+              let core = withoutSuffix.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false).first else { return false }
+        let parts = core.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+              let major = Int(parts[0]), let minor = Int(parts[1]), let patch = Int(parts[2]) else { return false }
+        if major != 1 { return major > 1 }
+        if minor != 0 { return minor > 0 }
+        return patch > minimumPatch || (patch == minimumPatch && !unprefixed.contains("-"))
+    }
+
+    static func decode(_ objects: [[String: Any]]) throws -> [Self] {
+        try objects.filter { ($0["comingSoon"] as? Bool) != true }.map { object in
+            guard let version = object["version"] as? String,
+                  !version.isEmpty, let rawChanges = object["changes"] as? [Any] else {
+                throw DockhandServiceError.invalidResponse
+            }
+            let changes: [Change] = try rawChanges.map { raw in
+                if let text = raw as? String { return Change(type: nil, text: text) }
+                guard let change = raw as? [String: Any], let text = change["text"] as? String else {
+                    throw DockhandServiceError.invalidResponse
+                }
+                return Change(type: change["type"] as? String, text: text)
+            }
+            return Self(version: version, date: object["date"] as? String, changes: changes)
+        }
+    }
+}
+
 struct PendingContainerUpdate: Sendable, Hashable {
     var containerID: String
     var containerName: String
@@ -435,6 +484,16 @@ struct DockhandService {
             environmentID: environmentID
         )
         return try Self.decodeDashboardHost(response)
+    }
+
+    func fetchDockhandChangelog(environmentID: Int, serverVersion: String?) async throws -> [DockhandChangelogRelease] {
+        // Without a reported version, a read-only request verifies capability.
+        // Never guess the installed version from the bundled release history.
+        if let serverVersion, !DockhandChangelogRelease.supportsChangelog(version: serverVersion) {
+            throw DockhandServiceError.invalidResponse
+        }
+        let response = try await performJSONArrayRequest(path: "/api/changelog", method: "GET", environmentID: environmentID)
+        return try DockhandChangelogRelease.decode(response)
     }
 
     func fetchPendingContainerUpdates(environmentID: Int) async throws -> [PendingContainerUpdate] {

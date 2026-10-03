@@ -107,15 +107,21 @@ extension DockhandService {
         let dockhandObject = (object["dockhand"] as? [String: Any])
             ?? (object["app"] as? [String: Any])
             ?? (object["server"] as? [String: Any])
+        let runtime = object["runtime"] as? [String: Any]
+        let ownContainer = runtime?["ownContainer"] as? [String: Any]
+        let labels = ownContainer?["labels"] as? [String: Any]
+        let legacyVersion = stringValue(dockhandObject?["version"]) ?? stringValue(object["dockhandVersion"]) ?? stringValue(object["version"])
+        let legacyCommit = stringValue(dockhandObject?["commit"]) ?? stringValue(dockhandObject?["gitCommit"]) ?? stringValue(object["commit"])
+        let dockhand = DashboardHostSnapshot.Dockhand(
+            version: stringValue(labels?["version"]) ?? legacyVersion,
+            build: stringValue(dockhandObject?["build"]) ?? stringValue(object["build"]),
+            commit: stringValue(labels?["revision"]) ?? legacyCommit,
+            runtime: stringValue(dockhandObject?["runtime"]) ?? stringValue(runtime?["runtimeName"]),
+            database: stringValue(dockhandObject?["database"]) ?? stringValue(object["database"])
+        )
 
         return DashboardHostSnapshot(
-            dockhand: .init(
-                version: stringValue(dockhandObject?["version"]) ?? stringValue(object["dockhandVersion"]) ?? stringValue(object["version"]),
-                build: stringValue(dockhandObject?["build"]) ?? stringValue(object["build"]),
-                commit: stringValue(dockhandObject?["commit"]) ?? stringValue(dockhandObject?["gitCommit"]) ?? stringValue(object["commit"]),
-                runtime: stringValue(dockhandObject?["runtime"]) ?? stringValue(object["runtime"]),
-                database: stringValue(dockhandObject?["database"]) ?? stringValue(object["database"])
-            ),
+            dockhand: dockhand,
             docker: .init(
                 version: dockerObject["version"] as? String ?? String(localized: "Unknown"),
                 apiVersion: dockerObject["apiVersion"] as? String ?? String(localized: "Unknown"),

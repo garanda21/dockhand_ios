@@ -3,6 +3,57 @@ import XCTest
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    func testDockhandVersionUsesOwnContainerRatherThanDockerVersion() throws {
+        let snapshot = try DockhandService.decodeDashboardHost([
+            "docker": ["version": "29.0", "apiVersion": "1.52"],
+            "host": ["name": "example"],
+            "runtime": ["runtimeName": "Node.js", "ownContainer": ["labels": ["version": "v1.0.50", "revision": "abc123"]]]
+        ])
+        XCTAssertEqual(snapshot.dockhand?.version, "v1.0.50")
+        XCTAssertEqual(snapshot.dockhand?.commit, "abc123")
+        XCTAssertEqual(snapshot.dockhand?.runtime, "Node.js")
+        XCTAssertEqual(snapshot.docker.version, "29.0")
+    }
+
+    func testDockhandVersionIsAbsentWithoutOwnContainerAndSupportsLegacyFields() throws {
+        let unknown = try DockhandService.decodeDashboardHost(["docker": ["version": "29.0"], "host": [:], "runtime": ["runtimeVersion": "24.0"]])
+        XCTAssertNil(unknown.dockhand?.version)
+        let legacy = try DockhandService.decodeDashboardHost(["docker": [:], "host": [:], "dockhand": ["version": "1.0.35"]])
+        XCTAssertEqual(legacy.dockhand?.version, "1.0.35")
+    }
+
+    func testChangelogCompatibilityRejectsUnknownAndUnverifiedVersions() {
+        for version: String? in [nil, "", "v", "latest", "1.0", "1.0.3", "1.0.4-beta.1", "-", "1..4"] {
+            XCTAssertFalse(DockhandChangelogRelease.supportsChangelog(version: version), "Unexpected support: \(version ?? "nil")")
+        }
+        for version in ["1.0.4", "v1.0.50", "1.0.50-baseline", "1.0.50+build", "1.1.0", "2.0.0"] {
+            XCTAssertTrue(DockhandChangelogRelease.supportsChangelog(version: version), version)
+        }
+    }
+
+    func testChangelogDecodesTypedAndLegacyChangesAndExcludesUpcomingReleases() throws {
+        let releases = try DockhandChangelogRelease.decode([
+            ["version": "1.0.51", "comingSoon": true, "changes": []],
+            ["version": "1.0.50", "date": "2026-09-30", "changes": [["type": "fix", "text": "Fixed issue"], "Legacy note"]]
+        ])
+        XCTAssertEqual(releases.map(\.version), ["1.0.50"])
+        XCTAssertEqual(releases[0].changes.map(\.text), ["Fixed issue", "Legacy note"])
+        XCTAssertEqual(releases[0].changes[0].type, "fix")
+        XCTAssertThrowsError(try DockhandChangelogRelease.decode([["version": "1.0.50", "changes": [42]]]))
+    }
+
+    func testUnsupportedServerRejectsChangelogBeforeNetworking() async {
+        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
+        do {
+            _ = try await service.fetchDockhandChangelog(environmentID: 1, serverVersion: "1.0.3")
+            XCTFail("Unsupported servers must not fetch the changelog")
+        } catch DockhandServiceError.invalidResponse {
+            // Rejected locally; networking would return a transport error.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in

@@ -6,10 +6,13 @@ import SwiftUI
 @Observable
 final class ServerDetailsStore {
     var host: DashboardHostSnapshot?
+    var loadedScopeID: String?
     var isLoading = false
     var error: String?
-
     func load(appModel: AppModel) async {
+        let scope = appModel.connectionScopeID
+        host = nil
+        loadedScopeID = nil
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
             host = nil
@@ -19,13 +22,18 @@ final class ServerDetailsStore {
 
         isLoading = true
         error = nil
-        defer { isLoading = false }
+        defer {
+            if scope == appModel.connectionScopeID { isLoading = false }
+        }
 
         do {
             let service = appModel.service(baseURL: baseURL)
-            host = try await service.fetchDashboardHost(environmentID: environmentID)
+            let result = try await service.fetchDashboardHost(environmentID: environmentID)
+            guard scope == appModel.connectionScopeID, !Task.isCancelled else { return }
+            host = result
+            loadedScopeID = scope
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard scope == appModel.connectionScopeID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
@@ -36,6 +44,10 @@ struct SettingsView: View {
 
     @State private var statusMessage: String?
     @State private var detailsStore = ServerDetailsStore()
+
+    private var serverHost: DashboardHostSnapshot? {
+        detailsStore.loadedScopeID == appModel.connectionScopeID ? detailsStore.host : nil
+    }
 
     var body: some View {
         ScrollView {
@@ -99,6 +111,32 @@ struct SettingsView: View {
                                 .font(.footnote.monospaced())
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                            if let version = serverHost?.dockhand?.version, !version.isEmpty {
+                                if DockhandChangelogRelease.supportsChangelog(version: version),
+                                   let baseURL = appModel.normalizedBaseURL,
+                                   let environmentID = appModel.selectedEnvironment?.id {
+                                    NavigationLink {
+                                        DockhandChangelogView(
+                                            service: appModel.service(baseURL: baseURL),
+                                            environmentID: environmentID,
+                                            serverName: profile.name,
+                                            serverVersion: version
+                                        )
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Text(verbatim: "Dockhand \(version)")
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption2)
+                                        }
+                                        .font(.footnote)
+                                    }
+                                    .accessibilityHint(String(localized: "View Dockhand changelog"))
+                                } else {
+                                    Text(verbatim: "Dockhand \(version)")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
 
                         Spacer(minLength: 0)
@@ -203,7 +241,7 @@ struct SettingsView: View {
                 }
             }
 
-            if let host = detailsStore.host {
+            if let host = serverHost {
                 VStack(alignment: .leading, spacing: 14) {
                     let dockhandRows = host.dockhand.map(dockhandDetailRows) ?? []
                     if !dockhandRows.isEmpty {
@@ -705,5 +743,103 @@ private struct ServerProfileDetailView: View {
 
         await appModel.deleteServerProfile(profileID)
         dismiss()
+    }
+}
+
+private struct DockhandChangelogView: View {
+    let service: DockhandService
+    let environmentID: Int
+    let serverName: String
+    let serverVersion: String?
+    var initialReleases: [DockhandChangelogRelease]? = nil
+
+    @State private var releases: [DockhandChangelogRelease] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent(String(localized: "Server"), value: serverName)
+                LabeledContent(String(localized: "Installed version"), value: serverVersion ?? String(localized: "Unavailable"))
+            } footer: {
+                Text(String(localized: "Release history provided by this Dockhand server."))
+            }
+
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(.secondary)
+                    Button(String(localized: "Retry")) {
+                        Task { await load() }
+                    }
+                }
+            } else if releases.isEmpty {
+                ContentUnavailableView(
+                    String(localized: "No release notes"),
+                    systemImage: "text.document",
+                    description: Text(String(localized: "This server returned no release notes."))
+                )
+            } else {
+                ForEach(releases) { release in
+                    Section {
+                        ForEach(Array(release.changes.enumerated()), id: \.offset) { _, change in
+                            Label {
+                                Text(verbatim: change.text)
+                                    .textSelection(.enabled)
+                            } icon: {
+                                Image(systemName: change.type == "feature" ? "sparkles" : change.type == "fix" ? "wrench.adjustable" : "circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Text(verbatim: release.version)
+                            if let serverVersion, release.version.trimmingCharacters(in: CharacterSet(charactersIn: "v")) == serverVersion.trimmingCharacters(in: CharacterSet(charactersIn: "v")) {
+                                Text(String(localized: "Installed"))
+                                    .foregroundStyle(.tint)
+                            }
+                            Spacer()
+                            if let date = release.date {
+                                Text(verbatim: date)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(String(localized: "Dockhand changelog"))
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if let initialReleases {
+                releases = initialReleases
+                isLoading = false
+            } else {
+                await load()
+            }
+        }
+        .refreshable { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let result = try await service.fetchDockhandChangelog(environmentID: environmentID, serverVersion: serverVersion)
+            guard !Task.isCancelled else { return }
+            releases = result
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            if case DockhandServiceError.unexpectedStatus(404) = error {
+                errorMessage = String(localized: "This server does not provide a changelog.")
+            } else {
+                errorMessage = error.dockhandUserFacingMessage
+            }
+        }
     }
 }
