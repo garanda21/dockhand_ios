@@ -1,8 +1,41 @@
 import XCTest
+import SwiftUI
 @testable import DockhandMobile
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    @MainActor
+    func testStackEditorsPreserveTypingSelectionAndScroll() {
+        for kind in [StackEditorSyntaxKind.yaml, .env] {
+            var text = (0..<120).map { "KEY\($0): value" }.joined(separator: "\n")
+            let binding = Binding<String>(get: { text }, set: { text = $0 })
+            let editor = SyntaxHighlightingTextEditor(text: binding, isFocused: .constant(false), kind: kind)
+            let coordinator = editor.makeCoordinator()
+            let view = UITextView(frame: CGRect(x: 0, y: 0, width: 320, height: 380))
+            coordinator.applyHighlight(to: view)
+            view.layoutIfNeeded()
+            view.setContentOffset(CGPoint(x: 0, y: 150), animated: false)
+            for character in ["a", "b", "😀"] {
+                let current = NSMutableString(string: view.text)
+                current.insert(character, at: 25)
+                view.text = current as String
+                view.selectedRange = NSRange(location: 25 + character.utf16.count, length: 0)
+                view.setContentOffset(CGPoint(x: 0, y: 150), animated: false)
+                let selection = view.selectedRange
+                let offset = view.contentOffset
+                let expected = view.text
+                coordinator.textViewDidChange(view)
+                XCTAssertEqual(text, expected)
+                XCTAssertEqual(view.text, expected)
+                XCTAssertEqual(view.selectedRange, selection)
+                XCTAssertEqual(view.contentOffset.y, offset.y, accuracy: 1)
+                coordinator.applyHighlight(to: view)
+                XCTAssertEqual(view.selectedRange, selection)
+                XCTAssertEqual(view.contentOffset.y, offset.y, accuracy: 1)
+            }
+        }
+    }
+
     func testDockhandVersionUsesOwnContainerRatherThanDockerVersion() throws {
         let snapshot = try DockhandService.decodeDashboardHost([
             "docker": ["version": "29.0", "apiVersion": "1.52"],
@@ -42,16 +75,17 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertThrowsError(try DockhandChangelogRelease.decode([["version": "1.0.50", "changes": [42]]]))
     }
 
-    func testUnsupportedServerRejectsChangelogBeforeNetworking() async {
-        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
-        do {
-            _ = try await service.fetchDockhandChangelog(environmentID: 1, serverVersion: "1.0.3")
-            XCTFail("Unsupported servers must not fetch the changelog")
-        } catch DockhandServiceError.invalidResponse {
-            // Rejected locally; networking would return a transport error.
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
+    @MainActor
+    func testServerDetailsReloadsWhenRememberedEnvironmentBecomesAvailable() {
+        let model = AppModel()
+        model.selectedEnvironmentID = 1
+        model.environments = []
+        let waitingID = ServerDetailsStore.loadID(appModel: model)
+        let scope = model.connectionScopeID
+        model.environments = [makeEnvironment(publicIP: nil)]
+        model.selectedEnvironmentID = model.environments[0].id
+        XCTAssertEqual(model.connectionScopeID, scope)
+        XCTAssertNotEqual(ServerDetailsStore.loadID(appModel: model), waitingID)
     }
 
     func testBundledChangelogFallbackUsesFirstPublishedVersionPerServer() throws {
@@ -64,19 +98,6 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(home.first?.version, "1.0.50")
         XCTAssertEqual(aws.first?.version, "1.0.49")
         XCTAssertNil(try DockhandChangelogRelease.decode([]).first?.version)
-    }
-
-    @MainActor
-    func testServerDetailsReloadsWhenRememberedEnvironmentBecomesAvailable() {
-        let model = AppModel()
-        model.selectedEnvironmentID = 1
-        model.environments = []
-        let waitingID = ServerDetailsStore.loadID(appModel: model)
-        let scope = model.connectionScopeID
-        model.environments = [makeEnvironment(publicIP: nil)]
-        model.selectedEnvironmentID = model.environments[0].id
-        XCTAssertEqual(model.connectionScopeID, scope)
-        XCTAssertNotEqual(ServerDetailsStore.loadID(appModel: model), waitingID)
     }
 
     func testContainerNotesRequireDockhand1043OrNewer() {
@@ -99,14 +120,11 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(updates.first?.newerTags, ["1.2", "1.3"])
     }
 
-    func testOldServerRejectsContainerNotesBeforeNetworking() async {
-        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
-        let update = PendingContainerUpdate(containerID: "abc", containerName: "Example", currentImage: "example:latest")
-        do {
-            _ = try await service.fetchContainerReleaseNotes(update: update, environmentID: 1, serverVersion: "1.0.42")
-            XCTFail("Old servers must not fetch notes")
-        } catch DockhandServiceError.invalidResponse {
-        } catch { XCTFail("Unexpected error: \(error)") }
+    func testPublicReleaseURLsUseOnlyGitHubAndPreserveExplicitTag() {
+        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/latest")
+        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/tags/2026.9.1")
+        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://example.com/releases"))
+        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/owner/repo/issues"))
     }
 
     func testContainerNotesRetryRecreatedContainerByName() async throws {
@@ -140,11 +158,26 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
-    func testPublicReleaseURLsUseOnlyGitHubAndPreserveExplicitTag() {
-        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/latest")
-        XCTAssertEqual(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1")?.absoluteString, "https://api.github.com/repos/cloudflare/cloudflared/releases/tags/2026.9.1")
-        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://example.com/releases"))
-        XCTAssertNil(ContainerReleaseNotes.githubReleaseURL(changelog: "https://github.com/owner/repo/issues"))
+    func testOldServerRejectsContainerNotesBeforeNetworking() async {
+        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
+        let update = PendingContainerUpdate(containerID: "abc", containerName: "Example", currentImage: "example:latest")
+        do {
+            _ = try await service.fetchContainerReleaseNotes(update: update, environmentID: 1, serverVersion: "1.0.42")
+            XCTFail("Old servers must not fetch notes")
+        } catch DockhandServiceError.invalidResponse {
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    func testUnsupportedServerRejectsChangelogBeforeNetworking() async {
+        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
+        do {
+            _ = try await service.fetchDockhandChangelog(environmentID: 1, serverVersion: "1.0.3")
+            XCTFail("Unsupported servers must not fetch the changelog")
+        } catch DockhandServiceError.invalidResponse {
+            // Rejected locally; networking would return a transport error.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 
     @MainActor

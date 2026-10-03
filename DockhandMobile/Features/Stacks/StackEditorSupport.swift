@@ -76,7 +76,7 @@ enum StackEditorValidationError: LocalizedError {
     }
 }
 
-enum StackEditorSyntaxKind {
+enum StackEditorSyntaxKind: Equatable {
     case yaml
     case env
 }
@@ -124,6 +124,8 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: SyntaxHighlightingTextEditor
         private var isApplyingHighlight = false
+        private var highlightedText: String?
+        private var highlightedKind: StackEditorSyntaxKind?
         private weak var textView: UITextView?
 
         init(parent: SyntaxHighlightingTextEditor) {
@@ -145,9 +147,9 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            guard !isApplyingHighlight else { return }
-            syncText(textView.text)
-            applyHighlight(to: textView)
+            guard !isApplyingHighlight, textView.markedTextRange == nil else { return }
+            parent.text = textView.text
+            applyHighlight(to: textView, currentText: textView.text)
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -165,15 +167,6 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
             syncFocus(false)
         }
 
-        private func syncText(_ text: String) {
-            guard parent.text != text else { return }
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                guard self.parent.text != text else { return }
-                self.parent.text = text
-            }
-        }
-
         private func syncFocus(_ isFocused: Bool) {
             guard parent.isFocused != isFocused else { return }
             DispatchQueue.main.async { [weak self] in
@@ -183,22 +176,36 @@ struct SyntaxHighlightingTextEditor: UIViewRepresentable {
             }
         }
 
-        func applyHighlight(to textView: UITextView) {
-            let selectedRange = textView.selectedRange
-            let currentText = parent.text
-
-            if textView.text == currentText, textView.attributedText.length > 0 {
+        func applyHighlight(to textView: UITextView, currentText: String? = nil) {
+            guard textView.markedTextRange == nil else { return }
+            let source = currentText ?? parent.text
+            if textView.text == source, highlightedText == source, highlightedKind == parent.kind {
                 textView.typingAttributes = StackEditorHighlighter.typingAttributes
                 return
             }
 
+            let selection = textView.selectedRange
+            let offset = textView.contentOffset
             isApplyingHighlight = true
-            textView.attributedText = StackEditorHighlighter.highlightedText(for: currentText, kind: parent.kind)
-            let clampedLocation = min(selectedRange.location, textView.attributedText.length)
-            let clampedLength = min(selectedRange.length, max(0, textView.attributedText.length - clampedLocation))
-            textView.selectedRange = NSRange(location: clampedLocation, length: clampedLength)
+            defer { isApplyingHighlight = false }
+
+            // Replace characters only for an external document change. During
+            // typing, mutate attributes in place so UIKit retains its edit state.
+            if textView.text != source { textView.text = source }
+            let highlighted = StackEditorHighlighter.highlightedText(for: source, kind: parent.kind)
+            textView.textStorage.beginEditing()
+            highlighted.enumerateAttributes(in: NSRange(location: 0, length: highlighted.length)) { attributes, range, _ in
+                textView.textStorage.setAttributes(attributes, range: range)
+            }
+            textView.textStorage.endEditing()
+            let location = min(selection.location, textView.textStorage.length)
+            let length = min(selection.length, textView.textStorage.length - location)
+            textView.selectedRange = NSRange(location: location, length: length)
             textView.typingAttributes = StackEditorHighlighter.typingAttributes
-            isApplyingHighlight = false
+            textView.layoutIfNeeded()
+            textView.setContentOffset(offset, animated: false)
+            highlightedText = source
+            highlightedKind = parent.kind
         }
     }
 }
