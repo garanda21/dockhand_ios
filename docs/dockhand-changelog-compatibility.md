@@ -37,3 +37,20 @@ Sources:
 
 This verifies published source compatibility, not live responses from every
 historical Docker image or a personal server.
+
+## Container image release notes
+
+Available Updates resolves the active server version from `/api/system`, falling
+back to its first published bundled changelog entry. Only versions >= 1.0.43
+request `GET /api/containers/{id}/version-notes?env=…&versions=…`.
+Official tags 1.0.42 (absent) and 1.0.43 (present) were checked.
+The requested versions include the newer target tag and skipped tags returned
+in `newerVersion` by pending-updates. Digest-only updates pass an empty list,
+which still allows the server to resolve a generic changelog URL.
+
+Each visible pending row shows View changes only for a response containing an
+HTTP(S) changelog link or release notes. Empty results and server errors hide
+the action. Results are scoped to the server/environment and cancelled on a
+scope change. Read-only validation on the Home server confirmed a link for an
+existing container; two stale pending IDs returned 500 and were absent from
+its current container list. No pending records were changed during validation.

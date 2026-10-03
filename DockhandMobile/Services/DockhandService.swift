@@ -168,6 +168,10 @@ struct DockhandChangelogRelease: Identifiable, Sendable, Equatable {
         supports(version: version, minimumPatch: 4)
     }
 
+    static func supportsContainerNotes(version: String?) -> Bool {
+        supports(version: version, minimumPatch: 43)
+    }
+
     private static func supports(version: String?, minimumPatch: Int) -> Bool {
         guard let version else { return false }
         let value = version.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -200,11 +204,31 @@ struct DockhandChangelogRelease: Identifiable, Sendable, Equatable {
     }
 }
 
+struct ContainerReleaseNotes: Decodable, Identifiable, Sendable {
+    struct Note: Decodable, Sendable {
+        let version: String
+        let name: String?
+        let body: String?
+        let url: String
+    }
+    var id: String { changelogUrl ?? notes.first?.url ?? "notes" }
+    let changelogUrl: String?
+    let notes: [Note]
+
+    static func webURL(_ value: String?) -> URL? {
+        guard let value, let url = URL(string: value),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
+        return url
+    }
+    var hasContent: Bool { Self.webURL(changelogUrl) != nil || !notes.isEmpty }
+}
+
 struct PendingContainerUpdate: Sendable, Hashable {
     var containerID: String
     var containerName: String
     var currentImage: String
     var checkedAt: String?
+    var newerTags: [String] = []
 }
 
 struct ContainerUpdateCheckProgress: Decodable, Sendable, Hashable {
@@ -494,6 +518,17 @@ struct DockhandService {
         }
         let response = try await performJSONArrayRequest(path: "/api/changelog", method: "GET", environmentID: environmentID)
         return try DockhandChangelogRelease.decode(response)
+    }
+
+    func fetchContainerReleaseNotes(update: PendingContainerUpdate, environmentID: Int, serverVersion: String?) async throws -> ContainerReleaseNotes {
+        guard DockhandChangelogRelease.supportsContainerNotes(version: serverVersion) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        let response = try await performJSONRequest(
+            path: "/api/containers/\(update.containerID)/version-notes", method: "GET", environmentID: environmentID,
+            additionalQueryItems: [URLQueryItem(name: "versions", value: update.newerTags.joined(separator: ","))]
+        )
+        return try JSONDecoder().decode(ContainerReleaseNotes.self, from: JSONSerialization.data(withJSONObject: response))
     }
 
     func fetchPendingContainerUpdates(environmentID: Int) async throws -> [PendingContainerUpdate] {

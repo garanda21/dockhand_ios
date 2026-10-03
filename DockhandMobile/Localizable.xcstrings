@@ -1,6 +1,36 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Open release notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir notas de versión"
+          }
+        }
+      }
+    },
+    "Open changelog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir historial de cambios"
+          }
+        }
+      }
+    },
+    "View changes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver cambios"
+          }
+        }
+      }
+    },
     "Unavailable" : {
       "localizations" : {
         "es" : {

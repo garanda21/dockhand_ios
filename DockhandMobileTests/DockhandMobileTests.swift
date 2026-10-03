@@ -79,6 +79,36 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertNotEqual(ServerDetailsStore.loadID(appModel: model), waitingID)
     }
 
+    func testContainerNotesRequireDockhand1043OrNewer() {
+        for version: String? in [nil, "latest", "1.0.42", "1.0.43-beta.1"] {
+            XCTAssertFalse(DockhandChangelogRelease.supportsContainerNotes(version: version))
+        }
+        for version in ["1.0.43", "v1.0.49", "1.0.50", "1.1.0"] {
+            XCTAssertTrue(DockhandChangelogRelease.supportsContainerNotes(version: version))
+        }
+    }
+
+    func testContainerReleaseNotesContentAndSafeLinks() throws {
+        let empty = try JSONDecoder().decode(ContainerReleaseNotes.self, from: Data(#"{"changelogUrl":null,"notes":[]}"#.utf8))
+        XCTAssertFalse(empty.hasContent)
+        let linked = try JSONDecoder().decode(ContainerReleaseNotes.self, from: Data(#"{"changelogUrl":"https://example.com/releases","notes":[]}"#.utf8))
+        XCTAssertTrue(linked.hasContent)
+        XCTAssertNil(ContainerReleaseNotes.webURL("javascript:alert(1)"))
+        XCTAssertNil(ContainerReleaseNotes.webURL("file:///tmp/notes"))
+        let updates = DockhandService.decodePendingContainerUpdates(["pendingUpdates": [["containerId": "abc", "containerName": "Example", "newerVersion": ["tag": "1.3", "skipped": ["1.2", "1.3"]]]]])
+        XCTAssertEqual(updates.first?.newerTags, ["1.2", "1.3"])
+    }
+
+    func testOldServerRejectsContainerNotesBeforeNetworking() async {
+        let service = DockhandService(baseURL: URL(string: "https://example.invalid")!, token: "")
+        let update = PendingContainerUpdate(containerID: "abc", containerName: "Example", currentImage: "example:latest")
+        do {
+            _ = try await service.fetchContainerReleaseNotes(update: update, environmentID: 1, serverVersion: "1.0.42")
+            XCTFail("Old servers must not fetch notes")
+        } catch DockhandServiceError.invalidResponse {
+        } catch { XCTFail("Unexpected error: \(error)") }
+    }
+
     @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in

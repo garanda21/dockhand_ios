@@ -148,11 +148,15 @@ extension DockhandService {
                   let containerName = update["containerName"] as? String else {
                 return nil
             }
+            let newer = update["newerVersion"] as? [String: Any]
+            var tags = newer?["skipped"] as? [String] ?? []
+            if let target = newer?["tag"] as? String, tags.last != target { tags.append(target) }
             return PendingContainerUpdate(
                 containerID: containerID,
                 containerName: containerName,
                 currentImage: update["currentImage"] as? String ?? String(localized: "Unknown image"),
-                checkedAt: update["checkedAt"] as? String
+                checkedAt: update["checkedAt"] as? String,
+                newerTags: tags
             )
         }
     }
