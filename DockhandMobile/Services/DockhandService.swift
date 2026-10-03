@@ -151,11 +151,116 @@ struct DashboardHostSnapshot: Codable, Sendable, Hashable {
     var host: Host
 }
 
+struct DockhandChangelogRelease: Identifiable, Sendable, Equatable {
+    struct Change: Sendable, Equatable {
+        let type: String?
+        let text: String
+    }
+
+    var id: String { version }
+    let version: String
+    let date: String?
+    let changes: [Change]
+
+    // /api/changelog and runtime.ownContainer.labels.version are verified in
+    // official release tags from 1.0.4 through 1.0.50. Unknown builds are gated.
+    static func supportsChangelog(version: String?) -> Bool {
+        supports(version: version, minimumPatch: 4)
+    }
+
+    static func supportsContainerNotes(version: String?) -> Bool {
+        supports(version: version, minimumPatch: 43)
+    }
+
+    private static func supports(version: String?, minimumPatch: Int) -> Bool {
+        guard let version else { return false }
+        let value = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unprefixed = value.hasPrefix("v") ? String(value.dropFirst()) : value
+        guard let withoutSuffix = unprefixed.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).first,
+              let core = withoutSuffix.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false).first else { return false }
+        let parts = core.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+              let major = Int(parts[0]), let minor = Int(parts[1]), let patch = Int(parts[2]) else { return false }
+        if major != 1 { return major > 1 }
+        if minor != 0 { return minor > 0 }
+        return patch > minimumPatch || (patch == minimumPatch && !unprefixed.contains("-"))
+    }
+
+    static func decode(_ objects: [[String: Any]]) throws -> [Self] {
+        try objects.filter { ($0["comingSoon"] as? Bool) != true }.map { object in
+            guard let version = object["version"] as? String,
+                  !version.isEmpty, let rawChanges = object["changes"] as? [Any] else {
+                throw DockhandServiceError.invalidResponse
+            }
+            let changes: [Change] = try rawChanges.map { raw in
+                if let text = raw as? String { return Change(type: nil, text: text) }
+                guard let change = raw as? [String: Any], let text = change["text"] as? String else {
+                    throw DockhandServiceError.invalidResponse
+                }
+                return Change(type: change["type"] as? String, text: text)
+            }
+            return Self(version: version, date: object["date"] as? String, changes: changes)
+        }
+    }
+}
+
+struct ContainerReleaseNotes: Decodable, Identifiable, Sendable {
+    struct Note: Decodable, Sendable {
+        let version: String
+        let name: String?
+        let body: String?
+        let url: String
+    }
+    var id: String { changelogUrl ?? notes.first?.url ?? "notes" }
+    let changelogUrl: String?
+    let notes: [Note]
+
+    static func webURL(_ value: String?) -> URL? {
+        guard let value, let url = URL(string: value),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
+        return url
+    }
+    static func githubReleaseURL(changelog: String?) -> URL? {
+        guard let url = webURL(changelog), url.host?.lowercased() == "github.com" else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count >= 3, parts[2] == "releases",
+              parts.prefix(2).allSatisfy({ $0.allSatisfy { $0.isLetter || $0.isNumber || "_.-".contains($0) } }) else { return nil }
+        let base = URL(string: "https://api.github.com/repos/\(parts[0])/\(parts[1])/releases")!
+        if parts.count > 4, parts[3] == "tag" {
+            return base.appendingPathComponent("tags").appendingPathComponent(parts.dropFirst(4).joined(separator: "/"))
+        }
+        return base.appendingPathComponent("latest")
+    }
+
+    static func loadPublicRelease(changelog: String?) async throws -> Note? {
+        guard let url = githubReleaseURL(changelog: changelog) else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        // Public GitHub request: never attach Dockhand or proxy credentials.
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw DockhandServiceError.invalidResponse
+        }
+        struct Release: Decodable {
+            let tag_name: String
+            let name: String?
+            let body: String?
+            let html_url: String
+        }
+        let release = try JSONDecoder().decode(Release.self, from: data)
+        return Note(version: release.tag_name, name: release.name, body: release.body, url: release.html_url)
+    }
+
+    var hasContent: Bool { Self.webURL(changelogUrl) != nil || !notes.isEmpty }
+}
+
 struct PendingContainerUpdate: Sendable, Hashable {
     var containerID: String
     var containerName: String
     var currentImage: String
     var checkedAt: String?
+    var newerTags: [String] = []
 }
 
 struct ContainerUpdateCheckProgress: Decodable, Sendable, Hashable {
@@ -435,6 +540,53 @@ struct DockhandService {
             environmentID: environmentID
         )
         return try Self.decodeDashboardHost(response)
+    }
+
+    func fetchDockhandChangelog(environmentID: Int, serverVersion: String?) async throws -> [DockhandChangelogRelease] {
+        // Without a reported version, a read-only request verifies capability.
+        // Never guess the installed version from the bundled release history.
+        if let serverVersion, !DockhandChangelogRelease.supportsChangelog(version: serverVersion) {
+            throw DockhandServiceError.invalidResponse
+        }
+        let response = try await performJSONArrayRequest(path: "/api/changelog", method: "GET", environmentID: environmentID)
+        return try DockhandChangelogRelease.decode(response)
+    }
+
+    func fetchContainerReleaseNotes(update: PendingContainerUpdate, environmentID: Int, serverVersion: String?) async throws -> ContainerReleaseNotes {
+        guard DockhandChangelogRelease.supportsContainerNotes(version: serverVersion) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        return try await Self.resolveContainerReleaseNotes(update: update) { identifier in
+            let response = try await performJSONRequest(
+                path: "/api/containers/\(identifier)/version-notes", method: "GET", environmentID: environmentID,
+                additionalQueryItems: [URLQueryItem(name: "versions", value: update.newerTags.joined(separator: ","))]
+            )
+            return try JSONDecoder().decode(ContainerReleaseNotes.self, from: JSONSerialization.data(withJSONObject: response))
+        }
+    }
+
+    static func resolveContainerReleaseNotes(
+        update: PendingContainerUpdate,
+        fetch: (String) async throws -> ContainerReleaseNotes
+    ) async throws -> ContainerReleaseNotes {
+        do {
+            return try await fetch(update.containerID)
+        } catch {
+            // Pending-update records can outlive a recreated container. Docker
+            // accepts its name too; retry only resolution failures in the same env.
+            let resolutionFailed: Bool
+            switch error {
+            case DockhandServiceError.message("Failed to resolve release notes"),
+                 DockhandServiceError.unexpectedStatus(404),
+                 DockhandServiceError.unexpectedStatus(500): resolutionFailed = true
+            default: resolutionFailed = false
+            }
+            let name = update.containerName
+            guard resolutionFailed, name != update.containerID, !name.isEmpty,
+                  name.allSatisfy({ $0.isLetter || $0.isNumber || "_.-".contains($0) }),
+                  !Task.isCancelled else { throw error }
+            return try await fetch(name)
+        }
     }
 
     func fetchPendingContainerUpdates(environmentID: Int) async throws -> [PendingContainerUpdate] {

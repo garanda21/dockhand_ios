@@ -94,6 +94,8 @@ final class DashboardStore {
 @Observable
 private final class DashboardResourceDetailStore {
     var pendingUpdates: [PendingContainerUpdate] = []
+    var serverVersion: String?
+    private var updatesLoadToken = UUID()
     var volumes: [VolumeSnapshot] = []
     var networks: [NetworkSnapshot] = []
     var activity = ContainerActivitySnapshot(events: [], total: 0)
@@ -106,6 +108,11 @@ private final class DashboardResourceDetailStore {
     var error: String?
 
     func loadUpdates(appModel: AppModel) async {
+        let scope = appModel.connectionScopeID
+        let token = UUID()
+        updatesLoadToken = token
+        serverVersion = nil
+        pendingUpdates = []
         guard let service = service(for: appModel),
               let environmentID = appModel.selectedEnvironment?.id else {
             pendingUpdates = []
@@ -115,18 +122,26 @@ private final class DashboardResourceDetailStore {
 
         isLoading = true
         error = nil
-        defer { isLoading = false }
+        defer { if token == updatesLoadToken { isLoading = false } }
 
         do {
             async let loadedUpdates = service.fetchPendingContainerUpdates(environmentID: environmentID)
             async let loadedStacks = service.fetchStacks(environmentID: environmentID)
             let (updates, stacks) = try await (loadedUpdates, loadedStacks)
+            guard token == updatesLoadToken, scope == appModel.connectionScopeID, !Task.isCancelled else { return }
             pendingUpdates = updates.sorted {
                 $0.containerName.localizedCaseInsensitiveCompare($1.containerName) == .orderedAscending
             }
             self.stacks = stacks
+            let host = try? await service.fetchDashboardHost(environmentID: environmentID)
+            var version = host?.dockhand?.version
+            if version == nil {
+                version = (try? await service.fetchDockhandChangelog(environmentID: environmentID, serverVersion: nil))?.first?.version
+            }
+            guard token == updatesLoadToken, scope == appModel.connectionScopeID, !Task.isCancelled else { return }
+            serverVersion = version
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard token == updatesLoadToken, scope == appModel.connectionScopeID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
@@ -867,6 +882,17 @@ private struct DashboardUpdatesDetailView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                                 associationLabel(for: update.containerID)
+                                if DockhandChangelogRelease.supportsContainerNotes(version: store.serverVersion),
+                                   let baseURL = appModel.normalizedBaseURL,
+                                   let environmentID = appModel.selectedEnvironment?.id {
+                                    ContainerChangesButton(
+                                        service: appModel.service(baseURL: baseURL),
+                                        update: update,
+                                        environmentID: environmentID,
+                                        serverVersion: store.serverVersion
+                                    )
+                                    .id("\(appModel.connectionScopeID):\(update.containerID)")
+                                }
                             }
 
                             Spacer(minLength: 8)
@@ -889,7 +915,7 @@ private struct DashboardUpdatesDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Available Updates")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: appModel.connectionScopeID) {
+        .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
             await store.loadUpdates(appModel: appModel)
         }
         .refreshable {
@@ -1225,4 +1251,117 @@ private extension Double {
     var percentText: String {
         (self / 100).formatted(.percent.precision(.fractionLength(1)))
     }
+}
+
+private struct ContainerChangesButton: View {
+    let service: DockhandService
+    let update: PendingContainerUpdate
+    let environmentID: Int
+    let serverVersion: String?
+
+    @State private var notes: ContainerReleaseNotes?
+    @State private var presentedNotes: ContainerReleaseNotes?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let notes, notes.hasContent {
+                Button {
+                    presentedNotes = notes
+                } label: {
+                    Label(String(localized: "View changes"), systemImage: "text.document")
+                        .font(.footnote)
+                }
+                .buttonStyle(.borderless)
+            } else {
+                Color.clear.frame(width: 0, height: 0)
+            }
+        }
+        .task(id: update) {
+            notes = nil
+            guard DockhandChangelogRelease.supportsContainerNotes(version: serverVersion) else { return }
+            let result = try? await service.fetchContainerReleaseNotes(update: update, environmentID: environmentID, serverVersion: serverVersion)
+            guard !Task.isCancelled else { return }
+            notes = result
+        }
+        .sheet(item: $presentedNotes) { notes in
+            ContainerChangesView(containerName: update.containerName, notes: notes)
+        }
+    }
+}
+
+private struct ContainerChangesView: View {
+    let containerName: String
+    let notes: ContainerReleaseNotes
+    @State private var publicNote: ContainerReleaseNotes.Note?
+    @State private var isLoading = false
+    @State private var loadFailed = false
+    @Environment(\.dismiss) private var dismiss
+
+    private var displayedNotes: [ContainerReleaseNotes.Note] {
+        notes.notes.isEmpty ? publicNote.map { [$0] } ?? [] : notes.notes
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let url = ContainerReleaseNotes.webURL(notes.changelogUrl) {
+                    Link(destination: url) {
+                        Label(String(localized: "Open changelog"), systemImage: "arrow.up.right.square")
+                    }
+                }
+                if isLoading {
+                    ProgressView(String(localized: "Loading release notes"))
+                } else if notes.notes.isEmpty && publicNote == nil {
+                    Text(String(localized: "Release notes could not be loaded. You can open the changelog."))
+                        .foregroundStyle(.secondary)
+                    if loadFailed {
+                        Button(String(localized: "Retry")) { Task { await loadPublicNotes() } }
+                    }
+                }
+                if publicNote != nil, ContainerReleaseNotes.githubReleaseURL(changelog: notes.changelogUrl)?.lastPathComponent == "latest" {
+                    Text(String(localized: "Latest published release. It may differ from the pending image update."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Array(displayedNotes.enumerated()), id: \.offset) { _, note in
+                    Section {
+                        if let body = note.body, !body.isEmpty {
+                            Text(.init(body))
+                                .textSelection(.enabled)
+                        }
+                        if let url = ContainerReleaseNotes.webURL(note.url) {
+                            Link(String(localized: "Open release notes"), destination: url)
+                        }
+                    } header: {
+                        Text(verbatim: note.name ?? note.version)
+                    }
+                }
+            }
+            .task { await loadPublicNotes() }
+            .navigationTitle(containerName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Done")) { dismiss() }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func loadPublicNotes() async {
+        guard notes.notes.isEmpty, publicNote == nil else { return }
+        isLoading = true
+        loadFailed = false
+        defer { isLoading = false }
+        do {
+            let result = try await ContainerReleaseNotes.loadPublicRelease(changelog: notes.changelogUrl)
+            guard !Task.isCancelled else { return }
+            publicNote = result
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            loadFailed = true
+        }
+    }
+
 }

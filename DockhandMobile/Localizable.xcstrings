@@ -1,6 +1,166 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Latest published release. It may differ from the pending image update." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última publicación. Puede diferir de la actualización pendiente de la imagen."
+          }
+        }
+      }
+    },
+    "Release notes could not be loaded. You can open the changelog." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar las notas. Puedes abrir el historial de cambios."
+          }
+        }
+      }
+    },
+    "Loading release notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando notas de versión"
+          }
+        }
+      }
+    },
+    "Open release notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir notas de versión"
+          }
+        }
+      }
+    },
+    "Open changelog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir historial de cambios"
+          }
+        }
+      }
+    },
+    "View changes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver cambios"
+          }
+        }
+      }
+    },
+    "Unavailable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No disponible"
+          }
+        }
+      }
+    },
+    "Dockhand · Version unavailable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockhand · Versión no disponible"
+          }
+        }
+      }
+    },
+    "View Dockhand changelog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver historial de cambios de Dockhand"
+          }
+        }
+      }
+    },
+    "This server returned no release notes." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este servidor no ha devuelto notas de versión."
+          }
+        }
+      }
+    },
+    "This server does not provide a changelog." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este servidor no proporciona un historial de cambios."
+          }
+        }
+      }
+    },
+    "Release history provided by this Dockhand server." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historial de cambios proporcionado por este servidor Dockhand."
+          }
+        }
+      }
+    },
+    "No release notes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin notas de versión"
+          }
+        }
+      }
+    },
+    "Installed version" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión instalada"
+          }
+        }
+      }
+    },
+    "Installed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalada"
+          }
+        }
+      }
+    },
+    "Dockhand changelog" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historial de cambios de Dockhand"
+          }
+        }
+      }
+    },
     " (healthy)" : {
       "localizations" : {
         "es" : {
