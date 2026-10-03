@@ -4,11 +4,11 @@ Settings reads the installed Dockhand version from the existing `GET /api/system
 response at `runtime.ownContainer.labels.version`. The Docker daemon version and
 Node.js runtime version are separate values. Legacy Dockhand version fields remain
 supported. If the server cannot inspect its own container, the installed version
-may be unavailable. Docker and Node.js versions are not used as a fallback.
+may be unavailable; the app falls back to the first published entry of that server’s bundled changelog, excluding `comingSoon` entries. Docker and Node.js versions are never used as a fallback.
 
 The version appears below the active server URL. Tapping it opens the release
 history returned by that same server's `GET /api/changelog`, fetched when the
-view opens. The view records the server name and installed version, handles load
+view opens, or during capability detection when the version is absent. The view records the server name and installed version, handles load
 errors and empty results, and omits entries marked `comingSoon`.
 
 ## Compatibility evidence
@@ -25,7 +25,7 @@ on 2026-10-02 (source checkout `5fd44756fda92b780af6378c95e9e2a4cdc35274`):
   plain string changes and optional dates.
 
 The link and network method require a parseable server version >= 1.0.4.
-Known older or unparseable versions do not trigger a changelog request. A server reporting
+Known older or unparseable versions do not trigger a changelog request. When the API omits the version (for example, an official `:latest` container with empty OCI version labels), Settings verifies support with a read-only changelog request and caches the response for navigation. The UI uses the first published changelog version when available, and shows version unavailable only if both sources are empty. A server reporting
 an eligible version but lacking the endpoint shows an unavailable/error state.
 The changelog is bundled with the installed server, so it is not a live source of
 newer releases. No self-update endpoint is called by this feature.

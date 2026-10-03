@@ -7,12 +7,14 @@ import SwiftUI
 final class ServerDetailsStore {
     var host: DashboardHostSnapshot?
     var loadedScopeID: String?
+    var verifiedChangelog: [DockhandChangelogRelease]?
     var isLoading = false
     var error: String?
     func load(appModel: AppModel) async {
         let scope = appModel.connectionScopeID
         host = nil
         loadedScopeID = nil
+        verifiedChangelog = nil
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
             host = nil
@@ -32,6 +34,12 @@ final class ServerDetailsStore {
             guard scope == appModel.connectionScopeID, !Task.isCancelled else { return }
             host = result
             loadedScopeID = scope
+            if result.dockhand?.version == nil {
+                let changelog = try? await service.fetchDockhandChangelog(environmentID: environmentID, serverVersion: nil)
+                guard scope == appModel.connectionScopeID, !Task.isCancelled else { return }
+                verifiedChangelog = changelog
+                host?.dockhand?.version = changelog?.first?.version
+            }
         } catch {
             guard scope == appModel.connectionScopeID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
@@ -120,7 +128,8 @@ struct SettingsView: View {
                                             service: appModel.service(baseURL: baseURL),
                                             environmentID: environmentID,
                                             serverName: profile.name,
-                                            serverVersion: version
+                                            serverVersion: version,
+                                            initialReleases: detailsStore.verifiedChangelog
                                         )
                                     } label: {
                                         HStack(spacing: 5) {
@@ -133,6 +142,28 @@ struct SettingsView: View {
                                     .accessibilityHint(String(localized: "View Dockhand changelog"))
                                 } else {
                                     Text(verbatim: "Dockhand \(version)")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else if serverHost != nil {
+                                if let changelog = detailsStore.verifiedChangelog,
+                                   let baseURL = appModel.normalizedBaseURL,
+                                   let environmentID = appModel.selectedEnvironment?.id {
+                                    NavigationLink {
+                                        DockhandChangelogView(
+                                            service: appModel.service(baseURL: baseURL),
+                                            environmentID: environmentID,
+                                            serverName: profile.name,
+                                            serverVersion: nil,
+                                            initialReleases: changelog
+                                        )
+                                    } label: {
+                                        Label(String(localized: "Dockhand · Version unavailable"), systemImage: "text.document")
+                                            .font(.footnote)
+                                    }
+                                    .accessibilityHint(String(localized: "View Dockhand changelog"))
+                                } else {
+                                    Text(String(localized: "Dockhand · Version unavailable"))
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                 }

@@ -54,6 +54,18 @@ final class DockhandMobileTests: XCTestCase {
         }
     }
 
+    func testBundledChangelogFallbackUsesFirstPublishedVersionPerServer() throws {
+        let home = try DockhandChangelogRelease.decode([
+            ["version": "1.0.51", "comingSoon": true, "changes": []],
+            ["version": "1.0.50", "changes": []],
+            ["version": "1.0.49", "changes": []]
+        ])
+        let aws = try DockhandChangelogRelease.decode([["version": "1.0.49", "changes": []]])
+        XCTAssertEqual(home.first?.version, "1.0.50")
+        XCTAssertEqual(aws.first?.version, "1.0.49")
+        XCTAssertNil(try DockhandChangelogRelease.decode([]).first?.version)
+    }
+
     @MainActor
     func testStartupDiscardsCorruptPersistedProfiles() throws {
         try withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in
