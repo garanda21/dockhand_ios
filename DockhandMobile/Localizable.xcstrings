@@ -1357,6 +1357,16 @@
         }
       }
     },
+    "Dockhand will sync the Git repository and deploy this stack using its saved deployment settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockhand sincronizará el repositorio Git y desplegará este stack usando sus opciones de despliegue guardadas."
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "es" : {
@@ -2665,6 +2675,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ordenar"
+          }
+        }
+      }
+    },
+    "Git stack could not be identified in this environment. Refresh the stack and try again." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo identificar el stack Git en este entorno. Actualiza el stack e inténtalo de nuevo."
           }
         }
       }

@@ -359,8 +359,8 @@ extension Components.Schemas.StackSummary {
         status.dockhandStateRank
     }
 
-    var supportsRedeploy: Bool {
-        sourceType?.lowercased() != "git"
+    var isGitStack: Bool {
+        sourceType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "git"
     }
 
     func canPerform(_ action: StackAction) -> Bool {
@@ -381,7 +381,7 @@ extension Components.Schemas.StackSummary {
                 || normalizedStatus == "stopped"
                 || normalizedStatus == "exited"
         case .redeploy:
-            return supportsRedeploy
+            return true
         }
     }
 }
