@@ -678,6 +678,22 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(accesses.first?.destinationURL?.absoluteString, "http://192.168.1.50:8080")
     }
 
+    func testStackEnvVariableDecodingKeepsSecretsMasked() {
+        let variables = DockhandService.decodeStackEnvVariables([
+            "variables": [
+                ["key": "PORT", "value": "8080", "isSecret": false],
+                ["key": "API_KEY", "value": "***", "isSecret": true],
+                ["value": "orphan"]
+            ],
+            "injectedSecretKeys": []
+        ])
+
+        XCTAssertEqual(variables.map(\.key), ["PORT", "API_KEY"])
+        XCTAssertEqual(variables.first?.value, "8080")
+        XCTAssertEqual(variables.last?.isSecret, true)
+        XCTAssertTrue(DockhandService.decodeStackEnvVariables([:]).isEmpty)
+    }
+
     func testPendingUpdateDecodingKeepsContainerIdentity() {
         let updates = DockhandService.decodePendingContainerUpdates([
             "pendingUpdates": [
