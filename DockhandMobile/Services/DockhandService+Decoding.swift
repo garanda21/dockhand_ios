@@ -161,6 +161,117 @@ extension DockhandService {
         }
     }
 
+    static func decodeBackupConfigs(_ objects: [[String: Any]]) -> [BackupConfigSnapshot] {
+        objects.compactMap { object in
+            guard let id = object["id"] as? Int,
+                  let targetName = object["targetName"] as? String,
+                  let destinationID = object["destinationId"] as? Int else {
+                return nil
+            }
+            return BackupConfigSnapshot(
+                id: id,
+                type: object["type"] as? String ?? "container",
+                targetName: targetName,
+                environmentID: object["environmentId"] as? Int,
+                destinationID: destinationID,
+                enabled: object["enabled"] as? Bool ?? true,
+                stopBeforeBackup: object["stopBeforeBackup"] as? Bool ?? false,
+                schedule: (object["schedule"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                lastBackupAt: object["lastBackupAt"] as? String,
+                lastBackupStatus: object["lastBackupStatus"] as? String,
+                allVolumes: object["allVolumes"] as? Bool ?? true,
+                selectedVolumes: decodeEmbeddedJSON(object["selectedVolumes"]) as? [String] ?? [],
+                retention: retentionPolicy(decodeEmbeddedJSON(object["retention"]) as? [String: Any]),
+                tags: decodeEmbeddedJSON(object["tags"]) as? [String] ?? []
+            )
+        }
+    }
+
+    static func decodeBackupDestinations(_ objects: [[String: Any]]) -> [BackupDestinationSnapshot] {
+        objects.compactMap { object in
+            guard let id = object["id"] as? Int, let name = object["name"] as? String else { return nil }
+            return BackupDestinationSnapshot(
+                id: id,
+                name: name,
+                repository: object["repository"] as? String ?? "",
+                hostPath: object["hostPath"] as? String,
+                lastTestAt: object["lastTestAt"] as? String,
+                lastTestStatus: object["lastTestStatus"] as? String,
+                lastTestError: object["lastTestError"] as? String
+            )
+        }
+    }
+
+    static func decodeBackupExecutions(_ object: [String: Any]) -> [BackupExecutionSnapshot] {
+        let executions = object["executions"] as? [[String: Any]] ?? []
+        return executions.compactMap { execution in
+            guard let id = execution["id"] as? Int else { return nil }
+            let details = execution["details"] as? [String: Any]
+            let snapshotID = details?["snapshotId"] as? String
+            return BackupExecutionSnapshot(
+                id: id,
+                triggeredBy: execution["triggeredBy"] as? String,
+                startedAt: (execution["startedAt"] as? String) ?? (execution["triggeredAt"] as? String),
+                durationMilliseconds: execution["duration"] as? Int,
+                status: execution["status"] as? String,
+                errorMessage: execution["errorMessage"] as? String,
+                snapshotShortID: snapshotID.map { String($0.prefix(8)) },
+                dataAdded: details?["dataAdded"] as? Int
+            )
+        }
+    }
+
+    static func decodeBackupSnapshots(_ result: Any?) -> [BackupSnapshotSummary] {
+        let snapshots = result as? [[String: Any]] ?? []
+        return snapshots.compactMap { snapshot in
+            guard let id = snapshot["id"] as? String else { return nil }
+            return BackupSnapshotSummary(
+                id: id,
+                shortID: snapshot["shortId"] as? String ?? String(id.prefix(8)),
+                time: snapshot["time"] as? String
+            )
+        }
+        .sorted { ($0.time ?? "") > ($1.time ?? "") }
+    }
+
+    /// Dockhand stores some config columns as JSON text; accept either form.
+    private static func decodeEmbeddedJSON(_ value: Any?) -> Any? {
+        guard let text = value as? String else { return value }
+        return try? JSONSerialization.jsonObject(with: Data(text.utf8))
+    }
+
+    private static func retentionPolicy(_ object: [String: Any]?) -> [BackupRetentionRule] {
+        let order = ["keepLast", "keepHourly", "keepDaily", "keepWeekly", "keepMonthly", "keepYearly"]
+        return order.compactMap { key in
+            guard let value = object?[key] as? Int, value > 0 else { return nil }
+            return BackupRetentionRule(key: key, value: value)
+        }
+    }
+
+    /// Progress lines carry `{ status, message }`; the final `result` follows
+    /// Dockhand's BackupResult (`success`/`warning`/`skipped`/`error`).
+    static func decodeBackupRunJob(_ object: [String: Any]) -> BackupRunJobSnapshot {
+        let lines = object["lines"] as? [[String: Any]] ?? []
+        let messages = lines.compactMap { line -> String? in
+            guard (line["event"] as? String) != "result",
+                  let data = line["data"] as? [String: Any] else { return nil }
+            let text = (data["message"] as? String) ?? (data["status"] as? String)
+            guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return text
+        }
+        let result = object["result"] as? [String: Any]
+            ?? lines.last(where: { ($0["event"] as? String) == "result" })?["data"] as? [String: Any]
+        let detail = (result?["error"] as? String)
+            ?? (result?["reason"] as? String)
+            ?? (result?["warning"] as? String)
+        return BackupRunJobSnapshot(
+            status: object["status"] as? String ?? "running",
+            messages: messages,
+            resultStatus: result?["status"] as? String,
+            resultDetail: detail
+        )
+    }
+
     static func decodeStackEnvVariables(_ object: [String: Any]) -> [StackEnvVariable] {
         let variables = object["variables"] as? [[String: Any]] ?? []
         return variables.compactMap { variable in

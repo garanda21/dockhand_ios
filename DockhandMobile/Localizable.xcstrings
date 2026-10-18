@@ -3507,6 +3507,676 @@
           }
         }
       }
+    },
+    "Backups" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backups"
+          }
+        }
+      }
+    },
+    "%d failed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d con fallos"
+          }
+        }
+      }
+    },
+    "No failures" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin fallos"
+          }
+        }
+      }
+    },
+    "Starting backup…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando copia…"
+          }
+        }
+      }
+    },
+    "%@ backed up" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia de %@ completada"
+          }
+        }
+      }
+    },
+    "%1$@ backed up with a warning: %2$@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia de %1$@ completada con aviso: %2$@"
+          }
+        }
+      }
+    },
+    "%1$@ backup skipped: %2$@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia de %1$@ omitida: %2$@"
+          }
+        }
+      }
+    },
+    "%1$@ backup failed: %2$@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falló la copia de %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "See Dockhand for details" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consulta Dockhand para más detalles"
+          }
+        }
+      }
+    },
+    "Succeeded" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correcta"
+          }
+        }
+      }
+    },
+    "Warning" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aviso"
+          }
+        }
+      }
+    },
+    "Skipped" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitida"
+          }
+        }
+      }
+    },
+    "Failed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fallida"
+          }
+        }
+      }
+    },
+    "Never run" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nunca ejecutada"
+          }
+        }
+      }
+    },
+    "Backups are not enabled on this Dockhand server. Set FEAT_BACKUPS_ENABLED=true on the Dockhand container to turn them on." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las copias de seguridad no están activadas en este servidor Dockhand. Define FEAT_BACKUPS_ENABLED=true en el contenedor de Dockhand para activarlas."
+          }
+        }
+      }
+    },
+    "No backup schedules in this environment. Create them in the Dockhand web UI." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay copias programadas en este entorno. Créalas en la web de Dockhand."
+          }
+        }
+      }
+    },
+    "Schedules" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Programaciones"
+          }
+        }
+      }
+    },
+    "Destinations, schedules and restores are managed in the Dockhand web UI." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los destinos, las programaciones y las restauraciones se gestionan en la web de Dockhand."
+          }
+        }
+      }
+    },
+    "Run backup now?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Ejecutar la copia ahora?"
+          }
+        }
+      }
+    },
+    "Run backup" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejecutar copia"
+          }
+        }
+      }
+    },
+    "%@ will be stopped while the backup runs." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ se detendrá mientras se ejecuta la copia."
+          }
+        }
+      }
+    },
+    "Dockhand backs up %@ to its configured destination." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockhand copiará %@ en su destino configurado."
+          }
+        }
+      }
+    },
+    "Run now" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejecutar ahora"
+          }
+        }
+      }
+    },
+    "Stop backup of %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener la copia de %@"
+          }
+        }
+      }
+    },
+    "Run backup of %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejecutar la copia de %@"
+          }
+        }
+      }
+    },
+    "Running…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En curso…"
+          }
+        }
+      }
+    },
+    "Unknown destination" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destino desconocido"
+          }
+        }
+      }
+    },
+    "%@ · Manual only" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Solo manual"
+          }
+        }
+      }
+    },
+    "Shows backup schedules and lets you run one now" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra las copias programadas y permite ejecutar una ahora"
+          }
+        }
+      }
+    },
+    "Destinations" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destinos"
+          }
+        }
+      }
+    },
+    "Test" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Probar"
+          }
+        }
+      }
+    },
+    "Test connection to %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Probar conexión con %@"
+          }
+        }
+      }
+    },
+    "Reachable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accesible"
+          }
+        }
+      }
+    },
+    "Unreachable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No accesible"
+          }
+        }
+      }
+    },
+    "Not tested" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin probar"
+          }
+        }
+      }
+    },
+    "%1$@ is not reachable: %2$@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ no es accesible: %2$@"
+          }
+        }
+      }
+    },
+    "%@ is reachable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ es accesible"
+          }
+        }
+      }
+    },
+    "Connection test failed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La prueba de conexión falló"
+          }
+        }
+      }
+    },
+    "Snapshots could not be loaded" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar los snapshots"
+          }
+        }
+      }
+    },
+    "Configuration" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración"
+          }
+        }
+      }
+    },
+    "Stack" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack"
+          }
+        }
+      }
+    },
+    "Container" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenedor"
+          }
+        }
+      }
+    },
+    "Destination" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destino"
+          }
+        }
+      }
+    },
+    "Schedule" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Programación"
+          }
+        }
+      }
+    },
+    "Manual only" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo manual"
+          }
+        }
+      }
+    },
+    "Stops during backup" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se detiene durante la copia"
+          }
+        }
+      }
+    },
+    "All volumes" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos los volúmenes"
+          }
+        }
+      }
+    },
+    "Retention" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retención"
+          }
+        }
+      }
+    },
+    "Recent runs" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejecuciones recientes"
+          }
+        }
+      }
+    },
+    "Loading…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cargando…"
+          }
+        }
+      }
+    },
+    "No runs yet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay ejecuciones"
+          }
+        }
+      }
+    },
+    "No snapshots" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin snapshots"
+          }
+        }
+      }
+    },
+    "Snapshots" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshots"
+          }
+        }
+      }
+    },
+    "Restores are done from the Dockhand web UI." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las restauraciones se hacen desde la web de Dockhand."
+          }
+        }
+      }
+    },
+    "Backup" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup"
+          }
+        }
+      }
+    },
+    "Keep all snapshots" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservar todos los snapshots"
+          }
+        }
+      }
+    },
+    "last %d" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "últimos %d"
+          }
+        }
+      }
+    },
+    "%d hourly" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d por hora"
+          }
+        }
+      }
+    },
+    "%d daily" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d diarios"
+          }
+        }
+      }
+    },
+    "%d weekly" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d semanales"
+          }
+        }
+      }
+    },
+    "%d monthly" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d mensuales"
+          }
+        }
+      }
+    },
+    "%d yearly" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d anuales"
+          }
+        }
+      }
+    },
+    "Manual" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manual"
+          }
+        }
+      }
+    },
+    "Scheduled" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Programada"
+          }
+        }
+      }
+    },
+    "%@ added" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ añadidos"
+          }
+        }
+      }
+    },
+    "%d unreachable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d no accesibles"
+          }
+        }
+      }
+    },
+    "Destinations are created and edited in the Dockhand web UI." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los destinos se crean y editan en la web de Dockhand."
+          }
+        }
+      }
     }
   },
   "version" : "1.2"

@@ -351,6 +351,7 @@ struct DashboardView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var store = DashboardStore()
+    @State private var backupsStore = BackupsStore()
 
     private var dashboardLoadID: String {
         "\(appModel.selectedProfileID ?? "none"):\(appModel.selectedEnvironment?.id ?? -1):\(appModel.environments.count):\(appModel.dashboardRefreshRevision)"
@@ -384,6 +385,9 @@ struct DashboardView: View {
         .background(backgroundGradient)
         .task(id: dashboardLoadID) {
             await runDashboardLoop()
+        }
+        .task(id: dashboardLoadID) {
+            await backupsStore.load(appModel: appModel)
         }
         .refreshable {
             await store.load(appModel: appModel)
@@ -731,6 +735,22 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Shows recent container activity")
+                if backupsStore.isAvailable == true {
+                    NavigationLink {
+                        BackupsView(appModel: appModel, store: backupsStore)
+                    } label: {
+                        inventoryTile(
+                            String(localized: "Backups"),
+                            value: "\(backupsStore.configs.count)",
+                            detail: backupsStore.failedCount > 0
+                                ? String(format: String(localized: "%d failed"), locale: Locale.current, backupsStore.failedCount)
+                                : String(localized: "No failures"),
+                            systemImage: "externaldrive.badge.timemachine"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows backup schedules and lets you run one now")
+                }
                 inventoryTile(
                     String(localized: "Build cache"),
                     value: snapshot.buildCacheSize.dockhandByteCount,
