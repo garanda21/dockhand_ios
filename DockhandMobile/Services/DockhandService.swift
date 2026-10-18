@@ -1,6 +1,12 @@
 import DockhandAPI
 import Foundation
 
+struct StackEnvVariable: Sendable, Hashable {
+    let key: String
+    let value: String
+    let isSecret: Bool
+}
+
 struct StackEditorDocument: Sendable, Hashable {
     var composeContent: String
     var envContent: String
@@ -731,6 +737,18 @@ struct DockhandService {
             noEnvFile: envDocument.noEnvFile ?? false,
             composeError: composeDocument.error
         )
+    }
+
+    /// Git stacks keep all variables in Dockhand's database, so the raw `.env`
+    /// file is empty for them. Secret values arrive masked from the server.
+    func fetchStackEnvVariables(name: String, environmentID: Int) async throws -> [StackEnvVariable] {
+        let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        let response = try await performJSONRequest(
+            path: "/api/stacks/\(encodedName)/env",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return Self.decodeStackEnvVariables(response)
     }
 
     func fetchContainerLogs(

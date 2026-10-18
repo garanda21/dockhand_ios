@@ -3360,6 +3360,66 @@
           }
         }
       }
+    },
+    "Environment variables" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variables de entorno"
+          }
+        }
+      }
+    },
+    "This stack is deployed from Git. Dockhand keeps its variables on the server, so there is no .env file to edit here." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este stack se despliega desde Git. Dockhand guarda sus variables en el servidor, así que aquí no hay un archivo .env que editar."
+          }
+        }
+      }
+    },
+    "No variables" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin variables"
+          }
+        }
+      }
+    },
+    "Secret variables" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variables secretas"
+          }
+        }
+      }
+    },
+    "Secret values are stored by Dockhand and never shown here." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockhand guarda los valores secretos y nunca se muestran aquí."
+          }
+        }
+      }
+    },
+    "Pull, build and force-recreate options are set in this stack's Git settings in Dockhand." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las opciones de pull, build y recreación forzada se definen en los ajustes Git de este stack en Dockhand."
+          }
+        }
+      }
     }
   },
   "version" : "1.2"

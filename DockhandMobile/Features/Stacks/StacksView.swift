@@ -185,6 +185,7 @@ private struct StackEditorView: View {
     @State private var showsDeleteConfirmation = false
     @State private var deployOptions = StackDeployOptions()
     @State private var isEditorFocused = false
+    @State private var envVariables: [StackEnvVariable] = []
 
     private var liveStack: Components.Schemas.StackSummary {
         isCurrentScope ? (store.stack(named: stack.name) ?? stack) : stack
@@ -362,7 +363,7 @@ private struct StackEditorView: View {
                     }
                 }
                 .buttonStyle(.glassProminent)
-                .disabled(!isCurrentScope || isSaving || isLoading)
+                .disabled(!isCurrentScope || isSaving || isLoading || !canSaveActivePane)
             }
 
             if document.needsFileLocation {
@@ -382,16 +383,85 @@ private struct StackEditorView: View {
                     text: $document.composeContent,
                     kind: .yaml
                 )
+            } else if liveStack.isGitStack {
+                gitEnvBlock
             } else {
                 editorBlock(
                     title: String(localized: "Environment file"),
                     text: $document.envContent,
                     kind: .env
                 )
+                secretVariablesBlock
             }
         }
         .padding(20)
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    /// Git stacks store every variable in Dockhand's database, so the raw `.env`
+    /// editor would show an empty file and saving it would not affect deployments.
+    private var canSaveActivePane: Bool {
+        !(activePane == .env && liveStack.isGitStack)
+    }
+
+    private var gitEnvBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Environment variables")
+                .font(.headline)
+            Text("This stack is deployed from Git. Dockhand keeps its variables on the server, so there is no .env file to edit here.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if envVariables.isEmpty {
+                if !isLoading {
+                    Text("No variables")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                envVariableRows(envVariables)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var secretVariablesBlock: some View {
+        let secrets = envVariables.filter(\.isSecret)
+        if !secrets.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Secret variables")
+                    .font(.headline)
+                Text("Secret values are stored by Dockhand and never shown here.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                envVariableRows(secrets)
+            }
+        }
+    }
+
+    private func envVariableRows(_ variables: [StackEnvVariable]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(variables, id: \.key) { variable in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(variable.key)
+                        .font(.footnote.monospaced().weight(.semibold))
+                    Spacer(minLength: 8)
+                    if variable.isSecret {
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(variable.value)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func editorBlock(title: String, text: Binding<String>, kind: StackEditorSyntaxKind) -> some View {
@@ -417,6 +487,11 @@ private struct StackEditorView: View {
         do {
             let service = appModel.service(baseURL: baseURL)
             document = try await service.fetchStackEditorDocument(name: stack.name, environmentID: environmentID)
+            if liveStack.isGitStack {
+                envVariables = try await service.fetchStackEnvVariables(name: stack.name, environmentID: environmentID)
+            } else {
+                envVariables = (try? await service.fetchStackEnvVariables(name: stack.name, environmentID: environmentID)) ?? []
+            }
             saveMessage = nil
             saveMessageIsError = false
         } catch {
@@ -427,7 +502,8 @@ private struct StackEditorView: View {
     }
 
     private func saveActivePane() async {
-        guard let baseURL = appModel.normalizedBaseURL,
+        guard canSaveActivePane,
+              let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id,
               isCurrentScope else {
             return
@@ -790,7 +866,12 @@ private struct StackRedeploySheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if !isGitStack {
+            if isGitStack {
+                Text("Pull, build and force-recreate options are set in this stack's Git settings in Dockhand.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
                 VStack(spacing: 12) {
                     Toggle("Pull images", isOn: $options.pull)
                     Toggle("Build images", isOn: $options.build)
