@@ -161,6 +161,18 @@ extension DockhandService {
         }
     }
 
+    static func decodeStackEnvVariables(_ object: [String: Any]) -> [StackEnvVariable] {
+        let variables = object["variables"] as? [[String: Any]] ?? []
+        return variables.compactMap { variable in
+            guard let key = variable["key"] as? String else { return nil }
+            return StackEnvVariable(
+                key: key,
+                value: variable["value"] as? String ?? "",
+                isSecret: variable["isSecret"] as? Bool ?? false
+            )
+        }
+    }
+
     static func decodeVolumes(_ objects: [[String: Any]]) -> [VolumeSnapshot] {
         objects.compactMap { volume in
             guard let name = volume["name"] as? String else { return nil }
