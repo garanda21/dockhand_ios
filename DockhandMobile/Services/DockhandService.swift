@@ -357,6 +357,21 @@ struct ContainerActivitySnapshot: Sendable, Hashable {
     var total: Int
 }
 
+/// Only decode fields needed for routing; never retain repository credentials or webhook secrets.
+struct GitStackDeployment: Decodable, Sendable, Hashable {
+    let id: Int
+    let stackName: String
+    let environmentId: Int?
+
+    static func resolve(in stacks: [Self], name: String, environmentID: Int) throws -> Self {
+        let matches = stacks.filter { $0.stackName == name && $0.environmentId == environmentID && $0.id > 0 }
+        guard matches.count == 1, let stack = matches.first else {
+            throw DockhandServiceError.message(String(localized: "Git stack could not be identified in this environment. Refresh the stack and try again."))
+        }
+        return stack
+    }
+}
+
 struct StackDeployOptions: Sendable, Hashable {
     var pull = true
     var build = false
@@ -365,6 +380,7 @@ struct StackDeployOptions: Sendable, Hashable {
 
 struct StackRedeployProgressEvent: Decodable, Sendable, Hashable {
     let status: String?
+    let line: String?
 }
 
 struct StackRedeployJobLine: Decodable, Sendable, Hashable {
@@ -418,11 +434,13 @@ struct DockhandService {
     let baseURL: URL
     let token: String
     let customHeaders: [DockhandCustomHeader]
+    private let session: URLSession
 
-    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = []) {
+    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = [], session: URLSession = DockhandHTTPSession.shared) {
         self.baseURL = baseURL
         self.token = DockhandToken.normalized(token)
         self.customHeaders = DockhandCustomHeaderValidator.sanitized(customHeaders)
+        self.session = session
     }
 
     private var client: Client {
@@ -443,7 +461,7 @@ struct DockhandService {
     }
 
     private func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        let (data, response) = try await DockhandHTTPSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         if let challenge = DockhandProxyChallenge.detect(response) {
             throw challenge
         }
@@ -1190,6 +1208,57 @@ struct DockhandService {
         let result = try JSONDecoder().decode(StackRedeployResult.self, from: data)
         if result.success == false || result.error != nil {
             throw DockhandServiceError.message(result.error ?? "Stack redeploy failed")
+        }
+        return .completed(result)
+    }
+
+    func makeGitStackListRequest(environmentID: Int) throws -> URLRequest {
+        guard var components = URLComponents(url: baseURL.appending(path: "/api/git/stacks"), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else { throw DockhandServiceError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        authorize(&request)
+        return request
+    }
+
+    func resolveGitStack(name: String, environmentID: Int) async throws -> GitStackDeployment {
+        let (data, response) = try await send(makeGitStackListRequest(environmentID: environmentID))
+        try Self.validateResponse(response, data: data)
+        let stacks = try JSONDecoder().decode([GitStackDeployment].self, from: data)
+        return try GitStackDeployment.resolve(in: stacks, name: name, environmentID: environmentID)
+    }
+
+    func makeGitStackDeployRequest(stack: GitStackDeployment, environmentID: Int) throws -> URLRequest {
+        guard stack.environmentId == environmentID, stack.id > 0 else {
+            throw DockhandServiceError.invalidResponse
+        }
+        var request = URLRequest(url: baseURL.appending(path: "/api/git/stacks/\(stack.id)/deploy"))
+        request.httpMethod = "POST"
+        // The Git endpoint uses saved deployment options, not the compose request body.
+        // No JSON Accept header: Dockhand returns a job ID for progress polling.
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        authorize(&request)
+        return request
+    }
+
+    func startGitStackRedeploy(stack: GitStackDeployment, environmentID: Int) async throws -> StackRedeployStartResult {
+        let (data, response) = try await send(makeGitStackDeployRequest(stack: stack, environmentID: environmentID))
+        try Self.validateResponse(response, data: data)
+        return try Self.decodeGitStackDeployResponse(data)
+    }
+
+    static func decodeGitStackDeployResponse(_ data: Data) throws -> StackRedeployStartResult {
+        if let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
+           let jobID = payload.jobId, !jobID.isEmpty {
+            return .job(jobID)
+        }
+        let result = try JSONDecoder().decode(StackRedeployResult.self, from: data)
+        guard result.success == true, result.error == nil else {
+            throw DockhandServiceError.message(result.error ?? String(localized: "Stack redeploy failed"))
         }
         return .completed(result)
     }

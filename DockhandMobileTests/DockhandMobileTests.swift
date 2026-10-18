@@ -4,6 +4,104 @@ import SwiftUI
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    func testComposeRedeployKeepsEndpointEnvironmentAndAllOptions() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitDeploymentURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://dockhand.test")!, token: "test", session: session)
+        let options = StackDeployOptions(pull: false, build: true, forceRecreate: true)
+        try await service.redeployStack(stackName: "local-stack", environmentID: 2, options: options)
+        let start = try await service.startStackRedeploy(stackName: "local-stack", environmentID: 2, options: StackDeployOptions(pull: true, build: true, forceRecreate: true))
+        guard case .completed(let result) = start else { return XCTFail("Expected compose success") }
+        XCTAssertEqual(result.success, true)
+    }
+
+    func testGitDeploymentLookupStartAndJobOverHTTP() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitDeploymentURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://dockhand.test")!, token: "test", session: session)
+        let stack = try await service.resolveGitStack(name: "beszel", environmentID: 2)
+        XCTAssertEqual(stack.id, 20)
+        let start = try await service.startGitStackRedeploy(stack: stack, environmentID: 2)
+        XCTAssertEqual(start, .job("git-job"))
+        let snapshot = try await service.fetchStackRedeployJob(id: "git-job")
+        XCTAssertEqual(snapshot.status, "done")
+        XCTAssertEqual(snapshot.result?.success, true)
+        XCTAssertEqual(snapshot.lines.first?.data.line, "Recreating beszel")
+    }
+
+    func testGitDeploymentPermissionErrorsArePropagated() async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GitDeploymentURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://forbidden.test")!, token: "test", session: session)
+        do {
+            _ = try await service.resolveGitStack(name: "beszel", environmentID: 2)
+            XCTFail("Expected forbidden response to stop the deployment")
+        } catch {
+            guard case DockhandServiceError.message(let message) = error else {
+                return XCTFail("Expected Dockhand's permission error, got \(error)")
+            }
+            XCTAssertEqual(message, "Permission denied")
+        }
+    }
+
+    func testGitStacksOfferRedeployRegardlessOfRunningState() {
+        for status in ["running", "stopped", "created"] {
+            let stack = Components.Schemas.StackSummary(name: "beszel", containers: [], containerDetails: [], status: status, sourceType: "Git")
+            XCTAssertTrue(stack.isGitStack)
+            XCTAssertTrue(stack.canPerform(.redeploy))
+        }
+        XCTAssertFalse(Components.Schemas.StackSummary(name: "local", containers: [], containerDetails: [], status: "running").isGitStack)
+    }
+
+    func testGitDeploymentResolutionRequiresUniqueNameAndEnvironment() throws {
+        let stacks = try JSONDecoder().decode([GitStackDeployment].self, from: Data(#"[{"id":10,"stackName":"beszel","environmentId":1},{"id":20,"stackName":"beszel","environmentId":2},{"id":30,"stackName":"other","environmentId":1}]"#.utf8))
+        XCTAssertEqual(try GitStackDeployment.resolve(in: stacks, name: "beszel", environmentID: 2).id, 20)
+        XCTAssertThrowsError(try GitStackDeployment.resolve(in: stacks, name: "beszel", environmentID: 3))
+        XCTAssertThrowsError(try GitStackDeployment.resolve(in: stacks + [stacks[0]], name: "beszel", environmentID: 1))
+        XCTAssertThrowsError(try GitStackDeployment.resolve(in: [.init(id: 5, stackName: "beszel", environmentId: nil)], name: "beszel", environmentID: 1))
+        XCTAssertThrowsError(try GitStackDeployment.resolve(in: [.init(id: 0, stackName: "beszel", environmentId: 1)], name: "beszel", environmentID: 1))
+    }
+
+    func testGitDeploymentRequestsUseScopedIDAndProfileAuthentication() throws {
+        let service = DockhandService(baseURL: URL(string: "https://dockhand.example.com")!, token: "dh_test", customHeaders: [.init(name: "P-Access-Token", value: "proxy-test")])
+        let lookup = try service.makeGitStackListRequest(environmentID: 2)
+        XCTAssertEqual(lookup.httpMethod, "GET")
+        XCTAssertEqual(lookup.url?.path, "/api/git/stacks")
+        XCTAssertEqual(URLComponents(url: lookup.url!, resolvingAgainstBaseURL: false)?.queryItems, [.init(name: "env", value: "2")])
+        let deploy = try service.makeGitStackDeployRequest(stack: .init(id: 20, stackName: "beszel", environmentId: 2), environmentID: 2)
+        XCTAssertEqual(deploy.httpMethod, "POST")
+        XCTAssertEqual(deploy.url?.path, "/api/git/stacks/20/deploy")
+        XCTAssertEqual(deploy.value(forHTTPHeaderField: "Accept"), "text/event-stream")
+        XCTAssertNil(deploy.httpBody, "Git deployments must use saved options, not compose overrides")
+        for request in [lookup, deploy] {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer dh_test")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "P-Access-Token"), "proxy-test")
+        }
+        XCTAssertThrowsError(try service.makeGitStackDeployRequest(stack: .init(id: 20, stackName: "beszel", environmentId: 2), environmentID: 1))
+    }
+
+    func testGitDeploymentResponsesRequireSuccessfulResultOrJobID() throws {
+        XCTAssertEqual(try DockhandService.decodeGitStackDeployResponse(Data(#"{"jobId":"git-job"}"#.utf8)), .job("git-job"))
+        if case .completed(let result) = try DockhandService.decodeGitStackDeployResponse(Data(#"{"success":true,"output":"Deployed"}"#.utf8)) {
+            XCTAssertEqual(result.output, "Deployed")
+        } else { XCTFail("Expected completed result") }
+        for payload in [#"{"success":false,"error":"Git sync failed"}"#, #"{}"#, #"{"jobId":""}"#, #"{"success":true,"error":"Deployment failed"}"#] {
+            XCTAssertThrowsError(try DockhandService.decodeGitStackDeployResponse(Data(payload.utf8)))
+        }
+    }
+
+    func testGitDeploymentJobDecodesComposeLinesAndFailure() throws {
+        let snapshot = try JSONDecoder().decode(StackRedeployJobSnapshot.self, from: Data(#"{"status":"error","lines":[{"event":"progress","data":{"type":"line","line":"Pulling beszel"}},{"event":"result","data":{"success":false,"error":"Pull failed"}}],"result":{"success":false,"error":"Pull failed"}}"#.utf8))
+        XCTAssertEqual(snapshot.lines[0].data.line, "Pulling beszel")
+        XCTAssertEqual(snapshot.result?.error, "Pull failed")
+    }
+
     @MainActor
     func testStackEditorsPreserveTypingSelectionAndScroll() {
         for kind in [StackEditorSyntaxKind.yaml, .env] {
@@ -799,4 +897,56 @@ final class DockhandMobileTests: XCTestCase {
             createdAt: "2026-07-05T00:00:00Z"
         )
     }
+}
+
+private final class GitDeploymentURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let status: Int
+        let payload: String
+        if request.url?.host == "forbidden.test" {
+            status = 403
+            payload = #"{"error":"Permission denied"}"#
+        } else {
+            status = 200
+            switch (request.httpMethod, request.url?.path) {
+            case ("GET", "/api/git/stacks"):
+                payload = #"[{"id":10,"stackName":"beszel","environmentId":1},{"id":20,"stackName":"beszel","environmentId":2}]"#
+            case ("POST", "/api/stacks/local-stack/deploy"):
+                var body = request.httpBody ?? Data()
+                if body.isEmpty, let stream = request.httpBodyStream {
+                    stream.open()
+                    defer { stream.close() }
+                    var buffer = [UInt8](repeating: 0, count: 1024)
+                    while stream.hasBytesAvailable {
+                        let count = stream.read(&buffer, maxLength: buffer.count)
+                        guard count > 0 else { break }
+                        body.append(contentsOf: buffer.prefix(count))
+                    }
+                }
+                let options = (try? JSONSerialization.jsonObject(with: body)) as? [String: Bool]
+                let env = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "env" })?.value
+                guard options?.count == 3, options?["pull"] != nil, options?["build"] == true, options?["forceRecreate"] == true, env == "2" else {
+                    client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+                    return
+                }
+                payload = #"{"success":true,"output":"Compose redeployed"}"#
+            case ("POST", "/api/git/stacks/20/deploy"):
+                payload = #"{"jobId":"git-job"}"#
+            case ("GET", "/api/jobs/git-job"):
+                payload = #"{"status":"done","lines":[{"event":"progress","data":{"type":"line","line":"Recreating beszel"}}],"result":{"success":true,"output":"Recreated beszel"}}"#
+            default:
+                client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
+                return
+            }
+        }
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

@@ -73,12 +73,15 @@ final class StacksStore {
 
     func redeploy(stack: Components.Schemas.StackSummary, appModel: AppModel, options: StackDeployOptions) async {
         guard let baseURL = appModel.normalizedBaseURL,
-              let environmentID = appModel.selectedEnvironment?.id else { return }
+              let environmentID = appModel.selectedEnvironment?.id,
+              !hasPendingAction else { return }
+        let scope = appModel.connectionScope
+        let tracksProgress = stack.isGitStack || options.pull
 
         activeStackActionID = stackActionID(for: .redeploy, stackName: stack.name)
         error = nil
         resetRedeployProgress()
-        if options.pull {
+        if tracksProgress {
             redeployStatus = .deploying
             redeploySteps.append(String(localized: "Starting redeploy…"))
         }
@@ -86,17 +89,27 @@ final class StacksStore {
 
         do {
             let service = appModel.service(baseURL: baseURL)
-            if options.pull {
+            if tracksProgress {
                 let result: StackRedeployResult
-                switch try await service.startStackRedeploy(
-                    stackName: stack.name,
-                    environmentID: environmentID,
-                    options: options
-                ) {
+                let start: StackRedeployStartResult
+                if stack.isGitStack {
+                    let gitStack = try await service.resolveGitStack(name: stack.name, environmentID: environmentID)
+                    try Task.checkCancellation()
+                    // A server/environment switch during resolution must never deploy another stack.
+                    guard appModel.isCurrentScope(scope) else { throw CancellationError() }
+                    start = try await service.startGitStackRedeploy(stack: gitStack, environmentID: environmentID)
+                } else {
+                    start = try await service.startStackRedeploy(
+                        stackName: stack.name,
+                        environmentID: environmentID,
+                        options: options
+                    )
+                }
+                switch start {
                 case .completed(let completed):
                     result = completed
                 case .job(let jobID):
-                    result = try await watchStackRedeployJob(jobID, service: service)
+                    result = try await watchStackRedeployJob(jobID, service: service, appModel: appModel, scope: scope)
                 }
                 try Task.checkCancellation()
                 applyRedeployResult(result)
@@ -109,13 +122,15 @@ final class StacksStore {
                     options: options
                 )
             }
+            try Task.checkCancellation()
+            guard appModel.isCurrentScope(scope) else { throw CancellationError() }
             actionMessage = String(
                 format: String(localized: "%@ redeployed"),
                 locale: Locale.current,
                 stack.name
             )
             actionMessageOwner = stack.name
-            if options.pull {
+            if !stack.isGitStack && options.pull {
                 for containerID in stack.containerDetails.map(\.id) {
                     try? await service.clearPendingContainerUpdate(
                         containerID: containerID,
@@ -126,14 +141,14 @@ final class StacksStore {
             appModel.requestDashboardRefresh()
             await load(appModel: appModel)
         } catch {
-            if error.isDockhandCancellation {
-                if options.pull {
+            if error.isDockhandCancellation || !appModel.isCurrentScope(scope) {
+                if tracksProgress {
                     redeployStatus = .cancelled
                     redeploySteps.append(String(localized: "Progress monitoring cancelled"))
                 }
                 return
             }
-            if options.pull {
+            if tracksProgress {
                 redeployStatus = .failed
                 redeployError = error.dockhandUserFacingMessage
             }
@@ -150,16 +165,24 @@ final class StacksStore {
 
     private func watchStackRedeployJob(
         _ jobID: String,
-        service: DockhandService
+        service: DockhandService,
+        appModel: AppModel,
+        scope: DockhandConnectionScope
     ) async throws -> StackRedeployResult {
         var cursor = 0
 
         while true {
             try Task.checkCancellation()
+            guard appModel.isCurrentScope(scope) else { throw CancellationError() }
             let snapshot = try await service.fetchStackRedeployJob(id: jobID)
+            try Task.checkCancellation()
+            guard appModel.isCurrentScope(scope) else { throw CancellationError() }
 
             if cursor < snapshot.lines.count {
                 for line in snapshot.lines[cursor...] where line.event != "result" {
+                    if let output = line.data.line, !output.isEmpty {
+                        redeployOutput.append(contentsOf: cleanRedeployOutput(output))
+                    }
                     if let status = line.data.status, !status.isEmpty,
                        redeploySteps.last != status {
                         redeploySteps.append(status)
@@ -172,7 +195,7 @@ final class StacksStore {
                 guard let result = snapshot.result else {
                     throw DockhandServiceError.invalidResponse
                 }
-                if snapshot.status == "error" || result.success == false || result.error != nil {
+                if snapshot.status == "error" || result.success != true || result.error != nil {
                     throw DockhandServiceError.message(result.error ?? String(localized: "Stack redeploy failed"))
                 }
                 return result
@@ -184,8 +207,12 @@ final class StacksStore {
 
     private func applyRedeployResult(_ result: StackRedeployResult) {
         guard let output = result.output, !output.isEmpty else { return }
+        redeployOutput = cleanRedeployOutput(output)
+    }
+
+    private func cleanRedeployOutput(_ output: String) -> [String] {
         let ansiPattern = "\u{001B}\\[[0-?]*[ -/]*[@-~]"
-        redeployOutput = output
+        return output
             .components(separatedBy: .newlines)
             .map { $0.replacingOccurrences(of: ansiPattern, with: "", options: .regularExpression) }
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

@@ -236,6 +236,8 @@ private struct StackEditorView: View {
                 options: $deployOptions,
                 store: store,
                 stackName: liveStack.name,
+                isGitStack: liveStack.isGitStack,
+                canDeploy: isCurrentScope,
                 isRunning: store.isRunning(.redeploy, stackName: liveStack.name)
             ) {
                 await runRedeploy()
@@ -291,9 +293,7 @@ private struct StackEditorView: View {
                 stackActionButton(.stop, "stop.fill", String(localized: "Stop"))
                 stackActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
                 stackActionButton(.down, "arrow.down.to.line.compact", String(localized: "Down"))
-                if liveStack.supportsRedeploy {
-                    redeployButton
-                }
+                redeployButton
                 deleteButton
             }
         }
@@ -734,6 +734,8 @@ private struct StackRedeploySheet: View {
     @Binding var options: StackDeployOptions
     let store: StacksStore
     let stackName: String
+    let isGitStack: Bool
+    let canDeploy: Bool
     let isRunning: Bool
     let onDeploy: () async -> Void
     @Environment(\.dismiss) private var dismiss
@@ -741,7 +743,7 @@ private struct StackRedeploySheet: View {
     @State private var selectedDetent: PresentationDetent = .height(380)
 
     private var showsProgress: Bool {
-        options.pull && store.redeployStatus != .idle
+        (isGitStack || options.pull) && store.redeployStatus != .idle
     }
 
     var body: some View {
@@ -779,21 +781,31 @@ private struct StackRedeploySheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Redeploy stack")
                     .font(.title3.weight(.semibold))
-                Text("Choose how Dockhand should redeploy this compose stack.")
+                Text(isGitStack
+                     ? String(localized: "Dockhand will sync the Git repository and deploy this stack using its saved deployment settings.")
+                     : String(localized: "Choose how Dockhand should redeploy this compose stack."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(spacing: 12) {
-                Toggle("Pull images", isOn: $options.pull)
-                Toggle("Build images", isOn: $options.build)
-                Toggle("Force recreate", isOn: $options.forceRecreate)
+            if !isGitStack {
+                VStack(spacing: 12) {
+                    Toggle("Pull images", isOn: $options.pull)
+                    Toggle("Build images", isOn: $options.build)
+                    Toggle("Force recreate", isOn: $options.forceRecreate)
+                }
+                .toggleStyle(.switch)
+                .padding(18)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
             }
-            .toggleStyle(.switch)
-            .padding(18)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+
+            if !canDeploy {
+                Text("Server or environment changed. Go back and reopen this stack before saving or running actions.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
 
             Button(action: startDeploy) {
                 if isRunning {
@@ -805,7 +817,7 @@ private struct StackRedeploySheet: View {
                 }
             }
             .buttonStyle(.glassProminent)
-            .disabled(isRunning)
+            .disabled(isRunning || !canDeploy)
 
             Spacer(minLength: 0)
         }
@@ -882,6 +894,7 @@ private struct StackRedeploySheet: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
+                .disabled(!canDeploy)
             }
         }
     }
@@ -916,7 +929,8 @@ private struct StackRedeploySheet: View {
     }
 
     private func startDeploy() {
-        if options.pull {
+        guard canDeploy else { return }
+        if isGitStack || options.pull {
             selectedDetent = .large
             deployTask = Task { await onDeploy() }
         } else {
