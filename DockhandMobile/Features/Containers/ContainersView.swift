@@ -10,6 +10,8 @@ final class ContainersStore {
     var error: String?
     var actionMessage: String?
     var activeActionID: String?
+    var pendingUpdates: [String: PendingContainerUpdate] = [:]
+    var updatingContainerID: String?
 
     func load(appModel: AppModel) async {
         guard let baseURL = appModel.normalizedBaseURL,
@@ -24,8 +26,12 @@ final class ContainersStore {
 
         do {
             let service = appModel.service(baseURL: baseURL)
+            // Update badges are optional; a failed pending-updates request must not hide the list.
+            async let loadedUpdates = try? service.fetchPendingContainerUpdates(environmentID: environmentID)
             containers = try await service.fetchContainers(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            let updates = await loadedUpdates ?? []
+            pendingUpdates = Dictionary(updates.map { ($0.containerID, $0) }, uniquingKeysWith: { first, _ in first })
         } catch {
             guard !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
@@ -55,6 +61,36 @@ final class ContainersStore {
             guard !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
+    }
+
+    func update(_ container: Components.Schemas.Container, appModel: AppModel) async {
+        guard let baseURL = appModel.normalizedBaseURL,
+              let environmentID = appModel.selectedEnvironment?.id,
+              updatingContainerID == nil else { return }
+
+        updatingContainerID = container.id
+        error = nil
+        actionMessage = nil
+        defer { updatingContainerID = nil }
+
+        do {
+            let service = appModel.service(baseURL: baseURL)
+            let response = try await service.updateContainers(ids: [container.id], environmentID: environmentID)
+            appModel.requestDashboardRefresh()
+            await load(appModel: appModel)
+            if let failures = response.failureDetails {
+                error = failures
+            } else {
+                actionMessage = String(format: String(localized: "%@ updated"), locale: Locale.current, container.name)
+            }
+        } catch {
+            guard !error.isDockhandCancellation else { return }
+            self.error = error.dockhandUserFacingMessage
+        }
+    }
+
+    func pendingUpdate(for container: Components.Schemas.Container) -> PendingContainerUpdate? {
+        pendingUpdates[container.id]
     }
 
     func isRunning(_ action: ContainerAction, containerID: String) -> Bool {
@@ -139,7 +175,7 @@ struct ContainersView: View {
                                 store: store
                             )
                         } label: {
-                            ContainerRow(container: container)
+                            ContainerRow(container: container, hasUpdate: store.pendingUpdate(for: container) != nil)
                         }
                     }
                 }
@@ -231,6 +267,7 @@ private enum ContainerListSort: String, CaseIterable, Identifiable {
 
 private struct ContainerRow: View {
     let container: Components.Schemas.Container
+    let hasUpdate: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -238,6 +275,15 @@ private struct ContainerRow: View {
                 Text(container.name)
                     .font(.headline)
                 Spacer()
+                if hasUpdate {
+                    Label("Update", systemImage: "arrow.up.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.blue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.blue.opacity(0.14), in: Capsule())
+                        .accessibilityLabel(String(localized: "Update available"))
+                }
                 Text(container.state.localizedDockhandStateLabel.uppercased())
                     .font(.caption.weight(.bold))
                     .foregroundStyle(container.state == "running" ? .green : .secondary)
@@ -266,6 +312,7 @@ private struct ContainerDetailView: View {
     let appModel: AppModel
     let store: ContainersStore
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showsUpdateConfirmation = false
 
     private var isCurrentScope: Bool {
         appModel.isCurrentScope(scope)
@@ -301,6 +348,10 @@ private struct ContainerDetailView: View {
                     staleScopeWarning
                 }
 
+                if let update = store.pendingUpdate(for: liveContainer) {
+                    updateCard(update)
+                }
+
                 actionBar
                 quickLinks
                 portsBlock
@@ -313,6 +364,49 @@ private struct ContainerDetailView: View {
         }
         .navigationTitle(liveContainer.name)
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            String(localized: "Update container?"),
+            isPresented: $showsUpdateConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Update")) {
+                Task { await store.update(liveContainer, appModel: appModel) }
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text("Dockhand pulls the newer image and recreates the container with its current settings.")
+        }
+    }
+
+    private func updateCard(_ update: PendingContainerUpdate) -> some View {
+        let isUpdating = store.updatingContainerID == liveContainer.id
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Label("Update available", systemImage: "arrow.up.circle.fill")
+                .font(.headline)
+                .foregroundStyle(.blue)
+            if let newest = update.newerTags.last {
+                Text(String(format: String(localized: "Newer image: %@"), locale: Locale.current, newest))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                showsUpdateConfirmation = true
+            } label: {
+                if isUpdating {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Update container", systemImage: "arrow.up.circle")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(!isCurrentScope || store.updatingContainerID != nil || store.activeActionID != nil)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.blue.opacity(0.08)), in: .rect(cornerRadius: 24))
     }
 
     private var portsBlock: some View {

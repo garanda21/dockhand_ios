@@ -906,7 +906,14 @@
       }
     },
     "Cancel" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        }
+      }
     },
     "Check for updates" : {
 
@@ -3357,6 +3364,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Los valores no pueden contener saltos de línea, caracteres de control ni emojis."
+          }
+        }
+      }
+    },
+    "Update" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar"
+          }
+        }
+      }
+    },
+    "Update available" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualización disponible"
+          }
+        }
+      }
+    },
+    "%@ updated" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ actualizado"
+          }
+        }
+      }
+    },
+    "Update container?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Actualizar contenedor?"
+          }
+        }
+      }
+    },
+    "Dockhand pulls the newer image and recreates the container with its current settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockhand descarga la imagen más reciente y recrea el contenedor con su configuración actual."
+          }
+        }
+      }
+    },
+    "Newer image: %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen más reciente: %@"
+          }
+        }
+      }
+    },
+    "Update container" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar contenedor"
+          }
+        }
+      }
+    },
+    "%1$d of %2$d containers failed to update:\n%3$@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d de %2$d contenedores no se pudieron actualizar:\n%3$@"
           }
         }
       }
