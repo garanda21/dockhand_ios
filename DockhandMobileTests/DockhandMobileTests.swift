@@ -678,6 +678,23 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(accesses.first?.destinationURL?.absoluteString, "http://192.168.1.50:8080")
     }
 
+    func testBatchUpdateFailureDetailsListOnlyFailedContainers() {
+        let response = ContainerBatchUpdateResponse(
+            success: false,
+            results: [
+                ContainerBatchUpdateResult(containerID: "a", containerName: "web", success: true, error: nil),
+                ContainerBatchUpdateResult(containerID: "b", containerName: "db", success: false, error: "pull failed")
+            ],
+            summary: ContainerBatchUpdateSummary(total: 2, success: 1, failed: 1)
+        )
+
+        XCTAssertEqual(response.failureDetails, "db: pull failed")
+
+        var allSucceeded = response
+        allSucceeded.results = [response.results[0]]
+        XCTAssertNil(allSucceeded.failureDetails)
+    }
+
     func testPendingUpdateDecodingKeepsContainerIdentity() {
         let updates = DockhandService.decodePendingContainerUpdates([
             "pendingUpdates": [

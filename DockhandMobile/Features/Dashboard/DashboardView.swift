@@ -194,19 +194,24 @@ private final class DashboardResourceDetailStore {
                 ids: updates.map(\.containerID),
                 environmentID: environmentID
             )
-            if response.summary.failed > 0 {
-                let details = response.results
-                    .filter { !$0.success }
-                    .map { "\($0.containerName): \($0.error ?? String(localized: "Update failed"))" }
-                    .joined(separator: "\n")
-                throw DockhandServiceError.message(details)
-            }
-            operationMessage = String(
-                format: String(localized: "%d containers updated"),
-                locale: .current,
-                response.summary.success
-            )
+            // loadUpdates clears messages, so refresh the list before reporting the outcome.
             await loadUpdates(appModel: appModel)
+            if response.summary.success > 0 {
+                operationMessage = String(
+                    format: String(localized: "%d containers updated"),
+                    locale: .current,
+                    response.summary.success
+                )
+            }
+            if let failures = response.failureDetails {
+                self.error = String(
+                    format: String(localized: "%1$d of %2$d containers failed to update:\n%3$@"),
+                    locale: .current,
+                    response.summary.failed,
+                    response.summary.total,
+                    failures
+                )
+            }
         } catch {
             guard !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
@@ -614,7 +619,7 @@ struct DashboardView: View {
                 NavigationLink {
                     DashboardUpdatesDetailView(appModel: appModel)
                 } label: {
-                    statusTile(String(localized: "Updates"), value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: .secondary)
+                    statusTile(String(localized: "Updates"), value: snapshot.containers.pendingUpdates, systemImage: "arrow.up.circle", tint: snapshot.containers.pendingUpdates == 0 ? .secondary : .blue, isEmphasized: snapshot.containers.pendingUpdates > 0)
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Shows the containers and stacks with pending updates")
@@ -655,7 +660,7 @@ struct DashboardView: View {
         .accessibilityHint("Opens the matching containers")
     }
 
-    private func statusTile(_ title: String, value: Int, systemImage: String, tint: Color) -> some View {
+    private func statusTile(_ title: String, value: Int, systemImage: String, tint: Color, isEmphasized: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
@@ -668,7 +673,10 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
         .padding(12)
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            isEmphasized ? tint.opacity(colorScheme == .dark ? 0.22 : 0.12) : Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.04),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
     }
 
     private func inventorySection(snapshot: DashboardEnvironmentSnapshot, host: DashboardHostSnapshot?) -> some View {

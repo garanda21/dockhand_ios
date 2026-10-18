@@ -313,6 +313,15 @@ struct ContainerBatchUpdateResponse: Decodable, Sendable, Hashable {
     var success: Bool
     var results: [ContainerBatchUpdateResult]
     var summary: ContainerBatchUpdateSummary
+
+    /// One line per failed container, so a partial batch still reports its successes separately.
+    var failureDetails: String? {
+        let failures = results.filter { !$0.success }
+        guard !failures.isEmpty else { return nil }
+        return failures
+            .map { "\($0.containerName): \($0.error ?? String(localized: "Update failed"))" }
+            .joined(separator: "\n")
+    }
 }
 
 struct VolumeUsageSnapshot: Sendable, Hashable {
