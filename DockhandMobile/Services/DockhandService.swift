@@ -267,6 +267,16 @@ struct PendingContainerUpdate: Sendable, Hashable {
     var currentImage: String
     var checkedAt: String?
     var newerTags: [String] = []
+    /// False for rows that only suggest a newer tag or wait out the minimum image age.
+    var hasImageUpdate = true
+    var pinnedToDigest = false
+
+    /// Dockhand's pending-update table keeps rows for recreated containers and for
+    /// tag suggestions that a pull would not apply. Mirror the server's dashboard
+    /// count: only image updates for containers that still exist can be updated.
+    static func actionable(_ updates: [PendingContainerUpdate], liveContainerIDs: Set<String>) -> [PendingContainerUpdate] {
+        updates.filter { $0.hasImageUpdate && !$0.pinnedToDigest && liveContainerIDs.contains($0.containerID) }
+    }
 }
 
 struct ContainerUpdateCheckProgress: Decodable, Sendable, Hashable {

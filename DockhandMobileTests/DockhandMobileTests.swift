@@ -711,6 +711,29 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertTrue(DockhandService.decodeStackEnvVariables([:]).isEmpty)
     }
 
+    func testActionablePendingUpdatesSkipOrphansAndTagSuggestions() {
+        let updates = DockhandService.decodePendingContainerUpdates([
+            "pendingUpdates": [
+                ["containerId": "live", "containerName": "web", "hasImageUpdate": true],
+                ["containerId": "recreated-old-id", "containerName": "bot", "hasImageUpdate": true],
+                ["containerId": "tag-only", "containerName": "db", "hasImageUpdate": false, "newerVersion": ["tag": "18"]],
+                ["containerId": "pinned", "containerName": "cache", "hasImageUpdate": false, "pinnedToDigest": true]
+            ]
+        ])
+
+        let actionable = PendingContainerUpdate.actionable(
+            updates,
+            liveContainerIDs: ["live", "tag-only", "pinned", "bot-new-id"]
+        )
+
+        XCTAssertEqual(actionable.map(\.containerID), ["live"])
+    }
+
+    func testExitedRuntimeTextKeepsWholePhrase() {
+        XCTAssertFalse("Exited (0) 7 days ago".localizedDockerRuntimeText.contains("(0)"))
+        XCTAssertTrue("Exited (137) 2 hours ago".localizedDockerRuntimeText.contains("137"))
+    }
+
     func testPendingUpdateDecodingKeepsContainerIdentity() {
         let updates = DockhandService.decodePendingContainerUpdates([
             "pendingUpdates": [
