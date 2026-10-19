@@ -711,6 +711,95 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertTrue(DockhandService.decodeStackEnvVariables([:]).isEmpty)
     }
 
+    func testBackupConfigDecodingReadsDockhandRows() {
+        let configs = DockhandService.decodeBackupConfigs([
+            [
+                "id": 3, "type": "stack", "targetName": "immich", "environmentId": 1, "destinationId": 2,
+                "enabled": false, "stopBeforeBackup": true, "schedule": "0 3 * * *",
+                "lastBackupAt": "2026-10-18T03:00:12.345Z", "lastBackupStatus": "success"
+            ],
+            ["id": 4, "targetName": "web", "destinationId": 2, "schedule": ""],
+            ["id": 5, "targetName": "missing-destination"]
+        ])
+
+        XCTAssertEqual(configs.map(\.id), [3, 4])
+        XCTAssertEqual(configs.first?.type, "stack")
+        XCTAssertEqual(configs.first?.enabled, false)
+        XCTAssertEqual(configs.first?.stopBeforeBackup, true)
+        XCTAssertEqual(configs.last?.type, "container")
+        XCTAssertNil(configs.last?.schedule)
+        XCTAssertEqual(DockhandService.decodeBackupDestinations([["id": 2, "name": "NAS", "repository": "/backups"], ["name": "x"]]).map(\.name), ["NAS"])
+    }
+
+    func testBackupRunJobDecodingSeparatesProgressFromResult() {
+        let job = DockhandService.decodeBackupRunJob([
+            "status": "error",
+            "lines": [
+                ["event": "progress", "data": ["status": "running", "message": "Snapshotting volumes"]],
+                ["event": "progress", "data": ["status": "running", "message": " "]],
+                ["event": "result", "data": ["status": "error", "error": "repository locked"]]
+            ],
+            "result": NSNull()
+        ])
+
+        XCTAssertEqual(job.messages, ["Snapshotting volumes"])
+        XCTAssertEqual(job.resultStatus, "error")
+        XCTAssertEqual(job.resultDetail, "repository locked")
+        XCTAssertEqual(BackupRunState(rawStatus: "warning"), .warning)
+        XCTAssertEqual(BackupRunState(rawStatus: "failed"), .failed)
+        XCTAssertEqual(BackupRunState(rawStatus: nil), .never)
+    }
+
+    /// Payloads captured from Dockhand with FEAT_BACKUPS_ENABLED=true.
+    func testBackupDecodingMatchesCapturedDockhandResponses() throws {
+        let configs = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(#"[{"id":1,"type":"container","targetName":"mosquitto","environmentId":1,"destinationId":1,"enabled":true,"allVolumes":true,"selectedVolumes":null,"stopBeforeBackup":false,"schedule":null,"retention":null,"options":null,"tags":"[\"dockhand-ios-test\"]","lastBackupAt":"2026-10-18T16:00:27.892Z","lastBackupStatus":"success","createdAt":"2026-10-18 16:00:15","updatedAt":"2026-10-18T16:00:27.892Z"}]"#.utf8)) as? [[String: Any]])
+        let decoded = DockhandService.decodeBackupConfigs(configs)
+        XCTAssertEqual(decoded.first?.targetName, "mosquitto")
+        XCTAssertNil(decoded.first?.schedule)
+        XCTAssertEqual(BackupRunState(rawStatus: decoded.first?.lastBackupStatus), .success)
+
+        let job = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(#"{"id": "752834c1-6ff7-4d93-bc06-7a9e57c91199", "status": "done", "lines": [{"event": "progress", "data": {"status": "metadata", "message": "Collecting metadata..."}}, {"event": "progress", "data": {"status": "backing-up", "message": "Backing up 3 volumes:"}}, {"event": "progress", "data": {"status": "backing-up", "message": "  \u2022 [BIND] /data/docker/zigbee/mosquitto \u2192 /mosquitto"}}, {"event": "result", "data": {"status": "success", "executionId": 13047, "snapshotId": "447cf73b1e65d657a1801af9dfdda4e835b7f47ec0873496fa4bb6e793895718", "summary": {"snapshotId": "447cf73b1e65d657a1801af9dfdda4e835b7f47ec0873496fa4bb6e793895718", "filesNew": 2, "filesChanged": 0, "filesUnmodified": 0, "dataAdded": 20988, "totalBytesProcessed": 16732, "totalFilesProcessed": 2}, "retention": "none"}}], "result": {"status": "success", "executionId": 13047, "snapshotId": "447cf73b"}}"#.utf8)) as? [String: Any])
+        let snapshot = DockhandService.decodeBackupRunJob(job)
+        XCTAssertEqual(snapshot.status, "done")
+        XCTAssertEqual(snapshot.messages.first, "Collecting metadata...")
+        XCTAssertEqual(snapshot.resultStatus, "success")
+    }
+
+    func testBackupDetailDecodingReadsExecutionsSnapshotsAndRetention() throws {
+        let executions = DockhandService.decodeBackupExecutions([
+            "executions": [
+                ["id": 13049, "triggeredBy": "manual", "startedAt": "2026-10-18T16:06:10.833Z", "duration": 2897,
+                 "status": "success", "errorMessage": NSNull(),
+                 "details": ["snapshotId": "009d03d080f01a01", "dataAdded": 11637]],
+                ["id": 13048, "triggeredBy": "manual", "triggeredAt": "2026-10-18T16:00:41.882Z", "duration": 2881,
+                 "status": "failed", "errorMessage": "Backup cancelled", "details": [:]]
+            ],
+            "total": 2
+        ])
+        XCTAssertEqual(executions.map(\.id), [13049, 13048])
+        XCTAssertEqual(executions.first?.snapshotShortID, "009d03d0")
+        XCTAssertEqual(executions.first?.dataAdded, 11637)
+        XCTAssertNil(executions.first?.errorMessage)
+        XCTAssertEqual(executions.last?.startedAt, "2026-10-18T16:00:41.882Z")
+        XCTAssertEqual(executions.last?.errorMessage, "Backup cancelled")
+
+        let snapshots = DockhandService.decodeBackupSnapshots([
+            ["id": "447cf73b1e65", "shortId": "447cf73b", "time": "2026-10-18T16:00:25.85Z"],
+            ["id": "009d03d080f0", "shortId": "009d03d0", "time": "2026-10-18T16:06:11.68Z"]
+        ])
+        XCTAssertEqual(snapshots.map(\.shortID), ["009d03d0", "447cf73b"])
+
+        let config = try XCTUnwrap(DockhandService.decodeBackupConfigs([[
+            "id": 1, "targetName": "app", "destinationId": 1, "allVolumes": false,
+            "selectedVolumes": #"["data","config"]"#,
+            "retention": #"{"keepDaily":7,"keepLast":3,"keepWeekly":0}"#,
+            "tags": #"["dockhand-ios-test"]"#
+        ]]).first)
+        XCTAssertEqual(config.selectedVolumes, ["data", "config"])
+        XCTAssertEqual(config.retention, [BackupRetentionRule(key: "keepLast", value: 3), BackupRetentionRule(key: "keepDaily", value: 7)])
+        XCTAssertEqual(config.tags, ["dockhand-ios-test"])
+    }
+
     func testActionablePendingUpdatesSkipOrphansAndTagSuggestions() {
         let updates = DockhandService.decodePendingContainerUpdates([
             "pendingUpdates": [

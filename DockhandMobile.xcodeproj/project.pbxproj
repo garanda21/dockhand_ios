@@ -19,6 +19,7 @@
 		64F5B574C1B073E59E9DC83D /* StackEditorSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F846090140816C679D138A /* StackEditorSupport.swift */; };
 		77FD9371154AEFF7152A9686 /* dockhand_glass.icon in Resources */ = {isa = PBXBuildFile; fileRef = B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */; };
 		7B369144D2CEB78771441943 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3266A680155F8775A56868 /* AppModel.swift */; };
+		824025456E8882C42DA3BD36 /* BackupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B940973D69401B11D72205 /* BackupsView.swift */; };
 		A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */; };
 		A8F9039D7C41A72D87FFE6C8 /* SwiftTermContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0434B449F5D96778B679B176 /* SwiftTermContainerView.swift */; };
 		AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1F5D851E40D36A5154376B /* PreferencesStore.swift */; };
@@ -76,6 +77,7 @@
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		B95649492DE23AD9F6E55DBA /* dockhand_glass.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = dockhand_glass.icon; sourceTree = "<group>"; };
 		C5FC6A2CB1B06506690B8E1E /* StacksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksView.swift; sourceTree = "<group>"; };
+		B4B940973D69401B11D72205 /* BackupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupsView.swift; sourceTree = "<group>"; };
 		C6E2BA2D001FAAFD17F7BA6D /* ImagesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesStore.swift; sourceTree = "<group>"; };
 		D4F56858EF25CC073EFD0846 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		DC7935A747A89C9F23582DBC /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
@@ -164,6 +166,14 @@
 			path = Containers;
 			sourceTree = "<group>";
 		};
+		D7309514E52AC7F105B2B7FE /* Backups */ = {
+			isa = PBXGroup;
+			children = (
+				B4B940973D69401B11D72205 /* BackupsView.swift */,
+			);
+			path = Backups;
+			sourceTree = "<group>";
+		};
 		6F945C305978AF233853B2DD /* Images */ = {
 			isa = PBXGroup;
 			children = (
@@ -195,6 +205,7 @@
 		9C4F11BDBB66979A36E86A23 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				D7309514E52AC7F105B2B7FE /* Backups */,
 				6740CEC087BEF848097093A8 /* Containers */,
 				A73A4AC14A12E13B71FC208F /* Dashboard */,
 				6F945C305978AF233853B2DD /* Images */,
@@ -363,6 +374,7 @@
 				5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */,
 				F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */,
 				40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */,
+				824025456E8882C42DA3BD36 /* BackupsView.swift in Sources */,
 				A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */,
 				4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */,
 				D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */,

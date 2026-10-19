@@ -1,6 +1,63 @@
 import DockhandAPI
 import Foundation
 
+struct BackupConfigSnapshot: Sendable, Hashable, Identifiable {
+    let id: Int
+    let type: String
+    let targetName: String
+    let environmentID: Int?
+    let destinationID: Int
+    let enabled: Bool
+    let stopBeforeBackup: Bool
+    let schedule: String?
+    let lastBackupAt: String?
+    let lastBackupStatus: String?
+    var allVolumes = true
+    var selectedVolumes: [String] = []
+    /// restic keep-policy, e.g. `keepLast: 7`; empty when the config keeps everything.
+    var retention: [BackupRetentionRule] = []
+    var tags: [String] = []
+}
+
+struct BackupRetentionRule: Sendable, Hashable {
+    let key: String
+    let value: Int
+}
+
+struct BackupExecutionSnapshot: Sendable, Hashable, Identifiable {
+    let id: Int
+    let triggeredBy: String?
+    let startedAt: String?
+    let durationMilliseconds: Int?
+    let status: String?
+    let errorMessage: String?
+    let snapshotShortID: String?
+    let dataAdded: Int?
+}
+
+struct BackupSnapshotSummary: Sendable, Hashable, Identifiable {
+    let id: String
+    let shortID: String
+    let time: String?
+}
+
+struct BackupDestinationSnapshot: Sendable, Hashable, Identifiable {
+    let id: Int
+    let name: String
+    let repository: String
+    let hostPath: String?
+    let lastTestAt: String?
+    let lastTestStatus: String?
+    let lastTestError: String?
+}
+
+struct BackupRunJobSnapshot: Sendable, Hashable {
+    let status: String
+    let messages: [String]
+    let resultStatus: String?
+    let resultDetail: String?
+}
+
 struct StackEnvVariable: Sendable, Hashable {
     let key: String
     let value: String
@@ -768,6 +825,150 @@ struct DockhandService {
             environmentID: environmentID
         )
         return Self.decodeStackEnvVariables(response)
+    }
+
+    /// Returns `nil` when the server has backups disabled: without
+    /// `FEAT_BACKUPS_ENABLED=true` every `/api/backup/*` route answers 404.
+    func fetchBackupConfigs(environmentID: Int) async throws -> [BackupConfigSnapshot]? {
+        guard var components = URLComponents(url: baseURL.appending(path: "/api/backup/configs"), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        authorize(&request)
+
+        let (data, response) = try await send(request)
+        if (response as? HTTPURLResponse)?.statusCode == 404 {
+            return nil
+        }
+        try Self.validateResponse(response, data: data)
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
+            throw DockhandServiceError.invalidResponse
+        }
+        return Self.decodeBackupConfigs(json)
+    }
+
+    /// The server strips passwords, keys and certificates from this listing.
+    func fetchBackupDestinations(environmentID: Int) async throws -> [BackupDestinationSnapshot] {
+        let response = try await performJSONArrayRequest(
+            path: "/api/backup/destinations",
+            method: "GET",
+            environmentID: environmentID
+        )
+        return Self.decodeBackupDestinations(response)
+    }
+
+    /// Returns `nil` on success, otherwise the error Dockhand reported for the repository.
+    func testBackupDestination(id: Int, environmentID: Int) async throws -> String? {
+        let response = try await performJSONRequest(
+            path: "/api/backup/destinations/\(id)/test",
+            method: "POST",
+            environmentID: environmentID
+        )
+        if response["success"] as? Bool == true { return nil }
+        return response["error"] as? String
+            ?? (response["status"] as? String)
+            ?? String(localized: "Connection test failed")
+    }
+
+    func fetchBackupExecutions(configID: Int, environmentID: Int) async throws -> [BackupExecutionSnapshot] {
+        let response = try await performJSONRequest(
+            path: "/api/schedules/executions",
+            method: "GET",
+            environmentID: environmentID,
+            additionalQueryItems: [
+                URLQueryItem(name: "scheduleType", value: "backup"),
+                URLQueryItem(name: "scheduleId", value: "\(configID)"),
+                URLQueryItem(name: "limit", value: "20")
+            ]
+        )
+        return Self.decodeBackupExecutions(response)
+    }
+
+    /// Listing snapshots runs restic on the server, so Dockhand answers with a job to poll.
+    func fetchBackupSnapshots(configID: Int) async throws -> [BackupSnapshotSummary] {
+        guard var components = URLComponents(url: baseURL.appending(path: "/api/backup/snapshots"), resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "configId", value: "\(configID)")]
+        guard let url = components.url else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        authorize(&request)
+
+        let (data, response) = try await send(request)
+        try Self.validateResponse(response, data: data)
+        guard let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
+              let jobID = payload.jobId,
+              !jobID.isEmpty else {
+            throw DockhandServiceError.invalidResponse
+        }
+
+        var job = try await fetchJobObject(id: jobID)
+        while (job["status"] as? String) == "running" {
+            try await Task.sleep(for: .milliseconds(500))
+            job = try await fetchJobObject(id: jobID)
+        }
+        if (job["status"] as? String) == "error" {
+            let detail = (job["result"] as? [String: Any])?["error"] as? String
+            throw DockhandServiceError.message(detail ?? String(localized: "Snapshots could not be loaded"))
+        }
+        return Self.decodeBackupSnapshots(job["result"])
+    }
+
+    /// Starts a manual run as a background job. Requesting JSON would make the
+    /// server hold the connection until the backup ends, so ask for the job id instead.
+    func startBackupRun(configID: Int) async throws -> String {
+        var request = URLRequest(url: baseURL.appending(path: "/api/backup/configs/\(configID)/run"))
+        request.httpMethod = "POST"
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        authorize(&request)
+
+        let (data, response) = try await send(request)
+        try Self.validateResponse(response, data: data)
+        guard let payload = try? JSONDecoder().decode(ImagePullJobStartPayload.self, from: data),
+              let jobID = payload.jobId,
+              !jobID.isEmpty else {
+            throw DockhandServiceError.invalidResponse
+        }
+        return jobID
+    }
+
+    func fetchBackupRunJob(id: String) async throws -> BackupRunJobSnapshot {
+        Self.decodeBackupRunJob(try await fetchJobObject(id: id))
+    }
+
+    private func fetchJobObject(id: String) async throws -> [String: Any] {
+        let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        var request = URLRequest(url: baseURL.appending(path: "/api/jobs/\(encodedID)"))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        authorize(&request)
+
+        let (data, response) = try await send(request)
+        try Self.validateResponse(response, data: data)
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            throw DockhandServiceError.invalidResponse
+        }
+        return json
+    }
+
+    func stopBackupRun(configID: Int, environmentID: Int) async throws {
+        _ = try await performJSONRequest(
+            path: "/api/backup/configs/\(configID)/stop",
+            method: "POST",
+            environmentID: environmentID
+        )
     }
 
     func fetchContainerLogs(
