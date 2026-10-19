@@ -13,6 +13,7 @@ struct DockhandRootView: View {
     @State private var selectedTab: DockhandTab = .dashboard
     @State private var requestedContainerFilter = ContainerListFilter.all
     @State private var containerFilterRequestRevision = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -71,6 +72,10 @@ struct DockhandRootView: View {
                 selectedTab = .settings
             }
             await appModel.bootstrap()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await appModel.recoverConnectionIfNeeded() }
         }
     }
 

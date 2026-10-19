@@ -220,19 +220,24 @@ final class AppModel {
 
         do {
             let service = self.service(baseURL: baseURL)
-            do {
-                lastHealthStatus = try await service.fetchHealthStatus()
-            } catch {
-                throw DockhandConnectionStageError(stage: .health, underlying: error)
+            // The first requests after launch or returning to the app often fail while
+            // Wi-Fi or the local network permission wakes up; retry before giving up.
+            let loaded = try await Self.retryingConnection {
+                let health: String
+                do {
+                    health = try await service.fetchHealthStatus()
+                } catch {
+                    throw DockhandConnectionStageError(stage: .health, underlying: error)
+                }
+                do {
+                    return (health, try await service.fetchEnvironments())
+                } catch {
+                    throw DockhandConnectionStageError(stage: .environments, underlying: error)
+                }
             }
-
-            let loaded: [Components.Schemas.Environment]
-            do {
-                loaded = try await service.fetchEnvironments()
-            } catch {
-                throw DockhandConnectionStageError(stage: .environments, underlying: error)
-            }
-            environments = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            lastHealthStatus = loaded.0
+            let loadedEnvironments = loaded.1
+            environments = loadedEnvironments.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
             let preferredEnvironmentID = if forceEnvironmentReset {
                 PreferencesStore.selectedEnvironmentID(for: profileID) ?? selectedEnvironmentID
@@ -250,8 +255,34 @@ final class AppModel {
             PreferencesStore.setSelectedEnvironmentID(selectedEnvironmentID, for: profileID)
         } catch {
             guard !error.isDockhandCancellation else { return }
+            // Keep the last known environments so screens recover on their own
+            // once the server is reachable again.
             environmentError = error.dockhandUserFacingMessage
-            environments = []
+        }
+    }
+
+    /// Reconnects after a failed refresh, e.g. on pull to refresh or when the app
+    /// returns to the foreground, instead of requiring Settings → Refresh.
+    func recoverConnectionIfNeeded() async {
+        guard selectedProfile != nil,
+              !isLoadingEnvironments,
+              environmentError != nil || environments.isEmpty else { return }
+        await refreshEnvironments(forceEnvironmentReset: false)
+    }
+
+    private static func retryingConnection<T>(
+        attempts: Int = 3,
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        var attempt = 1
+        while true {
+            do {
+                return try await operation()
+            } catch {
+                guard attempt < attempts, !error.isDockhandCancellation else { throw error }
+                try await Task.sleep(for: .seconds(attempt))
+                attempt += 1
+            }
         }
     }
 

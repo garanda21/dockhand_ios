@@ -74,6 +74,21 @@ extension String {
             return exactStateLabel
         }
 
+        // Docker reports "Exited (0) 7 days ago"; word-by-word translation would
+        // leave the exit code and "ago" behind, so localize the whole phrase.
+        if let match = self.wholeMatch(of: /Exited \((-?\d+)\) (.+) ago/) {
+            let elapsed = String(match.2).localizingDockerDurations
+            if match.1 == "0" {
+                return String(format: String(localized: "Exited %@ ago"), locale: Locale.current, elapsed)
+            }
+            return String(
+                format: String(localized: "Exited with code %1$@ %2$@ ago"),
+                locale: Locale.current,
+                String(match.1),
+                elapsed
+            )
+        }
+
         var text = self
 
         let replacements = [
@@ -96,6 +111,14 @@ extension String {
             text = text.replacingOccurrences(of: source, with: target)
         }
 
+        return text.localizingDockerDurations
+    }
+
+    private var localizingDockerDurations: String {
+        var text = self
+        for phrase in ["About an hour", "About a minute", "Less than a second", "Less than a minute"] {
+            text = text.replacingOccurrences(of: phrase, with: String(localized: String.LocalizationValue(phrase)))
+        }
         let unitReplacements: [(pattern: String, singular: String, plural: String)] = [
             (#"(\d+)\s+days?"#, String(localized: "%d day"), String(localized: "%d days")),
             (#"(\d+)\s+hours?"#, String(localized: "%d hour"), String(localized: "%d hours")),
