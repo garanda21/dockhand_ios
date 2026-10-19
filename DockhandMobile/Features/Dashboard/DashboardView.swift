@@ -392,6 +392,7 @@ struct DashboardView: View {
             await runDashboardLoop()
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }
@@ -933,6 +934,7 @@ private struct DashboardUpdatesDetailView: View {
             await store.loadUpdates(appModel: appModel)
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.loadUpdates(appModel: appModel)
         }
         .confirmationDialog(

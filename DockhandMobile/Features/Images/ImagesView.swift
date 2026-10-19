@@ -118,6 +118,7 @@ struct ImagesView: View {
             await store.load(appModel: appModel)
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }

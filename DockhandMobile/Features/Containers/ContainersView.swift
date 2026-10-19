@@ -84,6 +84,9 @@ final class ContainersStore {
             if let failures = response.failureDetails {
                 error = failures
             } else {
+                // The update is applied even if the reload above failed or raced
+                // with another refresh, so drop the stale entry right away.
+                pendingUpdates = pendingUpdates.filter { $0.value.containerName != container.name }
                 actionMessage = String(format: String(localized: "%@ updated"), locale: Locale.current, container.name)
             }
         } catch {
@@ -239,6 +242,7 @@ struct ContainersView: View {
             stateFilter = requestedFilter
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }
