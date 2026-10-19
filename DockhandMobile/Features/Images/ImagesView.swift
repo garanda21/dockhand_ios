@@ -114,10 +114,11 @@ struct ImagesView: View {
                 ProgressView()
             }
         }
-        .task(id: appModel.connectionScopeID) {
+        .task(id: "\(appModel.connectionScopeID):\(appModel.dashboardRefreshRevision)") {
             await store.load(appModel: appModel)
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }

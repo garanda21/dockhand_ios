@@ -156,7 +156,9 @@ extension DockhandService {
                 containerName: containerName,
                 currentImage: update["currentImage"] as? String ?? String(localized: "Unknown image"),
                 checkedAt: update["checkedAt"] as? String,
-                newerTags: tags
+                newerTags: tags,
+                hasImageUpdate: update["hasImageUpdate"] as? Bool ?? true,
+                pinnedToDigest: update["pinnedToDigest"] as? Bool ?? false
             )
         }
     }

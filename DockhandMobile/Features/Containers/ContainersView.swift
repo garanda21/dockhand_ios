@@ -30,7 +30,10 @@ final class ContainersStore {
             async let loadedUpdates = try? service.fetchPendingContainerUpdates(environmentID: environmentID)
             containers = try await service.fetchContainers(environmentID: environmentID)
                 .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            let updates = await loadedUpdates ?? []
+            let updates = PendingContainerUpdate.actionable(
+                await loadedUpdates ?? [],
+                liveContainerIDs: Set(containers.map(\.id))
+            )
             pendingUpdates = Dictionary(updates.map { ($0.containerID, $0) }, uniquingKeysWith: { first, _ in first })
         } catch {
             guard !error.isDockhandCancellation else { return }
@@ -81,6 +84,9 @@ final class ContainersStore {
             if let failures = response.failureDetails {
                 error = failures
             } else {
+                // The update is applied even if the reload above failed or raced
+                // with another refresh, so drop the stale entry right away.
+                pendingUpdates = pendingUpdates.filter { $0.value.containerName != container.name }
                 actionMessage = String(format: String(localized: "%@ updated"), locale: Locale.current, container.name)
             }
         } catch {
@@ -97,8 +103,9 @@ final class ContainersStore {
         activeActionID == actionID(for: action, containerID: containerID)
     }
 
-    func container(id: String) -> Components.Schemas.Container? {
-        containers.first(where: { $0.id == id })
+    /// Updating recreates a container under a new id, so fall back to its name.
+    func container(id: String, name: String) -> Components.Schemas.Container? {
+        containers.first(where: { $0.id == id }) ?? containers.first(where: { $0.name == name })
     }
 
     private func actionID(for action: ContainerAction, containerID: String) -> String {
@@ -228,13 +235,14 @@ struct ContainersView: View {
                 ProgressView()
             }
         }
-        .task(id: appModel.connectionScopeID) {
+        .task(id: "\(appModel.connectionScopeID):\(appModel.dashboardRefreshRevision)") {
             await store.load(appModel: appModel)
         }
         .onChange(of: filterRequestRevision, initial: true) {
             stateFilter = requestedFilter
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }
@@ -271,22 +279,29 @@ private struct ContainerRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text(container.name)
                     .font(.headline)
-                Spacer()
-                if hasUpdate {
-                    Label("Update", systemImage: "arrow.up.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.blue)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.blue.opacity(0.14), in: Capsule())
-                        .accessibilityLabel(String(localized: "Update available"))
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(container.state.localizedDockhandStateLabel.uppercased())
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(container.state == "running" ? .green : .secondary)
+                    if hasUpdate {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.up.circle.fill")
+                            Text("Update")
+                        }
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .fixedSize()
+                            .foregroundStyle(.blue)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(.blue.opacity(0.14), in: Capsule())
+                            .accessibilityLabel(String(localized: "Update available"))
+                    }
                 }
-                Text(container.state.localizedDockhandStateLabel.uppercased())
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(container.state == "running" ? .green : .secondary)
             }
             Text(container.image)
                 .font(.subheadline)
@@ -319,7 +334,7 @@ private struct ContainerDetailView: View {
     }
 
     private var liveContainer: Components.Schemas.Container {
-        isCurrentScope ? (store.container(id: container.id) ?? container) : container
+        isCurrentScope ? (store.container(id: container.id, name: container.name) ?? container) : container
     }
 
     private var environmentForPorts: Components.Schemas.Environment? {
@@ -341,11 +356,18 @@ private struct ContainerDetailView: View {
                     Text(liveContainer.status.localizedDockerRuntimeText)
                         .font(.subheadline)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
                 .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 24))
 
                 if !isCurrentScope {
                     staleScopeWarning
+                }
+
+                if let error = store.error {
+                    resultBanner(error, systemImage: "exclamationmark.triangle.fill", tint: .red)
+                } else if let message = store.actionMessage {
+                    resultBanner(message, systemImage: "checkmark.circle.fill", tint: .green)
                 }
 
                 if let update = store.pendingUpdate(for: liveContainer) {
@@ -364,6 +386,12 @@ private struct ContainerDetailView: View {
         }
         .navigationTitle(liveContainer.name)
         .navigationBarTitleDisplayMode(.inline)
+        .animation(.default, value: store.actionMessage)
+        .animation(.default, value: store.pendingUpdate(for: liveContainer)?.containerID)
+        .onAppear {
+            store.actionMessage = nil
+            store.error = nil
+        }
         .confirmationDialog(
             String(localized: "Update container?"),
             isPresented: $showsUpdateConfirmation,
@@ -376,6 +404,16 @@ private struct ContainerDetailView: View {
         } message: {
             Text("Dockhand pulls the newer image and recreates the container with its current settings.")
         }
+    }
+
+    private func resultBanner(_ text: String, systemImage: String, tint: Color) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .glassEffect(.regular.tint(tint.opacity(0.1)), in: .rect(cornerRadius: 18))
+            .transition(.opacity)
     }
 
     private func updateCard(_ update: PendingContainerUpdate) -> some View {
@@ -430,16 +468,8 @@ private struct ContainerDetailView: View {
 
     private var actionBar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Actions")
-                    .font(.headline)
-                Spacer()
-                if let actionMessage = store.actionMessage {
-                    Text(actionMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text("Actions")
+                .font(.headline)
 
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),

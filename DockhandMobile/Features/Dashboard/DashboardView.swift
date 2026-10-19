@@ -127,9 +127,13 @@ private final class DashboardResourceDetailStore {
         do {
             async let loadedUpdates = service.fetchPendingContainerUpdates(environmentID: environmentID)
             async let loadedStacks = service.fetchStacks(environmentID: environmentID)
-            let (updates, stacks) = try await (loadedUpdates, loadedStacks)
+            async let loadedContainers = service.fetchContainers(environmentID: environmentID)
+            let (updates, stacks, containers) = try await (loadedUpdates, loadedStacks, loadedContainers)
             guard token == updatesLoadToken, scope == appModel.connectionScopeID, !Task.isCancelled else { return }
-            pendingUpdates = updates.sorted {
+            pendingUpdates = PendingContainerUpdate.actionable(
+                updates,
+                liveContainerIDs: Set(containers.map(\.id))
+            ).sorted {
                 $0.containerName.localizedCaseInsensitiveCompare($1.containerName) == .orderedAscending
             }
             self.stacks = stacks
@@ -172,6 +176,7 @@ private final class DashboardResourceDetailStore {
                 result.updatesFound,
                 result.total
             )
+            appModel.requestDashboardRefresh()
             await loadUpdates(appModel: appModel)
         } catch {
             guard !error.isDockhandCancellation else { return }
@@ -195,6 +200,7 @@ private final class DashboardResourceDetailStore {
                 environmentID: environmentID
             )
             // loadUpdates clears messages, so refresh the list before reporting the outcome.
+            appModel.requestDashboardRefresh()
             await loadUpdates(appModel: appModel)
             if response.summary.success > 0 {
                 operationMessage = String(
@@ -390,6 +396,7 @@ struct DashboardView: View {
             await backupsStore.load(appModel: appModel)
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.load(appModel: appModel)
         }
     }
@@ -947,6 +954,7 @@ private struct DashboardUpdatesDetailView: View {
             await store.loadUpdates(appModel: appModel)
         }
         .refreshable {
+            await appModel.recoverConnectionIfNeeded()
             await store.loadUpdates(appModel: appModel)
         }
         .confirmationDialog(

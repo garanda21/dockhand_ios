@@ -351,7 +351,14 @@
       }
     },
     "%1$d updates found after checking %2$d containers" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d actualizaciones encontradas tras revisar %2$d contenedores"
+          }
+        }
+      }
     },
     "%d container" : {
       "localizations" : {
@@ -374,7 +381,14 @@
       }
     },
     "%d containers updated" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d contenedores actualizados"
+          }
+        }
+      }
     },
     "%d core" : {
       "localizations" : {
@@ -780,7 +794,14 @@
       }
     },
     "All checked containers are up to date." : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos los contenedores revisados están actualizados."
+          }
+        }
+      }
     },
     "All containers healthy" : {
       "localizations" : {
@@ -823,7 +844,14 @@
       }
     },
     "Available Updates" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizaciones disponibles"
+          }
+        }
+      }
     },
     "Base URL" : {
       "localizations" : {
@@ -916,7 +944,14 @@
       }
     },
     "Check for updates" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar actualizaciones"
+          }
+        }
+      }
     },
     "Choose how Dockhand should redeploy this compose stack." : {
       "localizations" : {
@@ -1981,7 +2016,14 @@
       }
     },
     "No pending updates" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin actualizaciones pendientes"
+          }
+        }
+      }
     },
     "No ports" : {
       "localizations" : {
@@ -2132,7 +2174,14 @@
       }
     },
     "Pending updates" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizaciones pendientes"
+          }
+        }
+      }
     },
     "Port" : {
       "localizations" : {
@@ -2634,7 +2683,14 @@
 
     },
     "Shows the containers and stacks with pending updates" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra los contenedores y stacks con actualizaciones pendientes"
+          }
+        }
+      }
     },
     "Size" : {
       "localizations" : {
@@ -2998,22 +3054,57 @@
       }
     },
     "Update %@" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar %@"
+          }
+        }
+      }
     },
     "Update %d containers" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar %d contenedores"
+          }
+        }
+      }
     },
     "Update all containers" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar todos los contenedores"
+          }
+        }
+      }
     },
     "Update check failed" : {
 
     },
     "Update containers?" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Actualizar contenedores?"
+          }
+        }
+      }
     },
     "Update failed" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La actualización falló"
+          }
+        }
+      }
     },
     "Updates" : {
       "localizations" : {
@@ -4174,6 +4265,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Los destinos se crean y editan en la web de Dockhand."
+          }
+        }
+      }
+    },
+    "Exited %@ ago" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizado hace %@"
+          }
+        }
+      }
+    },
+    "Exited with code %1$@ %2$@ ago" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizado con código %1$@ hace %2$@"
           }
         }
       }
