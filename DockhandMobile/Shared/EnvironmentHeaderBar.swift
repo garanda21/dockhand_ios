@@ -6,56 +6,22 @@ struct EnvironmentHeaderBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "server.rack")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(appModel.selectedProfileName)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-
-                        if let host = appModel.normalizedBaseURL?.host(), !host.isEmpty {
-                            Text(host)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
+            // Side by side when it fits; stack the picker below on narrow widths (iPhone Duo folded).
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 10) {
+                    serverInfo
+                    // Pin the picker to the trailing edge on wide layouts (iPhone Duo unfolded, iPad).
+                    Spacer(minLength: 0)
+                    environmentMenu
+                    loadingIndicator
                 }
 
-                Menu {
-                    ForEach(appModel.environments, id: \.id) { environment in
-                        Button {
-                            appModel.selectEnvironment(environment.id)
-                        } label: {
-                            Label(environment.name, systemImage: appModel.selectedEnvironmentID == environment.id ? "checkmark.circle.fill" : "globe")
-                        }
+                VStack(alignment: .leading, spacing: 10) {
+                    serverInfo
+                    HStack(spacing: 10) {
+                        environmentMenu
+                        loadingIndicator
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "globe.europe.africa.fill")
-                        Text(appModel.selectedEnvironmentName)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .frame(minWidth: 0, maxWidth: 220, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .id(menuIdentity)
-                .buttonStyle(.glassProminent)
-                .disabled(appModel.environments.isEmpty)
-
-                if appModel.isLoadingEnvironments {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 28, height: 28)
                 }
             }
 
@@ -91,6 +57,65 @@ struct EnvironmentHeaderBar: View {
         .padding(12)
         .background(.clear)
         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 20))
+    }
+
+    private var serverInfo: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "server.rack")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(appModel.selectedProfileName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                if let host = appModel.normalizedBaseURL?.host(), !host.isEmpty {
+                    Text(host)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private var environmentMenu: some View {
+        Menu {
+            ForEach(appModel.environments, id: \.id) { environment in
+                Button {
+                    appModel.selectEnvironment(environment.id)
+                } label: {
+                    Label(environment.name, systemImage: appModel.selectedEnvironmentID == environment.id ? "checkmark.circle.fill" : "globe")
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "globe.europe.africa.fill")
+                Text(appModel.selectedEnvironmentName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+            }
+            .frame(minWidth: 0, maxWidth: 220, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 2)
+        }
+        .id(menuIdentity)
+        .buttonStyle(.glassProminent)
+        .controlSize(.small)
+        .disabled(appModel.environments.isEmpty)
+    }
+
+    @ViewBuilder
+    private var loadingIndicator: some View {
+        if appModel.isLoadingEnvironments {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 28, height: 28)
+        }
     }
 
     private var lastHealthStatus: String? {
