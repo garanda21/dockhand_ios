@@ -61,6 +61,7 @@ struct SettingsView: View {
 
     @State private var statusMessage: String?
     @State private var detailsStore = ServerDetailsStore()
+    @State private var isServerDetailsExpanded = false
 
     private var serverHost: DashboardHostSnapshot? {
         detailsStore.loadedScopeID == appModel.connectionScopeID ? detailsStore.host : nil
@@ -72,13 +73,14 @@ struct SettingsView: View {
                 activeServerCard
 
                 if !appModel.serverProfiles.isEmpty {
-                    serverDetailsCard
                     serverLibraryCard
                 }
 
                 if let statusMessage {
                     statusCard(statusMessage)
                 }
+
+                aboutCard
             }
             .padding()
         }
@@ -200,7 +202,7 @@ struct SettingsView: View {
                             
                     }
 
-                    
+                    serverDetailsDisclosure
                 }
             } else {
                 ContentUnavailableView(
@@ -262,26 +264,40 @@ struct SettingsView: View {
         .disabled(appModel.serverProfiles.isEmpty)
     }
 
-    private var serverDetailsCard: some View {
+    private var serverDetailsDisclosure: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Server details"))
-                        .font(.headline.weight(.semibold))
-                    Text(String(localized: "Dockhand, Docker and host information for the active environment."))
-                        .font(.footnote)
+            Button {
+                withAnimation(.snappy) { isServerDetailsExpanded.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "Server details"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(String(localized: "Dockhand, Docker and host information for the active environment."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 8)
+                    if detailsStore.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isServerDetailsExpanded ? 180 : 0))
                 }
-
-                Spacer(minLength: 12)
-
-                if detailsStore.isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityValue(isServerDetailsExpanded ? String(localized: "Expanded") : String(localized: "Collapsed"))
 
-            if let host = serverHost {
+            if !isServerDetailsExpanded {
+                EmptyView()
+            } else if let host = serverHost {
                 VStack(alignment: .leading, spacing: 14) {
                     let dockhandRows = host.dockhand.map(dockhandDetailRows) ?? []
                     if !dockhandRows.isEmpty {
@@ -331,8 +347,8 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(16)
-        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
+        .padding(14)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
     }
 
     private var serverLibraryCard: some View {
@@ -376,6 +392,73 @@ struct SettingsView: View {
         }
         .padding(16)
         .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
+    }
+
+    private var appVersionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
+    private var aboutCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "About"))
+                    .font(.headline.weight(.semibold))
+            }
+
+            VStack(spacing: 10) {
+                aboutRow(String(localized: "Version"), systemImage: "info.circle") {
+                    Text(verbatim: appVersionText)
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                aboutLink(String(localized: "Send feedback"), systemImage: "bubble.left.and.exclamationmark.bubble.right", url: URL(string: "https://github.com/garanda21/dockhand_ios/issues")!)
+                aboutLink(String(localized: "Source code"), systemImage: "chevron.left.forwardslash.chevron.right", url: URL(string: "https://github.com/garanda21/dockhand_ios")!)
+                aboutLink(String(localized: "Privacy policy"), systemImage: "hand.raised", url: URL(string: "https://github.com/garanda21/dockhand_ios/blob/main/PRIVACY.md")!)
+            }
+
+            HStack(spacing: 4) {
+                Text(String(localized: "Made with"))
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.pink)
+                    .accessibilityLabel(String(localized: "love"))
+                Text(String(localized: "for the open-source community"))
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(16)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 22))
+    }
+
+    private func aboutRow<Trailing: View>(_ title: String, systemImage: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline)
+            Spacer(minLength: 8)
+            trailing()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 18))
+    }
+
+    private func aboutLink(_ title: String, systemImage: String, url: URL) -> some View {
+        Link(destination: url) {
+            aboutRow(title, systemImage: systemImage) {
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func infoChip(_ title: String, _ value: String, systemImage: String, tint: Color = .secondary) -> some View {

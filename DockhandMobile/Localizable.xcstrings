@@ -1975,6 +1975,106 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acerca de"
+          }
+        }
+      }
+    },
+    "Free and open source, for everyone." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis y open source, para todos."
+          }
+        }
+      }
+    },
+    "Send feedback" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar feedback"
+          }
+        }
+      }
+    },
+    "Source code" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Código fuente"
+          }
+        }
+      }
+    },
+    "Privacy policy" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Política de privacidad"
+          }
+        }
+      }
+    },
+    "Made with" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hecho con"
+          }
+        }
+      }
+    },
+    "love" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "amor"
+          }
+        }
+      }
+    },
+    "for the open-source community" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "para la comunidad open source"
+          }
+        }
+      }
+    },
+    "Expanded" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expandido"
+          }
+        }
+      }
+    },
+    "Collapsed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contraído"
+          }
+        }
+      }
+    },
     "No containers" : {
       "localizations" : {
         "es" : {
@@ -2501,7 +2601,14 @@
       }
     },
     "Retry" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
+          }
+        }
+      }
     },
     "Running" : {
       "localizations" : {
@@ -3197,7 +3304,14 @@
       }
     },
     "Version" : {
-
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión"
+          }
+        }
+      }
     },
     "View Logs" : {
       "localizations" : {
