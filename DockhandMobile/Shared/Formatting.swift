@@ -26,6 +26,17 @@ struct PublishedPortAccess: Hashable, Identifiable {
 }
 
 extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Treats the receiver as a search query; an empty query matches everything.
+    func isSearchMatch(in fields: [String]) -> Bool {
+        let query = trimmed
+        guard !query.isEmpty else { return true }
+        return fields.contains { $0.localizedStandardContains(query) }
+    }
+
     var normalizedDockhandState: String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }

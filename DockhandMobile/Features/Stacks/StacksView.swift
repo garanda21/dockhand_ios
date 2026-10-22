@@ -6,9 +6,12 @@ struct StacksView: View {
     @State private var store = StacksStore()
     @State private var sort = StackListSort.name
     @State private var stateFilter = DockhandStateFilter.all
+    @State private var searchText = ""
 
     private var filteredStacks: [Components.Schemas.StackSummary] {
-        let filtered = store.stacks.filter { stateFilter.matches($0.status) }
+        let filtered = store.stacks.filter {
+            stateFilter.matches($0.status) && searchText.isSearchMatch(in: [$0.name])
+        }
         switch sort {
         case .name:
             return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -50,7 +53,9 @@ struct StacksView: View {
             Section("Stacks") {
                 if store.error == nil && filteredStacks.isEmpty {
                     Text(
-                        stateFilter == .all
+                        !searchText.trimmed.isEmpty
+                            ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
+                            : stateFilter == .all
                             ? String(localized: "No stacks")
                             : String(format: String(localized: "No stacks in %@"), locale: Locale.current, stateFilter.title)
                     )
@@ -73,6 +78,7 @@ struct StacksView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Stacks")
+        .searchable(text: $searchText, prompt: Text("Search stacks"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

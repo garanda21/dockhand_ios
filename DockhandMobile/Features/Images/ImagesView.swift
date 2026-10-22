@@ -7,6 +7,7 @@ struct ImagesView: View {
     @State private var pullSheetPresented = false
     @State private var stateFilter = ImageStateFilter.all
     @State private var pruneConfirmation: ImagePruneMode?
+    @State private var searchText = ""
 
     private var repositoryUsage: [String: RepositoryImageUsage] {
         Dictionary(
@@ -23,6 +24,7 @@ struct ImagesView: View {
         store.images.filter { image in
             let usage = repositoryUsage[image.repositoryKey] ?? .init(hasUsed: image.containers > 0, hasUnused: image.containers == 0)
             return stateFilter.matches(image: image, usage: usage)
+                && searchText.isSearchMatch(in: [image.displayName, image.repositoryKey, image.shortID])
         }
     }
 
@@ -50,7 +52,9 @@ struct ImagesView: View {
             Section("Images") {
                 if filteredImages.isEmpty {
                     Text(
-                        stateFilter == .all
+                        !searchText.trimmed.isEmpty
+                            ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
+                            : stateFilter == .all
                             ? String(localized: "No images")
                             : String(format: String(localized: "No images in %@"), locale: Locale.current, stateFilter.title)
                     )
@@ -76,6 +80,7 @@ struct ImagesView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Images")
+        .searchable(text: $searchText, prompt: Text("Search images"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

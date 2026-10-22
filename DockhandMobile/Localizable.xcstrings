@@ -1935,6 +1935,46 @@
     "No connected containers" : {
 
     },
+    "No results for “%@”" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin resultados para “%@”"
+          }
+        }
+      }
+    },
+    "Search containers" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar contenedores"
+          }
+        }
+      }
+    },
+    "Search images" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar imágenes"
+          }
+        }
+      }
+    },
+    "Search stacks" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar stacks"
+          }
+        }
+      }
+    },
     "No containers" : {
       "localizations" : {
         "es" : {
