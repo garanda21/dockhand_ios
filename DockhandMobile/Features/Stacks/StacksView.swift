@@ -7,6 +7,8 @@ struct StacksView: View {
     @State private var sort = StackListSort.name
     @State private var stateFilter = DockhandStateFilter.all
     @State private var searchText = ""
+    @State private var selectedStackName: String?
+    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var filteredStacks: [Components.Schemas.StackSummary] {
         let filtered = store.stacks.filter {
@@ -36,7 +38,27 @@ struct StacksView: View {
     }
 
     var body: some View {
-        List {
+        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
+            listColumn
+        } detail: {
+            NavigationStack {
+                if let stack = store.stacks.first(where: { $0.name == selectedStackName }) {
+                    StackEditorView(
+                        appModel: appModel,
+                        stack: stack,
+                        scope: appModel.connectionScope,
+                        store: store
+                    )
+                    .id(stack.name)
+                } else {
+                    ContentUnavailableView("Select a stack", systemImage: "square.3.layers.3d")
+                }
+            }
+        }
+    }
+
+    private var listColumn: some View {
+        List(selection: $selectedStackName) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -62,14 +84,7 @@ struct StacksView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredStacks, id: \.name) { stack in
-                        NavigationLink {
-                            StackEditorView(
-                                appModel: appModel,
-                                stack: stack,
-                                scope: appModel.connectionScope,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: stack.name) {
                             StackRow(stack: stack)
                         }
                     }

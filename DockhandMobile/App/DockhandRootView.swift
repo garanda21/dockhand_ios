@@ -17,56 +17,42 @@ struct DockhandRootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationStack {
-                DashboardView(
-                    appModel: appModel,
-                    onOpenSettings: { selectedTab = .settings },
-                    onOpenContainers: openContainers,
-                    onOpenStacks: { selectedTab = .stacks },
-                    onOpenImages: { selectedTab = .images }
-                )
+            Tab("Dashboard", systemImage: "gauge.with.dots.needle.67percent", value: DockhandTab.dashboard) {
+                NavigationStack {
+                    DashboardView(
+                        appModel: appModel,
+                        onOpenSettings: { selectedTab = .settings },
+                        onOpenContainers: openContainers,
+                        onOpenStacks: { selectedTab = .stacks },
+                        onOpenImages: { selectedTab = .images }
+                    )
+                }
             }
-            .tabItem {
-                Label("Dashboard", systemImage: "gauge.with.dots.needle.67percent")
-            }
-            .tag(DockhandTab.dashboard)
 
-            NavigationStack {
+            // List tabs own a NavigationSplitView, so they get no outer stack.
+            Tab("Containers", systemImage: "shippingbox", value: DockhandTab.containers) {
                 ContainersView(
                     appModel: appModel,
                     requestedFilter: requestedContainerFilter,
                     filterRequestRevision: containerFilterRequestRevision
                 )
             }
-            .tabItem {
-                Label("Containers", systemImage: "shippingbox")
-            }
-            .tag(DockhandTab.containers)
 
-            NavigationStack {
+            Tab("Stacks", systemImage: "square.3.layers.3d", value: DockhandTab.stacks) {
                 StacksView(appModel: appModel)
             }
-            .tabItem {
-                Label("Stacks", systemImage: "square.3.layers.3d")
-            }
-            .tag(DockhandTab.stacks)
 
-            NavigationStack {
+            Tab("Images", systemImage: "photo.stack", value: DockhandTab.images) {
                 ImagesView(appModel: appModel)
             }
-            .tabItem {
-                Label("Images", systemImage: "photo.stack")
-            }
-            .tag(DockhandTab.images)
 
-            NavigationStack {
-                SettingsView(appModel: appModel)
+            Tab("Settings", systemImage: "gearshape", value: DockhandTab.settings) {
+                NavigationStack {
+                    SettingsView(appModel: appModel)
+                }
             }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape")
-            }
-            .tag(DockhandTab.settings)
         }
+        .tabViewStyle(.sidebarAdaptable)
         .task {
             if appModel.serverProfiles.isEmpty {
                 selectedTab = .settings

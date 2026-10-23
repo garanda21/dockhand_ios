@@ -8,6 +8,8 @@ struct ImagesView: View {
     @State private var stateFilter = ImageStateFilter.all
     @State private var pruneConfirmation: ImagePruneMode?
     @State private var searchText = ""
+    @State private var selectedImageID: String?
+    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var repositoryUsage: [String: RepositoryImageUsage] {
         Dictionary(
@@ -29,7 +31,27 @@ struct ImagesView: View {
     }
 
     var body: some View {
-        List {
+        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
+            listColumn
+        } detail: {
+            NavigationStack {
+                if let image = store.images.first(where: { $0.id == selectedImageID }) {
+                    ImageDetailView(
+                        image: image,
+                        scope: appModel.connectionScope,
+                        appModel: appModel,
+                        store: store
+                    )
+                    .id(image.id)
+                } else {
+                    ContentUnavailableView("Select an image", systemImage: "photo.stack")
+                }
+            }
+        }
+    }
+
+    private var listColumn: some View {
+        List(selection: $selectedImageID) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -61,14 +83,7 @@ struct ImagesView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredImages, id: \.id) { image in
-                        NavigationLink {
-                            ImageDetailView(
-                                image: image,
-                                scope: appModel.connectionScope,
-                                appModel: appModel,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: image.id) {
                             ImageRow(
                                 image: image,
                                 usage: repositoryUsage[image.repositoryKey]

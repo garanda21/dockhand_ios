@@ -1,6 +1,36 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Select a container" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona un contenedor"
+          }
+        }
+      }
+    },
+    "Select a stack" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona un stack"
+          }
+        }
+      }
+    },
+    "Select an image" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona una imagen"
+          }
+        }
+      }
+    },
     "Latest published release. It may differ from the pending image update." : {
       "localizations" : {
         "es" : {

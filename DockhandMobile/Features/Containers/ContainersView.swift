@@ -121,6 +121,9 @@ struct ContainersView: View {
     @State private var sort = ContainerListSort.name
     @State private var stateFilter = ContainerListFilter.all
     @State private var searchText = ""
+    @State private var selectedContainerID: String?
+    @State private var selectedContainer: Components.Schemas.Container?
+    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var filteredContainers: [Components.Schemas.Container] {
         let filtered = store.containers.filter {
@@ -153,7 +156,32 @@ struct ContainersView: View {
     }
 
     var body: some View {
-        List {
+        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
+            listColumn
+        } detail: {
+            NavigationStack {
+                if let container = selectedContainer {
+                    ContainerDetailView(
+                        container: container,
+                        scope: appModel.connectionScope,
+                        appModel: appModel,
+                        store: store
+                    )
+                    .id(container.id)
+                } else {
+                    ContentUnavailableView("Select a container", systemImage: "shippingbox")
+                }
+            }
+        }
+        .onChange(of: selectedContainerID) { _, id in
+            // Keep the last resolved container so the detail survives an
+            // update that recreates it under a new id.
+            selectedContainer = id.flatMap { id in store.containers.first { $0.id == id } }
+        }
+    }
+
+    private var listColumn: some View {
+        List(selection: $selectedContainerID) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -179,14 +207,7 @@ struct ContainersView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredContainers, id: \.id) { container in
-                        NavigationLink {
-                            ContainerDetailView(
-                                container: container,
-                                scope: appModel.connectionScope,
-                                appModel: appModel,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: container.id) {
                             ContainerRow(container: container, hasUpdate: store.pendingUpdate(for: container) != nil)
                         }
                     }
