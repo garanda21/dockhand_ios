@@ -117,13 +117,11 @@ struct ContainersView: View {
     let appModel: AppModel
     let requestedFilter: ContainerListFilter
     let filterRequestRevision: Int
-    @State private var store = ContainersStore()
+    let store: ContainersStore
+    @Binding var selection: String?
     @State private var sort = ContainerListSort.name
     @State private var stateFilter = ContainerListFilter.all
     @State private var searchText = ""
-    @State private var selectedContainerID: String?
-    @State private var selectedContainer: Components.Schemas.Container?
-    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var filteredContainers: [Components.Schemas.Container] {
         let filtered = store.containers.filter {
@@ -156,32 +154,7 @@ struct ContainersView: View {
     }
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
-            listColumn
-        } detail: {
-            NavigationStack {
-                if let container = selectedContainer {
-                    ContainerDetailView(
-                        container: container,
-                        scope: appModel.connectionScope,
-                        appModel: appModel,
-                        store: store
-                    )
-                    .id(container.id)
-                } else {
-                    ContentUnavailableView("Select a container", systemImage: "shippingbox")
-                }
-            }
-        }
-        .onChange(of: selectedContainerID) { _, id in
-            // Keep the last resolved container so the detail survives an
-            // update that recreates it under a new id.
-            selectedContainer = id.flatMap { id in store.containers.first { $0.id == id } }
-        }
-    }
-
-    private var listColumn: some View {
-        List(selection: $selectedContainerID) {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -282,6 +255,35 @@ struct ContainersView: View {
             if isSelected {
                 Image(systemName: "checkmark")
             }
+        }
+    }
+}
+
+/// Detail column for the container selected in `ContainersView`.
+struct ContainerDetailColumn: View {
+    let appModel: AppModel
+    let store: ContainersStore
+    let selection: String?
+    // Keeps the last resolved container so the detail survives an update
+    // that recreates it under a new id.
+    @State private var container: Components.Schemas.Container?
+
+    var body: some View {
+        Group {
+            if let container {
+                ContainerDetailView(
+                    container: container,
+                    scope: appModel.connectionScope,
+                    appModel: appModel,
+                    store: store
+                )
+                .id(container.id)
+            } else {
+                ContentUnavailableView("Select a container", systemImage: "shippingbox")
+            }
+        }
+        .onChange(of: selection, initial: true) { _, id in
+            container = id.flatMap { id in store.containers.first { $0.id == id } }
         }
     }
 }

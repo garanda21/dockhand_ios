@@ -56,8 +56,67 @@ final class ServerDetailsStore {
     }
 }
 
+enum SettingsPane: Hashable {
+    case activeServer
+    case server(String)
+    case newServer
+    case about
+}
+
+/// Settings sections, shown as the content column of the root split view.
+struct SettingsList: View {
+    let appModel: AppModel
+    @Binding var selection: SettingsPane?
+
+    var body: some View {
+        List(selection: $selection) {
+            Section {
+                NavigationLink(value: SettingsPane.activeServer) {
+                    Label(String(localized: "Active server"), systemImage: "server.rack")
+                }
+            }
+
+            Section(String(localized: "Server library")) {
+                ForEach(appModel.serverProfiles) { profile in
+                    NavigationLink(value: SettingsPane.server(profile.id)) {
+                        SettingsSidebarServerRow(
+                            profile: profile,
+                            isActive: appModel.selectedProfileID == profile.id
+                        )
+                    }
+                }
+                NavigationLink(value: SettingsPane.newServer) {
+                    Label(String(localized: "Add server"), systemImage: "plus")
+                }
+            }
+
+            Section {
+                NavigationLink(value: SettingsPane.about) {
+                    Label(String(localized: "About"), systemImage: "info.circle")
+                }
+            }
+        }
+        .navigationTitle(String(localized: "Settings"))
+        .onChange(of: appModel.serverProfiles.map(\.id)) { oldIDs, newIDs in
+            // The server editor dismisses itself after save or delete, which is a
+            // no-op in a split detail column, so move the selection instead.
+            switch selection {
+            case .server(let id) where !newIDs.contains(id):
+                selection = .activeServer
+            case .newServer where newIDs.count > oldIDs.count:
+                selection = .activeServer
+            default:
+                break
+            }
+        }
+    }
+}
+
+/// Shows every settings section as cards, or a single section when `pane` is set
+/// by the root split view.
 struct SettingsView: View {
     let appModel: AppModel
+    var pane: SettingsPane?
 
     @State private var statusMessage: String?
     @State private var detailsStore = ServerDetailsStore()
@@ -68,6 +127,46 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        content
+            .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
+                await detailsStore.load(appModel: appModel)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch pane {
+        case nil:
+            allSections
+        case .server(let id):
+            ServerProfileDetailView(appModel: appModel, profileID: id)
+                .id(id)
+        case .newServer:
+            ServerProfileDetailView(appModel: appModel, profileID: nil)
+                .id("new")
+        case .about:
+            ScrollView {
+                aboutCard
+                    .padding()
+            }
+            .navigationTitle(String(localized: "About"))
+            .navigationBarTitleDisplayMode(.inline)
+        case .activeServer:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    activeServerCard
+                    if let statusMessage {
+                        statusCard(statusMessage)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle(String(localized: "Active server"))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var allSections: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 activeServerCard
@@ -86,9 +185,6 @@ struct SettingsView: View {
         }
         .navigationTitle(String(localized: "Settings"))
         .navigationBarTitleDisplayMode(.large)
-        .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
-            await detailsStore.load(appModel: appModel)
-        }
     }
 
     private var activeServerCard: some View {
@@ -531,6 +627,29 @@ struct SettingsView: View {
         Rectangle()
             .fill(.white.opacity(0.08))
             .frame(height: 1)
+    }
+}
+
+private struct SettingsSidebarServerRow: View {
+    let profile: DockhandServerProfile
+    let isActive: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(profile.name)
+                    .lineLimit(1)
+                if isActive {
+                    Text(String(localized: "ACTIVE"))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.blue)
+                }
+            }
+            Text(profile.baseURL)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 }
 

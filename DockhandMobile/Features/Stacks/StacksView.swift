@@ -3,12 +3,11 @@ import SwiftUI
 
 struct StacksView: View {
     let appModel: AppModel
-    @State private var store = StacksStore()
+    let store: StacksStore
+    @Binding var selection: String?
     @State private var sort = StackListSort.name
     @State private var stateFilter = DockhandStateFilter.all
     @State private var searchText = ""
-    @State private var selectedStackName: String?
-    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var filteredStacks: [Components.Schemas.StackSummary] {
         let filtered = store.stacks.filter {
@@ -38,27 +37,7 @@ struct StacksView: View {
     }
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
-            listColumn
-        } detail: {
-            NavigationStack {
-                if let stack = store.stacks.first(where: { $0.name == selectedStackName }) {
-                    StackEditorView(
-                        appModel: appModel,
-                        stack: stack,
-                        scope: appModel.connectionScope,
-                        store: store
-                    )
-                    .id(stack.name)
-                } else {
-                    ContentUnavailableView("Select a stack", systemImage: "square.3.layers.3d")
-                }
-            }
-        }
-    }
-
-    private var listColumn: some View {
-        List(selection: $selectedStackName) {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -149,6 +128,27 @@ struct StacksView: View {
             if isSelected {
                 Image(systemName: "checkmark")
             }
+        }
+    }
+}
+
+/// Detail column for the stack selected in `StacksView`.
+struct StackDetailColumn: View {
+    let appModel: AppModel
+    let store: StacksStore
+    let selection: String?
+
+    var body: some View {
+        if let stack = store.stacks.first(where: { $0.name == selection }) {
+            StackEditorView(
+                appModel: appModel,
+                stack: stack,
+                scope: appModel.connectionScope,
+                store: store
+            )
+            .id(stack.name)
+        } else {
+            ContentUnavailableView("Select a stack", systemImage: "square.3.layers.3d")
         }
     }
 }
@@ -859,6 +859,7 @@ private struct StackRedeploySheet: View {
             }
         }
         .presentationDetents([.height(380), .large], selection: $selectedDetent)
+        .presentationSizing(.form)
         .interactiveDismissDisabled(store.redeployStatus == .deploying)
         .onAppear {
             guard store.redeployStatus != .deploying else { return }

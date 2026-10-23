@@ -1342,6 +1342,7 @@ private struct ContainerChangesButton: View {
         }
         .sheet(item: $presentedNotes) { notes in
             ContainerChangesView(containerName: update.containerName, notes: notes)
+                .presentationSizing(.form)
         }
     }
 }

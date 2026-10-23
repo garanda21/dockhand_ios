@@ -3,13 +3,12 @@ import SwiftUI
 
 struct ImagesView: View {
     let appModel: AppModel
-    @State private var store = ImagesStore()
+    let store: ImagesStore
+    @Binding var selection: String?
     @State private var pullSheetPresented = false
     @State private var stateFilter = ImageStateFilter.all
     @State private var pruneConfirmation: ImagePruneMode?
     @State private var searchText = ""
-    @State private var selectedImageID: String?
-    @State private var preferredColumn = NavigationSplitViewColumn.sidebar
 
     private var repositoryUsage: [String: RepositoryImageUsage] {
         Dictionary(
@@ -31,27 +30,7 @@ struct ImagesView: View {
     }
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
-            listColumn
-        } detail: {
-            NavigationStack {
-                if let image = store.images.first(where: { $0.id == selectedImageID }) {
-                    ImageDetailView(
-                        image: image,
-                        scope: appModel.connectionScope,
-                        appModel: appModel,
-                        store: store
-                    )
-                    .id(image.id)
-                } else {
-                    ContentUnavailableView("Select an image", systemImage: "photo.stack")
-                }
-            }
-        }
-    }
-
-    private var listColumn: some View {
-        List(selection: $selectedImageID) {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -65,10 +44,12 @@ struct ImagesView: View {
                 }
             }
 
-            Section {
-                imageActionsPanel
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
+            if let actionMessage = store.listActionMessage {
+                Section {
+                    Label(actionMessage, systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Images") {
@@ -98,6 +79,51 @@ struct ImagesView: View {
         .searchable(text: $searchText, prompt: Text("Search images"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    pullSheetPresented = true
+                } label: {
+                    Label("Pull image", systemImage: "arrow.down.circle")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        pruneConfirmation = .danglingOnly
+                    } label: {
+                        Label("Prune", systemImage: "wand.and.stars.inverse")
+                    }
+                    Button(role: .destructive) {
+                        pruneConfirmation = .allUnused
+                    } label: {
+                        Label("Prune unused", systemImage: "wand.and.stars")
+                    }
+                } label: {
+                    if store.activeActionID == "prune" || store.activeActionID == "prune-unused" {
+                        ProgressView()
+                    } else {
+                        Label("Prune", systemImage: "wand.and.stars")
+                    }
+                }
+                .disabled(store.activeActionID == "prune" || store.activeActionID == "prune-unused")
+                // Attached to the menu so the popover arrow points at the toolbar button.
+                .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
+                    get: { pruneConfirmation != nil },
+                    set: { if !$0 { pruneConfirmation = nil } }
+                ), titleVisibility: .visible) {
+                    if let pruneConfirmation {
+                        Button(pruneConfirmation.confirmTitle, role: .destructive) {
+                            let danglingOnly = pruneConfirmation == .danglingOnly
+                            Task { await store.pruneImages(danglingOnly: danglingOnly, appModel: appModel) }
+                            self.pruneConfirmation = nil
+                        }
+                    }
+                } message: {
+                    Text(pruneConfirmation?.message ?? "")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     ForEach(ImageStateFilter.allCases) { filter in
                         Button {
@@ -114,20 +140,7 @@ struct ImagesView: View {
         .sheet(isPresented: $pullSheetPresented) {
             PullImageSheet(appModel: appModel, scope: appModel.connectionScope, store: store, actionScope: .list)
                 .presentationDetents([.large])
-        }
-        .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
-            get: { pruneConfirmation != nil },
-            set: { if !$0 { pruneConfirmation = nil } }
-        ), titleVisibility: .visible) {
-            if let pruneConfirmation {
-                Button(pruneConfirmation.confirmTitle, role: .destructive) {
-                    let danglingOnly = pruneConfirmation == .danglingOnly
-                    Task { await store.pruneImages(danglingOnly: danglingOnly, appModel: appModel) }
-                    self.pruneConfirmation = nil
-                }
-            }
-        } message: {
-            Text(pruneConfirmation?.message ?? "")
+                .presentationSizing(.form)
         }
         .overlay {
             if store.isLoading && store.images.isEmpty {
@@ -143,64 +156,6 @@ struct ImagesView: View {
         }
     }
 
-    private var imageActionsPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Image actions")
-                    .font(.headline)
-                Spacer()
-                if stateFilter != .all {
-                    Text(stateFilter.title)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let actionMessage = store.listActionMessage {
-                Label(actionMessage, systemImage: "checkmark.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                VStack(spacing: 12) {
-                    pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
-
-                    pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
-
-                    toolButton(
-                        title: String(localized: "Pull"),
-                        systemImage: "arrow.down.circle",
-                        tint: .blue,
-                        isProminent: true,
-                        height: 20
-                    ) {
-                        pullSheetPresented = true
-                    }
-                }
-
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
-                        pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
-
-                        pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
-                    }
-
-                    toolButton(
-                        title: String(localized: "Pull image"),
-                        systemImage: "arrow.down.circle",
-                        tint: .blue,
-                        isProminent: true,
-                        height: 20
-                    ) {
-                        pullSheetPresented = true
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
     @ViewBuilder
     private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
@@ -211,67 +166,26 @@ struct ImagesView: View {
             }
         }
     }
-
-    private func toolButton(
-        title: String,
-        systemImage: String,
-        tint: Color,
-        isProminent: Bool = false,
-        isRunning: Bool = false,
-        height: CGFloat = 44,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                if isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: systemImage)
-                }
-                Text(title)
-                    .lineLimit(1)
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-        }
-        .buttonStyle(isProminent ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.bordered))
-        .tint(tint)
-        .disabled(isRunning)
-    }
-
-    private func pruneButton(
-        _ mode: ImagePruneMode,
-        title: String,
-        systemImage: String,
-        tint: Color,
-        height: CGFloat,
-        isRunning: Bool
-    ) -> some View {
-        toolButton(
-            title: title,
-            systemImage: systemImage,
-            tint: tint,
-            isRunning: isRunning,
-            height: height
-        ) {
-            pruneConfirmation = mode
-        }
-    }
 }
 
-private struct AnyButtonStyle: PrimitiveButtonStyle {
-    private let makeBodyClosure: (Configuration) -> AnyView
+/// Detail column for the image selected in `ImagesView`.
+struct ImageDetailColumn: View {
+    let appModel: AppModel
+    let store: ImagesStore
+    let selection: String?
 
-    init<S: PrimitiveButtonStyle>(_ style: S) {
-        self.makeBodyClosure = { configuration in
-            AnyView(style.makeBody(configuration: configuration))
+    var body: some View {
+        if let image = store.images.first(where: { $0.id == selection }) {
+            ImageDetailView(
+                image: image,
+                scope: appModel.connectionScope,
+                appModel: appModel,
+                store: store
+            )
+            .id(image.id)
+        } else {
+            ContentUnavailableView("Select an image", systemImage: "photo.stack")
         }
-    }
-
-    func makeBody(configuration: Configuration) -> some View {
-        makeBodyClosure(configuration)
     }
 }
 
@@ -461,10 +375,12 @@ private struct ImageDetailView: View {
                 actionScope: .image(liveImage.id)
             )
                 .presentationDetents([.large])
+                .presentationSizing(.form)
         }
         .sheet(isPresented: $tagSheetPresented) {
             TagImageSheet(image: liveImage, scope: scope, appModel: appModel, store: store)
                 .presentationDetents([.medium])
+                .presentationSizing(.form)
         }
         .confirmationDialog("Delete image", isPresented: $deleteConfirmationPresented, titleVisibility: .visible) {
             Button("Delete image", role: .destructive) {
