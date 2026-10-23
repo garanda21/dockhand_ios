@@ -358,6 +358,10 @@ struct DashboardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var store = DashboardStore()
     @State private var backupsStore = BackupsStore()
+    @State private var contentWidth: CGFloat = 0
+
+    /// Measured width, not size class, so iPad splits and iPhone Duo panes adapt correctly.
+    private var isWideLayout: Bool { contentWidth >= 700 }
 
     private var dashboardLoadID: String {
         "\(appModel.selectedProfileID ?? "none"):\(appModel.selectedEnvironment?.id ?? -1):\(appModel.environments.count):\(appModel.dashboardRefreshRevision)"
@@ -385,6 +389,7 @@ struct DashboardView: View {
                 }
             }
             .padding()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         }
         .navigationTitle("Dockhand")
         .navigationBarTitleDisplayMode(.large)
@@ -454,12 +459,28 @@ struct DashboardView: View {
         snapshot: DashboardEnvironmentSnapshot,
         host: DashboardHostSnapshot?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            environmentHero(environment: environment, snapshot: snapshot, host: host)
-            healthBanner(snapshot: snapshot)
-            resourceSection(snapshot: snapshot)
-            statusTiles(snapshot: snapshot)
-            inventorySection(snapshot: snapshot, host: host)
+        Group {
+            if isWideLayout {
+                HStack(alignment: .top, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        environmentHero(environment: environment, snapshot: snapshot, host: host)
+                        healthBanner(snapshot: snapshot)
+                        resourceSection(snapshot: snapshot)
+                    }
+                    VStack(alignment: .leading, spacing: 16) {
+                        statusTiles(snapshot: snapshot)
+                        inventorySection(snapshot: snapshot, host: host)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    environmentHero(environment: environment, snapshot: snapshot, host: host)
+                    healthBanner(snapshot: snapshot)
+                    resourceSection(snapshot: snapshot)
+                    statusTiles(snapshot: snapshot)
+                    inventorySection(snapshot: snapshot, host: host)
+                }
+            }
         }
         .padding(20)
         .glassEffect(.regular.tint(.white.opacity(0.04)), in: .rect(cornerRadius: 24))

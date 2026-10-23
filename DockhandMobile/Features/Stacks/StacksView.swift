@@ -308,10 +308,7 @@ private struct StackEditorView: View {
                 }
             }
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                spacing: 10
-            ) {
+            AdaptiveActionGrid(itemCount: 6) {
                 stackActionButton(.start, "play.fill", String(localized: "Start"))
                 stackActionButton(.stop, "stop.fill", String(localized: "Stop"))
                 stackActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
@@ -746,10 +743,7 @@ private struct StackContainerCard: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-                spacing: 8
-            ) {
+            AdaptiveActionGrid(itemCount: 5, spacing: 8) {
                 stackContainerActionButton(.start, "play.fill", String(localized: "Start"))
                 stackContainerActionButton(.stop, "stop.fill", String(localized: "Stop"))
                 stackContainerActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))

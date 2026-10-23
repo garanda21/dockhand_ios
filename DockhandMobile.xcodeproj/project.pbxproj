@@ -39,6 +39,7 @@
 		E250B753CFA89B5B4699A38B /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 6C73308032173B848E282173 /* SwiftTerm */; };
 		E882AE90D8FD0104F7520724 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 125F5F1A04A3D953027B8DB4 /* Yams */; };
 		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
+		A1D4A7E25C0B4F6E9A3C2B11 /* AdaptiveActionGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D4A7E25C0B4F6E9A3C2B12 /* AdaptiveActionGrid.swift */; };
 		FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */; };
 /* End PBXBuildFile section */
 
@@ -72,6 +73,7 @@
 		6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DockhandService+Decoding.swift"; sourceTree = "<group>"; };
 		6ED8574F1769840BE2533DA4 /* StacksStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksStore.swift; sourceTree = "<group>"; };
 		87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentHeaderBar.swift; sourceTree = "<group>"; };
+		A1D4A7E25C0B4F6E9A3C2B12 /* AdaptiveActionGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveActionGrid.swift; sourceTree = "<group>"; };
 		956D5C8E99FCD80742BF586C /* DockhandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockhandRootView.swift; sourceTree = "<group>"; };
 		9F2FDC76CC6027751A0B547F /* DockhandAPI */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DockhandAPI; sourceTree = SOURCE_ROOT; };
 		A429AD5D837F77D7096E4664 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 			children = (
 				658C94BF66735EF772455033 /* ContainerLogsView.swift */,
 				87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */,
+				A1D4A7E25C0B4F6E9A3C2B12 /* AdaptiveActionGrid.swift */,
 				D4F56858EF25CC073EFD0846 /* Formatting.swift */,
 				4235237EFC10FBEF71895994 /* Shell */,
 				35AC0A8828C781207C5F87EA /* UserFacingError.swift */,
@@ -373,6 +376,7 @@
 				FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */,
 				5176FE99527E9678D2EE233E /* DockhandService.swift in Sources */,
 				F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */,
+				A1D4A7E25C0B4F6E9A3C2B11 /* AdaptiveActionGrid.swift in Sources */,
 				40B7D8CFB31E55631F043E6F /* Formatting.swift in Sources */,
 				824025456E8882C42DA3BD36 /* BackupsView.swift in Sources */,
 				A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */,

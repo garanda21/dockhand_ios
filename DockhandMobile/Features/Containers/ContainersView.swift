@@ -498,10 +498,7 @@ private struct ContainerDetailView: View {
             Text("Actions")
                 .font(.headline)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                spacing: 10
-            ) {
+            AdaptiveActionGrid(itemCount: 5) {
                 actionButton(.start, "play.fill", String(localized: "Start"))
                 actionButton(.stop, "stop.fill", String(localized: "Stop"))
                 actionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
