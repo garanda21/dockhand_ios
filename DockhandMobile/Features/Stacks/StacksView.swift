@@ -852,8 +852,8 @@ private struct StackRedeploySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if showsProgress && store.redeployStatus != .deploying {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Close") { dismiss() }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .close) { dismiss() }
                     }
                 }
             }

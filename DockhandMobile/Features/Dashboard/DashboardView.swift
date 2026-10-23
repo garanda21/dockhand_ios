@@ -1399,8 +1399,8 @@ private struct ContainerChangesView: View {
             .navigationTitle(containerName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "Done")) { dismiss() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .close) { dismiss() }
                 }
             }
         }

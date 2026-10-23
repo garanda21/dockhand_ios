@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Download an image from its registry into the selected environment." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descarga una imagen desde su registro al entorno seleccionado."
+          }
+        }
+      }
+    },
     "Select a container" : {
       "localizations" : {
         "es" : {
