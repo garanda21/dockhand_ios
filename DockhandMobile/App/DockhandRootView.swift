@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum DockhandSection: Hashable, CaseIterable {
+enum DockhandSection: Hashable, CaseIterable {
     case dashboard
     case containers
     case stacks
@@ -14,6 +14,16 @@ private enum DockhandSection: Hashable, CaseIterable {
         case .stacks: "Stacks"
         case .images: "Images"
         case .settings: "Settings"
+        }
+    }
+
+    var shortcut: KeyEquivalent {
+        switch self {
+        case .dashboard: "1"
+        case .containers: "2"
+        case .stacks: "3"
+        case .images: "4"
+        case .settings: "5"
         }
     }
 
@@ -56,6 +66,11 @@ struct DockhandRootView: View {
                 splitLayout
             }
         }
+        .focusedSceneValue(\.dockhandNavigation, DockhandNavigation(
+            section: section,
+            select: { section = $0 },
+            refresh: { appModel.requestDashboardRefresh() }
+        ))
         .task {
             if appModel.serverProfiles.isEmpty {
                 section = .settings
@@ -192,5 +207,36 @@ struct DockhandRootView: View {
         requestedContainerFilter = filter
         containerFilterRequestRevision &+= 1
         section = .containers
+    }
+}
+
+/// Scene actions exposed to the menu bar and the iPad keyboard shortcut overlay.
+struct DockhandNavigation {
+    let section: DockhandSection?
+    let select: (DockhandSection) -> Void
+    let refresh: () -> Void
+}
+
+extension FocusedValues {
+    @Entry var dockhandNavigation: DockhandNavigation?
+}
+
+struct DockhandCommands: Commands {
+    @FocusedValue(\.dockhandNavigation) private var navigation
+
+    var body: some Commands {
+        CommandMenu("Go") {
+            ForEach(DockhandSection.allCases, id: \.self) { item in
+                Button(item.title) { navigation?.select(item) }
+                    .keyboardShortcut(item.shortcut, modifiers: .command)
+                    .disabled(navigation == nil || navigation?.section == item)
+            }
+        }
+
+        CommandGroup(after: .toolbar) {
+            Button("Refresh") { navigation?.refresh() }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(navigation == nil)
+        }
     }
 }
