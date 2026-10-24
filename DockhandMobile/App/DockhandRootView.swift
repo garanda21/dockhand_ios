@@ -39,7 +39,8 @@ enum DockhandSection: Hashable, CaseIterable {
 }
 
 /// Regular width uses one three-column split view (sections, list, detail);
-/// compact width uses a tab bar with a navigation stack per tab.
+/// compact width uses a tab bar with a navigation stack per tab, so detail
+/// views are pushed once instead of living in a collapsed split view.
 struct DockhandRootView: View {
     @State private var appModel = AppModel()
     @State private var section: DockhandSection? = .dashboard
@@ -144,15 +145,30 @@ struct DockhandRootView: View {
             }
 
             Tab(DockhandSection.containers.title, systemImage: DockhandSection.containers.systemImage, value: .containers) {
-                NavigationSplitView { containersList } detail: { NavigationStack { containerDetail } }
+                NavigationStack {
+                    containersList
+                        .navigationDestination(item: $selectedContainerID) { id in
+                            ContainerDetailColumn(appModel: appModel, store: containersStore, selection: id)
+                        }
+                }
             }
 
             Tab(DockhandSection.stacks.title, systemImage: DockhandSection.stacks.systemImage, value: .stacks) {
-                NavigationSplitView { stacksList } detail: { NavigationStack { stackDetail } }
+                NavigationStack {
+                    stacksList
+                        .navigationDestination(item: $selectedStackName) { name in
+                            StackDetailColumn(appModel: appModel, store: stacksStore, selection: name)
+                        }
+                }
             }
 
             Tab(DockhandSection.images.title, systemImage: DockhandSection.images.systemImage, value: .images) {
-                NavigationSplitView { imagesList } detail: { NavigationStack { imageDetail } }
+                NavigationStack {
+                    imagesList
+                        .navigationDestination(item: $selectedImageID) { id in
+                            ImageDetailColumn(appModel: appModel, store: imagesStore, selection: id)
+                        }
+                }
             }
 
             Tab(DockhandSection.settings.title, systemImage: DockhandSection.settings.systemImage, value: .settings) {

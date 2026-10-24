@@ -28,6 +28,11 @@ enum DockhandUserFacingErrorFormatter {
             return true
         }
 
+        // OpenAPI client errors wrap a task cancellation as their underlying error.
+        if errorText(error).contains("underlying error: CancellationError()") {
+            return true
+        }
+
         return false
     }
 
