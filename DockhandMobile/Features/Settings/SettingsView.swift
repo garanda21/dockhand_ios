@@ -295,56 +295,56 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .accessibilityValue(isServerDetailsExpanded ? String(localized: "Expanded") : String(localized: "Collapsed"))
 
-            if !isServerDetailsExpanded {
-                EmptyView()
-            } else if let host = serverHost {
-                VStack(alignment: .leading, spacing: 14) {
-                    let dockhandRows = host.dockhand.map(dockhandDetailRows) ?? []
-                    if !dockhandRows.isEmpty {
+            if isServerDetailsExpanded {
+                if let host = serverHost {
+                    VStack(alignment: .leading, spacing: 14) {
+                        let dockhandRows = host.dockhand.map(dockhandDetailRows) ?? []
+                        if !dockhandRows.isEmpty {
+                            detailGroup(
+                                String(localized: "Dockhand"),
+                                systemImage: "server.rack",
+                                rows: dockhandRows
+                            )
+                            divider
+                        }
+
                         detailGroup(
-                            String(localized: "Dockhand"),
-                            systemImage: "server.rack",
-                            rows: dockhandRows
+                            String(localized: "Docker"),
+                            systemImage: "shippingbox",
+                            rows: [
+                                (String(localized: "Server"), host.docker.serverVersion),
+                                (String(localized: "Client"), host.docker.version),
+                                (String(localized: "API"), host.docker.apiVersion),
+                                (String(localized: "OS"), "\(host.docker.os) / \(host.docker.arch)"),
+                                (String(localized: "Kernel"), host.docker.kernelVersion),
+                                (String(localized: "Connection"), host.docker.connectionType.localizedConnectionTypeLabel)
+                            ]
                         )
+
                         divider
+
+                        detailGroup(
+                            String(localized: "Host"),
+                            systemImage: "desktopcomputer",
+                            rows: [
+                                (String(localized: "Name"), host.host.name),
+                                (String(localized: "CPU"), host.host.cpus.localizedCoresCountText),
+                                (String(localized: "Memory"), host.host.memory.dockhandByteCount),
+                                (String(localized: "Storage"), host.host.storageDriver)
+                            ]
+                        )
                     }
-
-                    detailGroup(
-                        String(localized: "Docker"),
-                        systemImage: "shippingbox",
-                        rows: [
-                            (String(localized: "Server"), host.docker.serverVersion),
-                            (String(localized: "Client"), host.docker.version),
-                            (String(localized: "API"), host.docker.apiVersion),
-                            (String(localized: "OS"), "\(host.docker.os) / \(host.docker.arch)"),
-                            (String(localized: "Kernel"), host.docker.kernelVersion),
-                            (String(localized: "Connection"), host.docker.connectionType.localizedConnectionTypeLabel)
-                        ]
-                    )
-
-                    divider
-
-                    detailGroup(
-                        String(localized: "Host"),
-                        systemImage: "desktopcomputer",
-                        rows: [
-                            (String(localized: "Name"), host.host.name),
-                            (String(localized: "CPU"), host.host.cpus.localizedCoresCountText),
-                            (String(localized: "Memory"), host.host.memory.dockhandByteCount),
-                            (String(localized: "Storage"), host.host.storageDriver)
-                        ]
-                    )
+                } else if let error = detailsStore.error {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(String(localized: "Select an environment to load server details."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            } else if let error = detailsStore.error {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(String(localized: "Select an environment to load server details."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(14)
@@ -403,10 +403,8 @@ struct SettingsView: View {
 
     private var aboutCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "About"))
-                    .font(.headline.weight(.semibold))
-            }
+            Text(String(localized: "About"))
+                .font(.headline.weight(.semibold))
 
             VStack(spacing: 10) {
                 aboutRow(String(localized: "Version"), systemImage: "info.circle") {
