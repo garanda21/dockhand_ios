@@ -88,6 +88,13 @@ struct DockhandRootView: View {
 
     @ViewBuilder
     private var splitLayout: some View {
+        splitColumns
+            // The sidebar footer shows the environment picker instead.
+            .environment(\.showsEnvironmentHeader, false)
+    }
+
+    @ViewBuilder
+    private var splitColumns: some View {
         if section == .dashboard {
             NavigationSplitView {
                 sectionList
@@ -112,6 +119,12 @@ struct DockhandRootView: View {
             }
         }
         .navigationTitle("Dockhand")
+        .safeAreaInset(edge: .bottom) {
+            EnvironmentHeaderBar(appModel: appModel)
+                .environment(\.showsEnvironmentHeader, true)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+        }
     }
 
     @ViewBuilder

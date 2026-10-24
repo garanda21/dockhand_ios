@@ -1,10 +1,22 @@
 import DockhandAPI
 import SwiftUI
 
+extension EnvironmentValues {
+    /// False where the layout shows the header elsewhere, such as the iPad sidebar footer.
+    @Entry var showsEnvironmentHeader = true
+}
+
 struct EnvironmentHeaderBar: View {
     let appModel: AppModel
+    @Environment(\.showsEnvironmentHeader) private var showsEnvironmentHeader
 
     var body: some View {
+        if showsEnvironmentHeader {
+            header
+        }
+    }
+
+    private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Side by side when it fits; stack the picker below on narrow widths (iPhone Duo folded).
             ViewThatFits(in: .horizontal) {
