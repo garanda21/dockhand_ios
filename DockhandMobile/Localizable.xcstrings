@@ -1,6 +1,26 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Show server picker in header" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar selector de servidor en la cabecera"
+          }
+        }
+      }
+    },
+    "Servers" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servidores"
+          }
+        }
+      }
+    },
     "Go" : {
       "localizations" : {
         "es" : {
