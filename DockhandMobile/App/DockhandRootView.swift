@@ -38,9 +38,9 @@ enum DockhandSection: Hashable, CaseIterable {
     }
 }
 
-/// Regular width uses one three-column split view (sections, list, detail);
-/// compact width uses a tab bar with a navigation stack per tab, so detail
-/// views are pushed once instead of living in a collapsed split view.
+/// A sidebar-adaptable tab view: a bottom tab bar on iPhone, a top tab bar
+/// that converts into a sidebar on iPad and Mac. List tabs push their detail
+/// on compact width and show list and detail side by side otherwise.
 struct DockhandRootView: View {
     @State private var appModel = AppModel()
     @State private var section: DockhandSection? = .dashboard
@@ -60,13 +60,7 @@ struct DockhandRootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .compact {
-                tabLayout
-            } else {
-                splitLayout
-            }
-        }
+        tabLayout
         .focusedSceneValue(\.dockhandNavigation, DockhandNavigation(
             section: section,
             select: { section = $0 },
@@ -84,59 +78,7 @@ struct DockhandRootView: View {
         }
     }
 
-    // MARK: Regular width
-
-    @ViewBuilder
-    private var splitLayout: some View {
-        if section == .dashboard {
-            NavigationSplitView {
-                sectionList
-            } detail: {
-                NavigationStack { dashboard }
-            }
-        } else {
-            NavigationSplitView {
-                sectionList
-            } content: {
-                contentColumn
-            } detail: {
-                NavigationStack { detailColumn }
-            }
-        }
-    }
-
-    private var sectionList: some View {
-        List(DockhandSection.allCases, id: \.self, selection: $section) { item in
-            NavigationLink(value: item) {
-                Label(item.title, systemImage: item.systemImage)
-            }
-        }
-        .navigationTitle("Dockhand")
-    }
-
-    @ViewBuilder
-    private var contentColumn: some View {
-        switch section {
-        case .containers: containersList
-        case .stacks: stacksList
-        case .images: imagesList
-        case .settings: SettingsList(appModel: appModel, selection: $settingsPane)
-        case .dashboard, nil: EmptyView()
-        }
-    }
-
-    @ViewBuilder
-    private var detailColumn: some View {
-        switch section {
-        case .containers: containerDetail
-        case .stacks: stackDetail
-        case .images: imageDetail
-        case .settings: SettingsView(appModel: appModel, pane: settingsPane ?? .activeServer)
-        case .dashboard, nil: EmptyView()
-        }
-    }
-
-    // MARK: Compact width
+    // MARK: Tabs
 
     private var tabLayout: some View {
         TabView(selection: Binding(get: { section ?? .dashboard }, set: { section = $0 })) {
@@ -145,34 +87,65 @@ struct DockhandRootView: View {
             }
 
             Tab(DockhandSection.containers.title, systemImage: DockhandSection.containers.systemImage, value: .containers) {
-                NavigationStack {
+                listTab(selection: $selectedContainerID) {
                     containersList
-                        .navigationDestination(item: $selectedContainerID) { id in
-                            ContainerDetailColumn(appModel: appModel, store: containersStore, selection: id)
-                        }
+                } detail: { id in
+                    ContainerDetailColumn(appModel: appModel, store: containersStore, selection: id)
                 }
             }
 
             Tab(DockhandSection.stacks.title, systemImage: DockhandSection.stacks.systemImage, value: .stacks) {
-                NavigationStack {
+                listTab(selection: $selectedStackName) {
                     stacksList
-                        .navigationDestination(item: $selectedStackName) { name in
-                            StackDetailColumn(appModel: appModel, store: stacksStore, selection: name)
-                        }
+                } detail: { name in
+                    StackDetailColumn(appModel: appModel, store: stacksStore, selection: name)
                 }
             }
 
             Tab(DockhandSection.images.title, systemImage: DockhandSection.images.systemImage, value: .images) {
-                NavigationStack {
+                listTab(selection: $selectedImageID) {
                     imagesList
-                        .navigationDestination(item: $selectedImageID) { id in
-                            ImageDetailColumn(appModel: appModel, store: imagesStore, selection: id)
-                        }
+                } detail: { id in
+                    ImageDetailColumn(appModel: appModel, store: imagesStore, selection: id)
                 }
             }
 
             Tab(DockhandSection.settings.title, systemImage: DockhandSection.settings.systemImage, value: .settings) {
-                NavigationStack { SettingsView(appModel: appModel) }
+                if horizontalSizeClass == .compact {
+                    NavigationStack { SettingsView(appModel: appModel) }
+                } else {
+                    NavigationSplitView {
+                        SettingsList(appModel: appModel, selection: $settingsPane)
+                            .toolbar(removing: .sidebarToggle)
+                            .toolbarTitleDisplayMode(.large)
+                    } detail: {
+                        NavigationStack { SettingsView(appModel: appModel, pane: settingsPane ?? .activeServer) }
+                    }
+                }
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+    }
+
+    /// Pushes the detail on compact width; shows list and detail side by side otherwise.
+    @ViewBuilder
+    private func listTab<List: View, Detail: View>(
+        selection: Binding<String?>,
+        @ViewBuilder list: () -> List,
+        @ViewBuilder detail: @escaping (String?) -> Detail
+    ) -> some View {
+        if horizontalSizeClass == .compact {
+            NavigationStack {
+                list()
+                    .navigationDestination(item: selection) { detail($0) }
+            }
+        } else {
+            NavigationSplitView {
+                list()
+                    .toolbar(removing: .sidebarToggle)
+                    .toolbarTitleDisplayMode(.large)
+            } detail: {
+                NavigationStack { detail(selection.wrappedValue) }
             }
         }
     }
