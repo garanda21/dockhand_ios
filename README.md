@@ -9,9 +9,17 @@ It is built for people who run containers across multiple Dockhand environments 
 > [Dockhand](https://github.com/Finsys/dockhand). It is not affiliated with,
 > endorsed by, or maintained by the official Dockhand project or its maintainers.
 
+## Download
+
+Dockhand Mobile is available for free on the App Store.
+
+<a href="https://apps.apple.com/app/id6785576410">
+  <img src="docs/images/download-on-the-app-store.svg" alt="Download on the App Store" height="50">
+</a>
+
 ## TestFlight
 
-You can try the latest beta build on TestFlight here:
+Want new features before they reach the App Store? You can try the latest beta build on TestFlight here:
 
 [Join Dockhand iOS on TestFlight](https://testflight.apple.com/join/FFE3aDxR)
 

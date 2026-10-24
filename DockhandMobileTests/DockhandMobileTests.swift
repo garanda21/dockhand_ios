@@ -1095,3 +1095,17 @@ private final class GitDeploymentURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func stopLoading() {}
 }
+
+final class ListSearchTests: XCTestCase {
+    func testEmptyQueryMatchesEverything() {
+        XCTAssertTrue("".isSearchMatch(in: ["nginx"]))
+        XCTAssertTrue("   ".isSearchMatch(in: []))
+    }
+
+    func testMatchesAnyFieldIgnoringCaseAndDiacritics() {
+        XCTAssertTrue("NGINX".isSearchMatch(in: ["web", "nginx:latest"]))
+        XCTAssertTrue(" proxy ".isSearchMatch(in: ["reverse-proxy"]))
+        XCTAssertTrue("cafe".isSearchMatch(in: ["Café"]))
+        XCTAssertFalse("redis".isSearchMatch(in: ["postgres", "nginx"]))
+    }
+}

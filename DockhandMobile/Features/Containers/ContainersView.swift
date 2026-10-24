@@ -120,9 +120,12 @@ struct ContainersView: View {
     @State private var store = ContainersStore()
     @State private var sort = ContainerListSort.name
     @State private var stateFilter = ContainerListFilter.all
+    @State private var searchText = ""
 
     private var filteredContainers: [Components.Schemas.Container] {
-        let filtered = store.containers.filter { stateFilter.matches($0) }
+        let filtered = store.containers.filter {
+            stateFilter.matches($0) && searchText.isSearchMatch(in: [$0.name, $0.image])
+        }
         switch sort {
         case .name:
             return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -167,7 +170,9 @@ struct ContainersView: View {
             Section("Containers") {
                 if filteredContainers.isEmpty {
                     Text(
-                        stateFilter == .all
+                        !searchText.trimmed.isEmpty
+                            ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
+                            : stateFilter == .all
                             ? String(localized: "No containers")
                             : String(format: String(localized: "No containers in %@"), locale: Locale.current, stateFilter.title)
                     )
@@ -190,6 +195,7 @@ struct ContainersView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Containers")
+        .searchable(text: $searchText, prompt: Text("Search containers"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
