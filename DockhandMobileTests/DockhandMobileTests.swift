@@ -579,7 +579,7 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertEqual(configuration.timeoutIntervalForResource, 120)
     }
 
-    func testAppTransportSecurityAllowsHTTPForLiteralIPAddresses() throws {
+    func testAppTransportSecurityAllowsHTTPForLiteralIPAddressesAndTailscale() throws {
         let transportSecurity = try XCTUnwrap(
             Bundle.main.object(forInfoDictionaryKey: "NSAppTransportSecurity") as? [String: Any]
         )
@@ -589,11 +589,12 @@ final class DockhandMobileTests: XCTestCase {
 
         XCTAssertEqual(
             Set(exceptions.keys),
-            ["0.0.0.0/0", "::/0"]
+            ["0.0.0.0/0", "::/0", "ts.net"]
         )
         XCTAssertTrue(exceptions.values.allSatisfy {
             $0["NSExceptionAllowsInsecureHTTPLoads"] as? Bool == true
         })
+        XCTAssertEqual(exceptions["ts.net"]?["NSIncludesSubdomains"] as? Bool, true)
         XCTAssertNil(transportSecurity["NSAllowsArbitraryLoads"])
     }
 
