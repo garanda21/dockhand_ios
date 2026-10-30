@@ -32,9 +32,9 @@ final class StacksStore {
             return
         }
 
+        // Keep the current list while refreshing so an open stack editor is not torn down.
         isLoading = true
         error = nil
-        stacks = []
         defer { isLoading = false }
 
         do {

@@ -3,7 +3,8 @@ import SwiftUI
 
 struct ImagesView: View {
     let appModel: AppModel
-    @State private var store = ImagesStore()
+    let store: ImagesStore
+    @Binding var selection: String?
     @State private var pullSheetPresented = false
     @State private var stateFilter = ImageStateFilter.all
     @State private var pruneConfirmation: ImagePruneMode?
@@ -29,7 +30,7 @@ struct ImagesView: View {
     }
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -43,10 +44,12 @@ struct ImagesView: View {
                 }
             }
 
-            Section {
-                imageActionsPanel
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
+            if let actionMessage = store.listActionMessage {
+                Section {
+                    Label(actionMessage, systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Images") {
@@ -61,14 +64,7 @@ struct ImagesView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredImages, id: \.id) { image in
-                        NavigationLink {
-                            ImageDetailView(
-                                image: image,
-                                scope: appModel.connectionScope,
-                                appModel: appModel,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: image.id) {
                             ImageRow(
                                 image: image,
                                 usage: repositoryUsage[image.repositoryKey]
@@ -82,6 +78,51 @@ struct ImagesView: View {
         .navigationTitle("Images")
         .searchable(text: $searchText, prompt: Text("Search images"))
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    pullSheetPresented = true
+                } label: {
+                    Label("Pull image", systemImage: "arrow.down.circle")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        pruneConfirmation = .danglingOnly
+                    } label: {
+                        Label("Prune", systemImage: "wand.and.stars.inverse")
+                    }
+                    Button(role: .destructive) {
+                        pruneConfirmation = .allUnused
+                    } label: {
+                        Label("Prune unused", systemImage: "wand.and.stars")
+                    }
+                } label: {
+                    if store.activeActionID == "prune" || store.activeActionID == "prune-unused" {
+                        ProgressView()
+                    } else {
+                        Label("Prune", systemImage: "wand.and.stars")
+                    }
+                }
+                .disabled(store.activeActionID == "prune" || store.activeActionID == "prune-unused")
+                // Attached to the menu so the popover arrow points at the toolbar button.
+                .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
+                    get: { pruneConfirmation != nil },
+                    set: { if !$0 { pruneConfirmation = nil } }
+                ), titleVisibility: .visible) {
+                    if let pruneConfirmation {
+                        Button(pruneConfirmation.confirmTitle, role: .destructive) {
+                            let danglingOnly = pruneConfirmation == .danglingOnly
+                            Task { await store.pruneImages(danglingOnly: danglingOnly, appModel: appModel) }
+                            self.pruneConfirmation = nil
+                        }
+                    }
+                } message: {
+                    Text(pruneConfirmation?.message ?? "")
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     ForEach(ImageStateFilter.allCases) { filter in
@@ -98,21 +139,6 @@ struct ImagesView: View {
         }
         .sheet(isPresented: $pullSheetPresented) {
             PullImageSheet(appModel: appModel, scope: appModel.connectionScope, store: store, actionScope: .list)
-                .presentationDetents([.large])
-        }
-        .confirmationDialog(pruneConfirmation?.title ?? "", isPresented: Binding(
-            get: { pruneConfirmation != nil },
-            set: { if !$0 { pruneConfirmation = nil } }
-        ), titleVisibility: .visible) {
-            if let pruneConfirmation {
-                Button(pruneConfirmation.confirmTitle, role: .destructive) {
-                    let danglingOnly = pruneConfirmation == .danglingOnly
-                    Task { await store.pruneImages(danglingOnly: danglingOnly, appModel: appModel) }
-                    self.pruneConfirmation = nil
-                }
-            }
-        } message: {
-            Text(pruneConfirmation?.message ?? "")
         }
         .overlay {
             if store.isLoading && store.images.isEmpty {
@@ -128,64 +154,6 @@ struct ImagesView: View {
         }
     }
 
-    private var imageActionsPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Image actions")
-                    .font(.headline)
-                Spacer()
-                if stateFilter != .all {
-                    Text(stateFilter.title)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let actionMessage = store.listActionMessage {
-                Label(actionMessage, systemImage: "checkmark.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                VStack(spacing: 12) {
-                    pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
-
-                    pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
-
-                    toolButton(
-                        title: String(localized: "Pull"),
-                        systemImage: "arrow.down.circle",
-                        tint: .blue,
-                        isProminent: true,
-                        height: 20
-                    ) {
-                        pullSheetPresented = true
-                    }
-                }
-
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
-                        pruneButton(.danglingOnly, title: String(localized: "Prune"), systemImage: "wand.and.stars.inverse", tint: .primary, height: 20, isRunning: store.activeActionID == "prune")
-
-                        pruneButton(.allUnused, title: String(localized: "Prune unused"), systemImage: "wand.and.stars", tint: .orange, height: 20, isRunning: store.activeActionID == "prune-unused")
-                    }
-
-                    toolButton(
-                        title: String(localized: "Pull image"),
-                        systemImage: "arrow.down.circle",
-                        tint: .blue,
-                        isProminent: true,
-                        height: 20
-                    ) {
-                        pullSheetPresented = true
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
     @ViewBuilder
     private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
@@ -196,67 +164,26 @@ struct ImagesView: View {
             }
         }
     }
-
-    private func toolButton(
-        title: String,
-        systemImage: String,
-        tint: Color,
-        isProminent: Bool = false,
-        isRunning: Bool = false,
-        height: CGFloat = 44,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                if isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: systemImage)
-                }
-                Text(title)
-                    .lineLimit(1)
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-        }
-        .buttonStyle(isProminent ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.bordered))
-        .tint(tint)
-        .disabled(isRunning)
-    }
-
-    private func pruneButton(
-        _ mode: ImagePruneMode,
-        title: String,
-        systemImage: String,
-        tint: Color,
-        height: CGFloat,
-        isRunning: Bool
-    ) -> some View {
-        toolButton(
-            title: title,
-            systemImage: systemImage,
-            tint: tint,
-            isRunning: isRunning,
-            height: height
-        ) {
-            pruneConfirmation = mode
-        }
-    }
 }
 
-private struct AnyButtonStyle: PrimitiveButtonStyle {
-    private let makeBodyClosure: (Configuration) -> AnyView
+/// Detail column for the image selected in `ImagesView`.
+struct ImageDetailColumn: View {
+    let appModel: AppModel
+    let store: ImagesStore
+    let selection: String?
 
-    init<S: PrimitiveButtonStyle>(_ style: S) {
-        self.makeBodyClosure = { configuration in
-            AnyView(style.makeBody(configuration: configuration))
+    var body: some View {
+        if let image = store.images.first(where: { $0.id == selection }) {
+            ImageDetailView(
+                image: image,
+                scope: appModel.connectionScope,
+                appModel: appModel,
+                store: store
+            )
+            .id(image.id)
+        } else {
+            ContentUnavailableView("Select an image", systemImage: "photo.stack")
         }
-    }
-
-    func makeBody(configuration: Configuration) -> some View {
-        makeBodyClosure(configuration)
     }
 }
 
@@ -445,11 +372,11 @@ private struct ImageDetailView: View {
                 suggestedName: liveImage.displayName,
                 actionScope: .image(liveImage.id)
             )
-                .presentationDetents([.large])
         }
         .sheet(isPresented: $tagSheetPresented) {
             TagImageSheet(image: liveImage, scope: scope, appModel: appModel, store: store)
                 .presentationDetents([.medium])
+                .presentationSizing(.form)
         }
         .confirmationDialog("Delete image", isPresented: $deleteConfirmationPresented, titleVisibility: .visible) {
             Button("Delete image", role: .destructive) {
@@ -829,25 +756,22 @@ private struct PullImageSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var imageName = ""
     @State private var pullTask: Task<Void, Never>?
+    @State private var selectedDetent: PresentationDetent = .height(320)
 
     private var effectiveImageName: String {
         (imageName.isEmpty ? suggestedName : imageName).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var showsProgress: Bool { store.pullStatus != .idle }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    imageField
-
-                    if store.pullStatus != .idle {
-                        pullSummary
-
-                        if !store.pullLayers.isEmpty {
-                            layersPanel
-                        }
-
-                        outputPanel
+                Group {
+                    if showsProgress {
+                        pullProgress
+                    } else {
+                        pullConfiguration
                     }
                 }
                 .padding()
@@ -855,86 +779,116 @@ private struct PullImageSheet: View {
             .navigationTitle("Pull image")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(store.pullStatus == .pulling ? String(localized: "Cancel") : String(localized: "Close")) {
-                        if store.pullStatus == .pulling {
-                            pullTask?.cancel()
-                        } else {
-                            dismiss()
-                        }
+                if store.pullStatus == .pulling {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .cancel) { pullTask?.cancel() }
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if store.pullStatus != .complete && store.pullStatus != .pulling {
-                        Button(store.pullStatus == .idle ? String(localized: "Pull") : String(localized: "Retry")) {
-                            startPull()
-                        }
-                        .disabled(effectiveImageName.isEmpty || !appModel.isCurrentScope(scope))
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .close) { dismiss() }
                     }
                 }
             }
         }
+        .presentationDetents([.height(320), .large], selection: $selectedDetent)
+        .presentationSizing(.form)
         .interactiveDismissDisabled(store.pullStatus == .pulling)
         .onAppear {
             if imageName.isEmpty {
                 imageName = suggestedName
             }
             store.resetPullProgress()
+            selectedDetent = .height(320)
+        }
+        .onChange(of: showsProgress) { _, isShowing in
+            if isShowing { selectedDetent = .large }
         }
         .onDisappear {
             pullTask?.cancel()
         }
     }
 
-    private var imageField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Image name")
-                .font(.headline)
-            TextField("nginx:latest", text: $imageName)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-                .disabled(store.pullStatus == .pulling)
-                .onSubmit { startPull() }
+    private var pullConfiguration: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Download an image from its registry into the selected environment.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Image(systemName: "shippingbox")
+                        .foregroundStyle(.secondary)
+                    TextField("nginx:latest", text: $imageName)
+                        .font(.body.monospaced())
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.go)
+                        .onSubmit { startPull() }
+                }
+                .padding(16)
+                .background(.fill.tertiary, in: .rect(cornerRadius: 20))
+
+                Label(appModel.selectedEnvironmentName, systemImage: "globe")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
+
+            if !appModel.isCurrentScope(scope) {
+                Text("Server or environment changed. Go back and reopen this image before running actions.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+
+            Button(action: startPull) {
+                Label("Pull", systemImage: "arrow.down.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(effectiveImageName.isEmpty || !appModel.isCurrentScope(scope))
         }
     }
 
-    private var pullSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var pullProgress: some View {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 summaryIcon
-
-                Text(summaryTitle)
-                    .font(.headline)
-                    .foregroundStyle(summaryColor)
-
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(summaryTitle)
+                        .font(.headline)
+                        .foregroundStyle(summaryColor)
+                    Text(effectiveImageName)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 Spacer()
-
                 if !store.pullLayers.isEmpty {
                     Text("\(store.completedPullLayerCount) / \(store.pullLayers.count) layers")
                         .font(.caption.weight(.medium))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.quaternary, in: .capsule)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
             }
 
             if store.pullStatus == .pulling, !store.pullLayers.isEmpty {
-                ProgressView(value: store.pullProgress)
-                    .tint(.blue)
-            }
-
-            if store.pullTotalBytes > 0 {
-                Text(
-                    String(
-                        format: String(localized: "Downloaded: %@ / %@"),
-                        locale: .current,
-                        formattedBytes(store.pullDownloadedBytes),
-                        formattedBytes(store.pullTotalBytes)
-                    )
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: store.pullProgress)
+                    if store.pullTotalBytes > 0 {
+                        Text(
+                            String(
+                                format: String(localized: "Downloaded: %@ / %@"),
+                                locale: .current,
+                                formattedBytes(store.pullDownloadedBytes),
+                                formattedBytes(store.pullTotalBytes)
+                            )
+                        )
+                        .font(.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             if let message = store.pullStatusMessage {
@@ -948,36 +902,37 @@ private struct PullImageSheet: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             }
+
+            if !store.pullLayers.isEmpty {
+                layersPanel
+            }
+
+            if !store.pullOutput.isEmpty {
+                outputPanel
+            }
+
+            if store.pullStatus == .failed || store.pullStatus == .cancelled {
+                Button(action: startPull) {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(!appModel.isCurrentScope(scope))
+            }
         }
     }
 
     private var layersPanel: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Layer ID")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Status")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Progress")
-                    .frame(width: 72, alignment: .trailing)
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(12)
-            .background(.quaternary)
-
             ForEach(store.pullLayers.sorted(using: KeyPathComparator(\.order))) { layer in
                 PullImageLayerRow(layer: layer)
                 if layer.id != store.pullLayers.last?.id {
                     Divider()
+                        .padding(.leading, 16)
                 }
             }
         }
-        .clipShape(.rect(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.quaternary)
-        }
+        .background(.fill.tertiary, in: .rect(cornerRadius: 20))
     }
 
     private var outputPanel: some View {
@@ -1071,28 +1026,30 @@ private struct PullImageLayerRow: View {
     private var isActive: Bool { statusLower.contains("downloading") || isExtracting }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(layer.id)
-                .font(.caption2.monospaced())
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Label {
-                Text(layer.status)
-                    .lineLimit(2)
-            } icon: {
+        HStack(spacing: 12) {
+            Group {
                 if layer.isComplete {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
                     ProgressView()
-                        .controlSize(.mini)
+                        .controlSize(.small)
                         .tint(isExtracting ? .orange : .blue)
                 }
             }
-            .font(.caption)
-            .foregroundStyle(layer.isComplete ? .green : isExtracting ? .orange : .primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(layer.id)
+                    .font(.footnote.monospaced())
+                    .lineLimit(1)
+                Text(layer.status)
+                    .font(.caption)
+                    .foregroundStyle(isExtracting ? .orange : .secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
 
             Group {
                 if layer.isComplete {
@@ -1105,10 +1062,11 @@ private struct PullImageLayerRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .font(.caption)
-            .frame(width: 72, alignment: .trailing)
+            .font(.caption.weight(.medium))
+            .monospacedDigit()
         }
-        .padding(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -1136,7 +1094,7 @@ private struct TagImageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

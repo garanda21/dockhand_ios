@@ -6,5 +6,6 @@ struct DockhandMobileApp: App {
         WindowGroup {
             DockhandRootView()
         }
+        .commands { DockhandCommands() }
     }
 }

@@ -56,18 +56,148 @@ final class ServerDetailsStore {
     }
 }
 
+enum SettingsPane: Hashable {
+    case activeServer
+    case server(String)
+}
+
+/// Settings sections, shown as the content column of the root split view.
+struct SettingsList: View {
+    let appModel: AppModel
+    @Binding var selection: SettingsPane?
+    @State private var isAddingServer = false
+
+    private var appVersionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
+    var body: some View {
+        List(selection: $selection) {
+            Section {
+                NavigationLink(value: SettingsPane.activeServer) {
+                    Label(String(localized: "Active server"), systemImage: "server.rack")
+                }
+            }
+
+            Section(String(localized: "Servers")) {
+                ForEach(appModel.serverProfiles) { profile in
+                    NavigationLink(value: SettingsPane.server(profile.id)) {
+                        SettingsSidebarServerRow(
+                            profile: profile,
+                            isActive: appModel.selectedProfileID == profile.id
+                        )
+                    }
+                }
+            }
+
+            Section(String(localized: "About")) {
+                LabeledContent {
+                    Text(verbatim: appVersionText)
+                        .monospacedDigit()
+                } label: {
+                    Label(String(localized: "Version"), systemImage: "info.circle")
+                }
+                aboutLink(String(localized: "Send feedback"), systemImage: "bubble.left.and.exclamationmark.bubble.right", url: URL(string: "https://github.com/garanda21/dockhand_ios/issues")!)
+                aboutLink(String(localized: "Source code"), systemImage: "chevron.left.forwardslash.chevron.right", url: URL(string: "https://github.com/garanda21/dockhand_ios")!)
+                aboutLink(String(localized: "Privacy policy"), systemImage: "hand.raised", url: URL(string: "https://github.com/garanda21/dockhand_ios/blob/main/PRIVACY.md")!)
+            }
+        }
+        .navigationTitle(String(localized: "Settings"))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isAddingServer = true
+                } label: {
+                    Label(String(localized: "Add server"), systemImage: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $isAddingServer) {
+            NavigationStack {
+                ServerProfileDetailView(appModel: appModel, profileID: nil)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(role: .cancel) { isAddingServer = false }
+                        }
+                    }
+            }
+            .presentationSizing(.form)
+        }
+        .onChange(of: appModel.serverProfiles.map(\.id)) { _, newIDs in
+            // The server editor dismisses itself after save or delete, which is a
+            // no-op in a split detail column, so move the selection instead.
+            switch selection {
+            case .server(let id) where !newIDs.contains(id):
+                selection = .activeServer
+            default:
+                break
+            }
+        }
+    }
+
+    private func aboutLink(_ title: String, systemImage: String, url: URL) -> some View {
+        Link(destination: url) {
+            LabeledContent {
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } label: {
+                Label(title, systemImage: systemImage)
+            }
+        }
+        .foregroundStyle(.primary)
+    }
+}
+
+/// Shows every settings section as cards, or a single section when `pane` is set
+/// by the root split view.
 struct SettingsView: View {
     let appModel: AppModel
+    var pane: SettingsPane?
 
     @State private var statusMessage: String?
     @State private var detailsStore = ServerDetailsStore()
     @State private var isServerDetailsExpanded = false
+    @AppStorage(EnvironmentHeaderBar.serverPickerKey) private var showsServerPickerInHeader = false
 
     private var serverHost: DashboardHostSnapshot? {
         detailsStore.loadedScopeID == appModel.connectionScopeID ? detailsStore.host : nil
     }
 
     var body: some View {
+        content
+            .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
+                await detailsStore.load(appModel: appModel)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch pane {
+        case nil:
+            allSections
+        case .server(let id):
+            ServerProfileDetailView(appModel: appModel, profileID: id)
+                .id(id)
+        case .activeServer:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    activeServerCard
+                    if let statusMessage {
+                        statusCard(statusMessage)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle(String(localized: "Active server"))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var allSections: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 activeServerCard
@@ -86,9 +216,6 @@ struct SettingsView: View {
         }
         .navigationTitle(String(localized: "Settings"))
         .navigationBarTitleDisplayMode(.large)
-        .task(id: ServerDetailsStore.loadID(appModel: appModel)) {
-            await detailsStore.load(appModel: appModel)
-        }
     }
 
     private var activeServerCard: some View {
@@ -97,9 +224,6 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(String(localized: "Active server"))
                         .font(.headline.weight(.semibold))
-                    Text(String(localized: "Quick context and switching."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 12)
@@ -186,7 +310,6 @@ struct SettingsView: View {
 
                     HStack(spacing: 10) {
                         serverSwitcherMenu
-                        //infoChip("Environment", appModel.selectedEnvironmentName, systemImage: "globe")
                         Button {
                             Task {
                                 await appModel.refreshEnvironments(forceEnvironmentReset: false)
@@ -199,8 +322,10 @@ struct SettingsView: View {
                                 .frame(maxWidth: 60, maxHeight: 50)
                         }
                         .buttonStyle(.glass)
-                            
                     }
+
+                    Toggle(String(localized: "Show server picker in header"), isOn: $showsServerPickerInHeader)
+                        .font(.subheadline)
 
                     serverDetailsDisclosure
                 }
@@ -529,6 +654,31 @@ struct SettingsView: View {
         Rectangle()
             .fill(.white.opacity(0.08))
             .frame(height: 1)
+    }
+}
+
+private struct SettingsSidebarServerRow: View {
+    let profile: DockhandServerProfile
+    let isActive: Bool
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(profile.name)
+                    .lineLimit(1)
+                Text(profile.baseURL)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if isActive {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .accessibilityLabel(String(localized: "Active server"))
+            }
+        }
     }
 }
 

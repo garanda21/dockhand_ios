@@ -117,7 +117,8 @@ struct ContainersView: View {
     let appModel: AppModel
     let requestedFilter: ContainerListFilter
     let filterRequestRevision: Int
-    @State private var store = ContainersStore()
+    let store: ContainersStore
+    @Binding var selection: String?
     @State private var sort = ContainerListSort.name
     @State private var stateFilter = ContainerListFilter.all
     @State private var searchText = ""
@@ -153,7 +154,7 @@ struct ContainersView: View {
     }
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -179,14 +180,7 @@ struct ContainersView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredContainers, id: \.id) { container in
-                        NavigationLink {
-                            ContainerDetailView(
-                                container: container,
-                                scope: appModel.connectionScope,
-                                appModel: appModel,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: container.id) {
                             ContainerRow(container: container, hasUpdate: store.pendingUpdate(for: container) != nil)
                         }
                     }
@@ -261,6 +255,35 @@ struct ContainersView: View {
             if isSelected {
                 Image(systemName: "checkmark")
             }
+        }
+    }
+}
+
+/// Detail column for the container selected in `ContainersView`.
+struct ContainerDetailColumn: View {
+    let appModel: AppModel
+    let store: ContainersStore
+    let selection: String?
+    // Keeps the last resolved container so the detail survives an update
+    // that recreates it under a new id.
+    @State private var container: Components.Schemas.Container?
+
+    var body: some View {
+        Group {
+            if let container {
+                ContainerDetailView(
+                    container: container,
+                    scope: appModel.connectionScope,
+                    appModel: appModel,
+                    store: store
+                )
+                .id(container.id)
+            } else {
+                ContentUnavailableView("Select a container", systemImage: "shippingbox")
+            }
+        }
+        .onChange(of: selection, initial: true) { _, id in
+            container = id.flatMap { id in store.containers.first { $0.id == id } }
         }
     }
 }
@@ -477,10 +500,7 @@ private struct ContainerDetailView: View {
             Text("Actions")
                 .font(.headline)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                spacing: 10
-            ) {
+            AdaptiveActionGrid(itemCount: 5) {
                 actionButton(.start, "play.fill", String(localized: "Start"))
                 actionButton(.stop, "stop.fill", String(localized: "Stop"))
                 actionButton(.restart, "arrow.clockwise", String(localized: "Restart"))

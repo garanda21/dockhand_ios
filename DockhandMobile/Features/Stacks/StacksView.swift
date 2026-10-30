@@ -3,7 +3,8 @@ import SwiftUI
 
 struct StacksView: View {
     let appModel: AppModel
-    @State private var store = StacksStore()
+    let store: StacksStore
+    @Binding var selection: String?
     @State private var sort = StackListSort.name
     @State private var stateFilter = DockhandStateFilter.all
     @State private var searchText = ""
@@ -36,7 +37,7 @@ struct StacksView: View {
     }
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             Section {
                 EnvironmentHeaderBar(appModel: appModel)
                     .listRowInsets(EdgeInsets())
@@ -62,14 +63,7 @@ struct StacksView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(filteredStacks, id: \.name) { stack in
-                        NavigationLink {
-                            StackEditorView(
-                                appModel: appModel,
-                                stack: stack,
-                                scope: appModel.connectionScope,
-                                store: store
-                            )
-                        } label: {
+                        NavigationLink(value: stack.name) {
                             StackRow(stack: stack)
                         }
                     }
@@ -134,6 +128,27 @@ struct StacksView: View {
             if isSelected {
                 Image(systemName: "checkmark")
             }
+        }
+    }
+}
+
+/// Detail column for the stack selected in `StacksView`.
+struct StackDetailColumn: View {
+    let appModel: AppModel
+    let store: StacksStore
+    let selection: String?
+
+    var body: some View {
+        if let stack = store.stacks.first(where: { $0.name == selection }) {
+            StackEditorView(
+                appModel: appModel,
+                stack: stack,
+                scope: appModel.connectionScope,
+                store: store
+            )
+            .id(stack.name)
+        } else {
+            ContentUnavailableView("Select a stack", systemImage: "square.3.layers.3d")
         }
     }
 }
@@ -293,10 +308,7 @@ private struct StackEditorView: View {
                 }
             }
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                spacing: 10
-            ) {
+            AdaptiveActionGrid(itemCount: 6) {
                 stackActionButton(.start, "play.fill", String(localized: "Start"))
                 stackActionButton(.stop, "stop.fill", String(localized: "Stop"))
                 stackActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
@@ -731,10 +743,7 @@ private struct StackContainerCard: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-                spacing: 8
-            ) {
+            AdaptiveActionGrid(itemCount: 5, spacing: 8) {
                 stackContainerActionButton(.start, "play.fill", String(localized: "Start"))
                 stackContainerActionButton(.stop, "stop.fill", String(localized: "Stop"))
                 stackContainerActionButton(.restart, "arrow.clockwise", String(localized: "Restart"))
@@ -843,13 +852,14 @@ private struct StackRedeploySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if showsProgress && store.redeployStatus != .deploying {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Close") { dismiss() }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(role: .close) { dismiss() }
                     }
                 }
             }
         }
         .presentationDetents([.height(380), .large], selection: $selectedDetent)
+        .presentationSizing(.form)
         .interactiveDismissDisabled(store.redeployStatus == .deploying)
         .onAppear {
             guard store.redeployStatus != .deploying else { return }

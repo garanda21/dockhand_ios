@@ -1,10 +1,25 @@
 import DockhandAPI
 import SwiftUI
 
+extension EnvironmentValues {
+    /// False where the layout shows the header elsewhere, such as the iPad sidebar footer.
+    @Entry var showsEnvironmentHeader = true
+}
+
 struct EnvironmentHeaderBar: View {
+    static let serverPickerKey = "showsServerPickerInHeader"
+
     let appModel: AppModel
+    @Environment(\.showsEnvironmentHeader) private var showsEnvironmentHeader
+    @AppStorage(serverPickerKey) private var showsServerPicker = false
 
     var body: some View {
+        if showsEnvironmentHeader {
+            header
+        }
+    }
+
+    private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Side by side when it fits; stack the picker below on narrow widths (iPhone Duo folded).
             ViewThatFits(in: .horizontal) {
@@ -59,7 +74,39 @@ struct EnvironmentHeaderBar: View {
         .glassEffect(.regular.tint(.white.opacity(0.03)), in: .rect(cornerRadius: 20))
     }
 
+    @ViewBuilder
     private var serverInfo: some View {
+        if showsServerPicker && appModel.serverProfiles.count > 1 {
+            Menu {
+                ForEach(appModel.serverProfiles) { profile in
+                    Button {
+                        guard profile.id != appModel.selectedProfileID else { return }
+                        Task { await appModel.selectServerProfile(profile.id, forceEnvironmentReset: true) }
+                    } label: {
+                        if appModel.selectedProfileID == profile.id {
+                            Label(profile.name, systemImage: "checkmark")
+                        } else {
+                            Text(profile.name)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    serverLabel
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(String(localized: "Switch server"))
+        } else {
+            serverLabel
+        }
+    }
+
+    private var serverLabel: some View {
         HStack(spacing: 8) {
             Image(systemName: "server.rack")
                 .font(.subheadline.weight(.semibold))
