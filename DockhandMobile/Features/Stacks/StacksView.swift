@@ -8,6 +8,7 @@ struct StacksView: View {
     @State private var sort = StackListSort.name
     @State private var stateFilter = DockhandStateFilter.all
     @State private var searchText = ""
+    @State private var creationTarget: StackCreationTarget?
 
     private var filteredStacks: [Components.Schemas.StackSummary] {
         let filtered = store.stacks.filter {
@@ -73,7 +74,23 @@ struct StacksView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Stacks")
         .searchable(text: $searchText, prompt: Text("Search stacks"))
+        .sheet(item: $creationTarget) { target in
+            StackCreationView(appModel: appModel, stacksStore: store, scope: target.scope) { name in
+                searchText = ""
+                stateFilter = .all
+                selection = name
+            }
+        }
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    creationTarget = StackCreationTarget(scope: appModel.connectionScope)
+                } label: {
+                    Label("Create stack", systemImage: "plus")
+                }
+                .disabled(appModel.normalizedBaseURL == nil || appModel.connectionScope.environmentID == nil || store.hasPendingAction)
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Section("Sort") {
@@ -1044,4 +1061,342 @@ private enum EditorPane: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var title: String { self == .compose ? String(localized: "Compose") : ".env" }
+}
+
+/// The presentation and its captured destination must change as one state value.
+private struct StackCreationTarget: Identifiable {
+    let id = UUID()
+    let scope: DockhandConnectionScope
+}
+
+private struct StackCreationView: View {
+    let appModel: AppModel
+    let stacksStore: StacksStore
+    let scope: DockhandConnectionScope
+    let onCreated: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var compose = "services:\n  app:\n    image: nginx:alpine\n"
+    @State private var envContent = ""
+    @State private var editorFocused = false
+    @State private var activePane = EditorPane.compose
+    @State private var showsDeploymentOptions = false
+    @State private var options = StackDeployOptions()
+    @State private var isWorking = false
+    @State private var isCreated = false
+    @State private var message: String?
+    @State private var attempt = 0
+    @State private var shouldStart = false
+    @State private var creationPhase = String(localized: "Checking stack…")
+
+    private var isCurrentScope: Bool { appModel.isCurrentScope(scope) }
+
+    private var canSubmit: Bool {
+        !isWorking && isCurrentScope && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                GlassEffectContainer(spacing: 18) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        destinationCard
+                        if !isCurrentScope {
+                            statusCard(String(localized: "The server or environment changed. Close this form and try again."),
+                                       symbol: "exclamationmark.triangle", color: .orange)
+                        }
+                        if let message {
+                            statusCard(message, symbol: "exclamationmark.circle", color: .red)
+                        }
+                        if isCreated && !isWorking {
+                            statusCard(String(localized: "The stack has been created. You can close this form or retry starting it."),
+                                       symbol: "checkmark.circle", color: .green)
+                        }
+                        if isWorking {
+                            progressCard
+                        } else {
+                            nameCard
+                            editorCard
+                            deploymentCard
+                            if attempt > 0 && !stacksStore.redeployOutput.isEmpty {
+                                progressCard
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .id(isWorking)
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Create stack")
+            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                if !isWorking { creationActions }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(isCreated ? String(localized: "Done") : String(localized: "Cancel")) { dismiss() }
+                        .disabled(isWorking)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationSizing(.form)
+        .interactiveDismissDisabled(isWorking)
+        .onChange(of: activePane) { editorFocused = false }
+        .task(id: attempt) {
+            guard attempt > 0 else { return }
+            await submit()
+        }
+    }
+
+    private var destinationCard: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "square.3.layers.3d")
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor.opacity(0.1), in: .rect(cornerRadius: 14))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(appModel.serverProfiles.first(where: { $0.id == scope.profileID })?.name ?? "")
+                    .font(.headline)
+                Label(appModel.environment(for: scope)?.name ?? "", systemImage: "server.rack")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    private var nameCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Stack name", systemImage: "tag")
+                .font(.headline)
+            TextField("Stack name", text: $name)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            Text("Use lowercase letters, numbers, hyphens or underscores. Start with a letter or number.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        .disabled(isWorking || isCreated || !isCurrentScope)
+    }
+
+    private var editorCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Pane", selection: $activePane) {
+                ForEach(EditorPane.allCases) { pane in
+                    Text(pane.title).tag(pane)
+                }
+            }
+            .pickerStyle(.segmented)
+            Label(activePane == .compose ? String(localized: "Compose file") : String(localized: "Environment file"),
+                  systemImage: activePane == .compose ? "doc.text" : "slider.horizontal.3")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            SyntaxHighlightingTextEditor(text: activePane == .compose ? $compose : $envContent,
+                                         isFocused: $editorFocused, kind: activePane == .compose ? .yaml : .env)
+                .frame(height: 320)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+                .clipShape(.rect(cornerRadius: 16))
+                .accessibilityLabel(activePane == .compose ? String(localized: "Compose file") : String(localized: "Environment file"))
+            if activePane == .env {
+                Text("Optional. Add environment variables used by your Compose file.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        .disabled(isWorking || isCreated || !isCurrentScope)
+    }
+
+    private var deploymentCard: some View {
+        DisclosureGroup(isExpanded: $showsDeploymentOptions) {
+            VStack(spacing: 14) {
+                Toggle("Pull images", isOn: $options.pull)
+                Divider()
+                Toggle("Build images", isOn: $options.build)
+                Divider()
+                Toggle("Force recreate", isOn: $options.forceRecreate)
+            }
+            .padding(.top, 16)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Deployment options", systemImage: "slider.horizontal.3")
+                    .font(.headline)
+                Text("Only used when starting the stack. Creating without starting ignores these options.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.primary)
+        }
+        .padding(20)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+        .disabled(isWorking || !isCurrentScope)
+    }
+
+    private var progressCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 16) {
+                if isWorking {
+                    ProgressView().controlSize(.large)
+                } else {
+                    Image(systemName: "terminal").font(.title2)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(name.trimmingCharacters(in: .whitespacesAndNewlines))
+                        .font(.title2.weight(.semibold))
+                    Text(creationPhase)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+            }
+            if isCreated {
+                Label("Stack files saved", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+            }
+            if isWorking && stacksStore.redeployStatus == .deploying,
+               let status = stacksStore.redeploySteps.last {
+                Text(status)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            if !stacksStore.redeployOutput.isEmpty {
+                Label("Deployment output", systemImage: "terminal")
+                    .font(.headline)
+                ScrollViewReader { reader in
+                    ScrollView {
+                        Text(stacksStore.redeployOutput.joined(separator: "\n"))
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear.frame(height: 1).id("output-end")
+                    }
+                    .frame(height: 260)
+                    .padding(14)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
+                    .onChange(of: stacksStore.redeployOutput.count, initial: true) {
+                        reader.scrollTo("output-end", anchor: .bottom)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 24))
+    }
+
+    private func statusCard(_ text: String, symbol: String, color: Color) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.footnote)
+            .foregroundStyle(color)
+            .textSelection(.enabled)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular.tint(color.opacity(0.08)), in: .rect(cornerRadius: 18))
+    }
+
+    private var creationActions: some View {
+        GlassEffectContainer(spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { actionButtons }
+                VStack(spacing: 12) { actionButtons }
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .controlSize(.large)
+        .disabled(!canSubmit)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.bar)
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        if !isCreated {
+            Button { begin(start: false) } label: {
+                Label("Create only", systemImage: "square.and.arrow.down")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity, minHeight: 24)
+            }
+            .buttonStyle(.glass)
+        }
+        Button { begin(start: true) } label: {
+            Label(isCreated ? String(localized: "Retry start") : String(localized: "Create and start"), systemImage: "play.fill")
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: .infinity, minHeight: 24)
+        }
+        .buttonStyle(.glassProminent)
+    }
+
+    private func begin(start: Bool) {
+        guard !isWorking else { return }
+        shouldStart = start
+        creationPhase = isCreated ? String(localized: "Deploying stack…") : String(localized: "Checking stack…")
+        isWorking = true
+        stacksStore.resetRedeployProgress()
+        message = nil
+        editorFocused = false
+        attempt += 1
+    }
+
+    @MainActor
+    private func submit() async {
+        defer { isWorking = false }
+        guard isCurrentScope, let environmentID = scope.environmentID,
+              let baseURL = appModel.normalizedBaseURL else { return }
+        let service = appModel.service(baseURL: baseURL)
+        let stackName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            if !isCreated {
+                try StackEditorValidator.validateNewStack(name: stackName, compose: compose, env: envContent,
+                                                         existingNames: [])
+                // The create endpoint can replace an existing stack: always check a fresh listing.
+                let currentStacks = try await service.fetchStacks(environmentID: environmentID)
+                try StackEditorValidator.validateNewStack(name: stackName, compose: compose, env: envContent,
+                                                         existingNames: currentStacks.map(\.name))
+                try Task.checkCancellation()
+                guard isCurrentScope else { throw CancellationError() }
+                creationPhase = String(localized: "Creating stack…")
+                try await service.createStack(name: stackName, compose: compose, envContent: envContent, environmentID: environmentID)
+                isCreated = true
+            }
+            if shouldStart {
+                creationPhase = String(localized: "Deploying stack…")
+                try await stacksStore.deployCreatedStack(name: stackName, service: service, environmentID: environmentID,
+                                                         appModel: appModel, scope: scope, options: options)
+            }
+            try Task.checkCancellation()
+            guard isCurrentScope else { throw CancellationError() }
+            creationPhase = String(localized: "Refreshing stack list…")
+            appModel.requestDashboardRefresh()
+            await stacksStore.load(appModel: appModel)
+            guard isCurrentScope else { throw CancellationError() }
+            onCreated(stackName)
+            dismiss()
+        } catch {
+            creationPhase = String(localized: "Operation stopped")
+            if !error.isDockhandCancellation { message = error.dockhandUserFacingMessage }
+            if isCreated && isCurrentScope {
+                appModel.requestDashboardRefresh()
+                await stacksStore.load(appModel: appModel)
+            }
+        }
+    }
 }

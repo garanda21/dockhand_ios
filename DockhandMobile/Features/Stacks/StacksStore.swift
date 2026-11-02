@@ -156,6 +156,36 @@ final class StacksStore {
         }
     }
 
+    func deployCreatedStack(name: String, service: DockhandService, environmentID: Int,
+                            appModel: AppModel, scope: DockhandConnectionScope,
+                            options: StackDeployOptions) async throws {
+        try Task.checkCancellation()
+        guard appModel.isCurrentScope(scope), scope.environmentID == environmentID, !hasPendingAction else { throw CancellationError() }
+        activeStackActionID = "create:" + name
+        resetRedeployProgress()
+        redeployStatus = .deploying
+        defer { activeStackActionID = nil }
+        do {
+            let start = try await service.startStackRedeploy(stackName: name, environmentID: environmentID, options: options)
+            let result: StackRedeployResult
+            switch start {
+            case .completed(let completed): result = completed
+            case .job(let id): result = try await watchStackRedeployJob(id, service: service, appModel: appModel, scope: scope)
+            }
+            try Task.checkCancellation()
+            guard appModel.isCurrentScope(scope) else { throw CancellationError() }
+            guard result.success == true, result.error == nil else {
+                throw DockhandServiceError.message(result.error ?? String(localized: "Stack redeploy failed"))
+            }
+            applyRedeployResult(result)
+            redeployStatus = .complete
+        } catch {
+            redeployStatus = error.isDockhandCancellation ? .cancelled : .failed
+            redeployError = error.dockhandUserFacingMessage
+            throw error
+        }
+    }
+
     func resetRedeployProgress() {
         redeployStatus = .idle
         redeploySteps = []

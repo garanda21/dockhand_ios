@@ -1364,6 +1364,19 @@ struct DockhandService {
         }
     }
 
+    /// Save first so a deployment failure never requires creating the stack again.
+    func createStack(name: String, compose: String, envContent: String, environmentID: Int) async throws {
+        let response = try await performJSONRequest(
+            path: "/api/stacks",
+            method: "POST",
+            environmentID: environmentID,
+            body: ["name": name, "compose": compose, "rawEnvContent": envContent, "start": false]
+        )
+        guard response["success"] as? Bool == true else {
+            throw DockhandServiceError.message((response["error"] as? String) ?? String(localized: "Failed to create stack"))
+        }
+    }
+
     func stackAction(_ action: StackAction, stackName: String, environmentID: Int) async throws {
         let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
         let response = try await performJSONRequest(
@@ -1426,6 +1439,8 @@ struct DockhandService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // Ask for a job ID so progress can be polled while Compose is running.
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         authorize(&request)
         request.httpBody = try JSONSerialization.data(withJSONObject: [
