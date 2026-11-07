@@ -92,10 +92,21 @@ final class DashboardStore {
 
 @MainActor
 @Observable
-private final class DashboardResourceDetailStore {
+final class DashboardResourceDetailStore {
     var pendingUpdates: [PendingContainerUpdate] = []
     var serverVersion: String?
     private var updatesLoadToken = UUID()
+    private var updateCheckToken = UUID()
+    private var loadedUpdatesScopeID: String?
+    private var checkedUpdatesScopeID: String?
+    private var lastCheckUpdatesFound: Int?
+
+    var hasCheckedCurrentEnvironment: Bool {
+        checkedUpdatesScopeID != nil && checkedUpdatesScopeID == loadedUpdatesScopeID
+    }
+    var lastCheckFoundNoUpdates: Bool {
+        hasCheckedCurrentEnvironment && lastCheckUpdatesFound == 0
+    }
     var volumes: [VolumeSnapshot] = []
     var networks: [NetworkSnapshot] = []
     var activity = ContainerActivitySnapshot(events: [], total: 0)
@@ -103,12 +114,25 @@ private final class DashboardResourceDetailStore {
     var isLoading = false
     var isCheckingUpdates = false
     var isUpdatingContainers = false
+    var updatingContainerIDs: Set<String> = []
+    var completedUpdateIDs: Set<String> = []
+    var containerUpdateMessage = ""
+    var containerUpdateOutput: [String] = []
     var updateCheckProgress: Double?
     var operationMessage: String?
     var error: String?
 
     func loadUpdates(appModel: AppModel) async {
         let scope = appModel.connectionScopeID
+        if scope != loadedUpdatesScopeID {
+            loadedUpdatesScopeID = scope
+            checkedUpdatesScopeID = nil
+            lastCheckUpdatesFound = nil
+            updateCheckToken = UUID()
+            isCheckingUpdates = false
+            updateCheckProgress = nil
+            operationMessage = nil
+        }
         let token = UUID()
         updatesLoadToken = token
         serverVersion = nil
@@ -151,57 +175,94 @@ private final class DashboardResourceDetailStore {
     }
 
     func checkForUpdates(appModel: AppModel) async {
-        guard let service = service(for: appModel),
+        guard !isCheckingUpdates, !isUpdatingContainers,
+              let service = service(for: appModel),
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
+        let scope = appModel.connectionScopeID
+        let token = UUID()
+        updateCheckToken = token
         isCheckingUpdates = true
         updateCheckProgress = nil
         operationMessage = nil
         error = nil
-        defer { isCheckingUpdates = false }
+        defer { if token == updateCheckToken { isCheckingUpdates = false } }
 
         do {
             let operation = try await service.startContainerUpdateCheck(environmentID: environmentID)
+            guard scope == appModel.connectionScopeID, token == updateCheckToken, !Task.isCancelled else { return }
             let result: ContainerUpdateCheckResult
             switch operation {
             case .job(let jobID):
-                result = try await watchUpdateCheckJob(jobID, service: service)
+                result = try await watchUpdateCheckJob(jobID, service: service, appModel: appModel, scope: scope, token: token)
             case .completed(let completedResult):
                 updateCheckProgress = 1
                 result = completedResult
             }
+            guard scope == appModel.connectionScopeID, token == updateCheckToken, !Task.isCancelled else { return }
+            checkedUpdatesScopeID = scope
+            lastCheckUpdatesFound = result.updatesFound
+            appModel.requestDashboardRefresh()
+            await loadUpdates(appModel: appModel)
+            guard scope == appModel.connectionScopeID, token == updateCheckToken, !Task.isCancelled else { return }
             operationMessage = String(
                 format: String(localized: "%1$d updates found after checking %2$d containers"),
                 locale: .current,
                 result.updatesFound,
                 result.total
             )
-            appModel.requestDashboardRefresh()
-            await loadUpdates(appModel: appModel)
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard scope == appModel.connectionScopeID, token == updateCheckToken, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
 
     func updateContainers(_ updates: [PendingContainerUpdate], appModel: AppModel) async {
-        guard !updates.isEmpty,
+        guard !updates.isEmpty, !isUpdatingContainers, !isCheckingUpdates,
               let service = service(for: appModel),
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
+        let scope = appModel.connectionScope
         isUpdatingContainers = true
+        updatingContainerIDs = Set(updates.map(\.containerID))
+        completedUpdateIDs = []
+        containerUpdateMessage = String(localized: "Updating containers…")
+        containerUpdateOutput = []
         operationMessage = nil
         error = nil
-        defer { isUpdatingContainers = false }
+        defer {
+            isUpdatingContainers = false
+            updatingContainerIDs = []
+        }
 
         do {
-            let response = try await service.updateContainers(
+            let response = try await service.updateContainersWithProgress(
                 ids: updates.map(\.containerID),
                 environmentID: environmentID
-            )
+            ) { event in
+                try Task.checkCancellation()
+                try await MainActor.run {
+                    guard appModel.isCurrentScope(scope) else { throw CancellationError() }
+                    if event.type == "heartbeat" { return }
+                    if event.isTerminalContainerStep, let id = event.containerId {
+                        self.completedUpdateIDs.insert(id)
+                    }
+                    if event.type != "pull_log" && event.type != "scan_log" && event.type != "complete" {
+                        self.containerUpdateMessage = event.displayMessage
+                    }
+                    let line = event.message ?? event.error ?? [event.pullStatus, event.pullProgress].compactMap { $0 }.joined(separator: " ")
+                    if !line.isEmpty, self.containerUpdateOutput.last != line {
+                        self.containerUpdateOutput.append(line)
+                        if self.containerUpdateOutput.count > 200 { self.containerUpdateOutput.removeFirst() }
+                    }
+                }
+            }
+            guard appModel.isCurrentScope(scope), !Task.isCancelled else { return }
+            containerUpdateMessage = String(localized: "Refreshing container updates…")
             // loadUpdates clears messages, so refresh the list before reporting the outcome.
             appModel.requestDashboardRefresh()
             await loadUpdates(appModel: appModel)
+            guard appModel.isCurrentScope(scope), !Task.isCancelled else { return }
             if response.summary.success > 0 {
                 operationMessage = String(
                     format: String(localized: "%d containers updated"),
@@ -219,20 +280,25 @@ private final class DashboardResourceDetailStore {
                 )
             }
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard appModel.isCurrentScope(scope), !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
 
     private func watchUpdateCheckJob(
         _ jobID: String,
-        service: DockhandService
+        service: DockhandService,
+        appModel: AppModel,
+        scope: String,
+        token: UUID
     ) async throws -> ContainerUpdateCheckResult {
         var cursor = 0
 
         while true {
             try Task.checkCancellation()
+            guard scope == appModel.connectionScopeID, token == updateCheckToken else { throw CancellationError() }
             let snapshot = try await service.fetchContainerUpdateCheckJob(id: jobID)
+            guard scope == appModel.connectionScopeID, token == updateCheckToken, !Task.isCancelled else { throw CancellationError() }
 
             if cursor < snapshot.lines.count {
                 for line in snapshot.lines[cursor...] {
@@ -878,6 +944,32 @@ private struct DashboardUpdatesDetailView: View {
                     .listRowBackground(Color.clear)
             }
 
+            if store.isUpdatingContainers {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text(store.containerUpdateMessage)
+                                .font(.headline)
+                                .accessibilityAddTraits(.updatesFrequently)
+                        }
+                        if !store.updatingContainerIDs.isEmpty {
+                            ProgressView(value: Double(store.completedUpdateIDs.count), total: Double(store.updatingContainerIDs.count))
+                            Text(String(format: String(localized: "%1$lld of %2$lld containers processed"),
+                                        Int64(store.completedUpdateIDs.count), Int64(store.updatingContainerIDs.count)))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !store.containerUpdateOutput.isEmpty {
+                            Text(store.containerUpdateOutput.suffix(8).joined(separator: "\n"))
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+
             if let error = store.error {
                 Section {
                     Text(error)
@@ -901,7 +993,9 @@ private struct DashboardUpdatesDetailView: View {
                 .disabled(store.isCheckingUpdates || store.isUpdatingContainers)
 
                 if store.isCheckingUpdates {
-                    ProgressView(value: store.updateCheckProgress)
+                    ProgressView(value: store.updateCheckProgress) {
+                        Text("Checking for updates…")
+                    }
                 }
 
                 if !store.pendingUpdates.isEmpty {
@@ -916,17 +1010,24 @@ private struct DashboardUpdatesDetailView: View {
 
             Section("Pending updates") {
                 if store.isLoading && store.pendingUpdates.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
+                    ProgressView("Loading pending updates…")
+                } else if store.isCheckingUpdates && store.pendingUpdates.isEmpty {
+                    Text("Waiting for the update check to finish…")
+                        .foregroundStyle(.secondary)
                 } else if store.pendingUpdates.isEmpty && store.error == nil {
-                    ContentUnavailableView(
-                        "No pending updates",
-                        systemImage: "checkmark.circle",
-                        description: Text("All checked containers are up to date.")
-                    )
+                    if store.lastCheckFoundNoUpdates {
+                        ContentUnavailableView(
+                            "No updates found",
+                            systemImage: "checkmark.circle",
+                            description: Text("No updates were found in the last check for this environment.")
+                        )
+                    } else {
+                        ContentUnavailableView(
+                            "No recorded updates",
+                            systemImage: "tray",
+                            description: Text("Run Check for updates to look for newer images. Loading this list does not check for new updates.")
+                        )
+                    }
                 } else {
                     ForEach(store.pendingUpdates, id: \.containerID) { update in
                         HStack(alignment: .center, spacing: 12) {
@@ -956,8 +1057,11 @@ private struct DashboardUpdatesDetailView: View {
                             Button {
                                 updatesToConfirm = [update]
                             } label: {
-                                Image(systemName: "arrow.up.circle")
-                                    .font(.title3)
+                                if store.updatingContainerIDs.contains(update.containerID) {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "arrow.up.circle").font(.title3)
+                                }
                             }
                             .buttonStyle(.borderless)
                             .disabled(store.isCheckingUpdates || store.isUpdatingContainers)
@@ -969,6 +1073,19 @@ private struct DashboardUpdatesDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            if store.isUpdatingContainers {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text(store.containerUpdateMessage).font(.subheadline.weight(.medium))
+                    Spacer(minLength: 0)
+                }
+                .padding(18)
+                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            }
+        }
         .navigationTitle("Available Updates")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: ServerDetailsStore.loadID(appModel: appModel)) {

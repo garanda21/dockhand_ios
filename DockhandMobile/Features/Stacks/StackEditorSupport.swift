@@ -4,6 +4,22 @@ import UIKit
 import Yams
 
 enum StackEditorValidator {
+    static func validateNewStack(name: String, compose: String, env: String, existingNames: [String]) throws {
+        guard name.range(of: #"^[a-z0-9][a-z0-9_-]*$"#, options: .regularExpression) != nil else {
+            throw DockhandServiceError.message(String(localized: "Use lowercase letters, numbers, hyphens or underscores. Start with a letter or number."))
+        }
+        guard !existingNames.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else {
+            throw DockhandServiceError.message(String(localized: "A stack with this name already exists in this environment."))
+        }
+        try validateCompose(compose)
+        guard let root = try Yams.load(yaml: compose) as? [String: Any],
+              let services = root["services"] as? [String: Any], !services.isEmpty,
+              services.values.allSatisfy({ $0 is [String: Any] }) else {
+            throw DockhandServiceError.message(String(localized: "Compose must contain a non-empty services mapping."))
+        }
+        try validateEnv(env)
+    }
+
     static func validateCompose(_ text: String) throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {

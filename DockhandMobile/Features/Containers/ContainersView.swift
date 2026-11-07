@@ -6,6 +6,8 @@ import SwiftUI
 @Observable
 final class ContainersStore {
     var containers: [Components.Schemas.Container] = []
+    private var listLoadToken = UUID()
+    private var loadedListScopeID: String?
     var isLoading = false
     var error: String?
     var actionMessage: String?
@@ -13,30 +15,38 @@ final class ContainersStore {
     var pendingUpdates: [String: PendingContainerUpdate] = [:]
     var updatingContainerID: String?
 
-    func load(appModel: AppModel) async {
+    func load(appModel: AppModel, service: DockhandService? = nil) async {
+        let scope = appModel.connectionLoadID
+        let token = UUID()
+        listLoadToken = token
+        isLoading = false
+        if loadedListScopeID != scope {
+            containers = []
+            pendingUpdates = [:]
+            loadedListScopeID = scope
+        }
+        error = nil
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
             containers = []
+            pendingUpdates = [:]
             return
         }
 
         isLoading = true
-        error = nil
-        defer { isLoading = false }
-
+        defer { if listLoadToken == token { isLoading = false } }
         do {
-            let service = appModel.service(baseURL: baseURL)
-            // Update badges are optional; a failed pending-updates request must not hide the list.
+            let service = service ?? appModel.service(baseURL: baseURL)
             async let loadedUpdates = try? service.fetchPendingContainerUpdates(environmentID: environmentID)
-            containers = try await service.fetchContainers(environmentID: environmentID)
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            let updates = PendingContainerUpdate.actionable(
-                await loadedUpdates ?? [],
-                liveContainerIDs: Set(containers.map(\.id))
-            )
+            let loaded = try await service.fetchContainers(environmentID: environmentID)
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !Task.isCancelled else { return }
+            containers = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            // Optional update badges must not delay the main list.
+            let updates = PendingContainerUpdate.actionable(await loadedUpdates ?? [], liveContainerIDs: Set(loaded.map(\.id)))
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !Task.isCancelled else { return }
             pendingUpdates = Dictionary(updates.map { ($0.containerID, $0) }, uniquingKeysWith: { first, _ in first })
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
@@ -169,7 +179,11 @@ struct ContainersView: View {
             }
 
             Section("Containers") {
-                if filteredContainers.isEmpty {
+                if appModel.isLoadingEnvironments && appModel.selectedEnvironment == nil {
+                    ProgressView("Loading environments…")
+                } else if store.isLoading && store.containers.isEmpty {
+                    ProgressView("Loading…")
+                } else if filteredContainers.isEmpty {
                     Text(
                         !searchText.trimmed.isEmpty
                             ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
@@ -230,12 +244,7 @@ struct ContainersView: View {
                 }
             }
         }
-        .overlay {
-            if store.isLoading && store.containers.isEmpty {
-                ProgressView()
-            }
-        }
-        .task(id: "\(appModel.connectionScopeID):\(appModel.dashboardRefreshRevision)") {
+        .task(id: "\(appModel.connectionLoadID):\(appModel.dashboardRefreshRevision)") {
             await store.load(appModel: appModel)
         }
         .onChange(of: filterRequestRevision, initial: true) {
