@@ -33,6 +33,8 @@ struct ImagePullLayer: Identifiable, Equatable {
 @Observable
 final class ImagesStore {
     var images: [Components.Schemas.ImageSummary] = []
+    private var listLoadToken = UUID()
+    private var loadedListScopeID: String?
     var isLoading = false
     var error: String?
     var actionMessage: String?
@@ -65,7 +67,16 @@ final class ImagesStore {
         !pullLayers.isEmpty && pullLayers.allSatisfy(\.isAlreadyPresent)
     }
 
-    func load(appModel: AppModel) async {
+    func load(appModel: AppModel, service: DockhandService? = nil) async {
+        let scope = appModel.connectionLoadID
+        let token = UUID()
+        listLoadToken = token
+        isLoading = false
+        if loadedListScopeID != scope {
+            images = []
+            loadedListScopeID = scope
+        }
+        error = nil
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
             images = []
@@ -73,15 +84,14 @@ final class ImagesStore {
         }
 
         isLoading = true
-        error = nil
-        defer { isLoading = false }
-
+        defer { if listLoadToken == token { isLoading = false } }
         do {
-            let service = appModel.service(baseURL: baseURL)
-            images = try await service.fetchImages(environmentID: environmentID)
-                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+            let service = service ?? appModel.service(baseURL: baseURL)
+            let loaded = try await service.fetchImages(environmentID: environmentID)
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !Task.isCancelled else { return }
+            images = loaded.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }

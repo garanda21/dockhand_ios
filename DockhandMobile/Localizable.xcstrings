@@ -1,6 +1,426 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Loading environments…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando entornos…"
+          }
+        }
+      }
+    },
+    "Checking for updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscando actualizaciones…"
+          }
+        }
+      }
+    },
+    "Loading pending updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando actualizaciones pendientes…"
+          }
+        }
+      }
+    },
+    "Waiting for the update check to finish…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando a que termine la comprobación…"
+          }
+        }
+      }
+    },
+    "No updates found": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron actualizaciones"
+          }
+        }
+      }
+    },
+    "No updates were found in the last check for this environment.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron actualizaciones en la última comprobación de este entorno."
+          }
+        }
+      }
+    },
+    "No recorded updates": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay actualizaciones registradas"
+          }
+        }
+      }
+    },
+    "Run Check for updates to look for newer images. Loading this list does not check for new updates.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulsa Buscar actualizaciones para buscar imágenes nuevas. Cargar esta lista no comprueba si hay nuevas actualizaciones."
+          }
+        }
+      }
+    },
+    "Pulling image…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando imagen…"
+          }
+        }
+      }
+    },
+    "Scanning image…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analizando imagen…"
+          }
+        }
+      }
+    },
+    "Stopping container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deteniendo contenedor…"
+          }
+        }
+      }
+    },
+    "Removing old container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminando contenedor anterior…"
+          }
+        }
+      }
+    },
+    "Recreating container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recreando contenedor…"
+          }
+        }
+      }
+    },
+    "Starting container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrancando contenedor…"
+          }
+        }
+      }
+    },
+    "Container updated": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenedor actualizado"
+          }
+        }
+      }
+    },
+    "Updating containers…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando contenedores…"
+          }
+        }
+      }
+    },
+    "Pulling images and recreating containers…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando imágenes y recreando contenedores…"
+          }
+        }
+      }
+    },
+    "Container update progress could not be confirmed. Refresh before trying again.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo confirmar el resultado de la actualización. Actualiza la lista antes de reintentarlo."
+          }
+        }
+      }
+    },
+    "Refreshing container updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando lista de contenedores…"
+          }
+        }
+      }
+    },
+    "%1$lld of %2$lld containers processed": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld de %2$lld contenedores procesados"
+          }
+        }
+      }
+    },
+    "Checking stack…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprobando stack…"
+          }
+        }
+      }
+    },
+    "Deploying stack…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desplegando stack…"
+          }
+        }
+      }
+    },
+    "Stack files saved": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos del stack guardados"
+          }
+        }
+      }
+    },
+    "Deployment output": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salida del despliegue"
+          }
+        }
+      }
+    },
+    "Refreshing stack list…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando lista de stacks…"
+          }
+        }
+      }
+    },
+    "Operation stopped": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operación detenida"
+          }
+        }
+      }
+    },
+    "Create only": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo crear"
+          }
+        }
+      }
+    },
+    "Optional. Add environment variables used by your Compose file.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opcional. Añade las variables de entorno que utiliza tu archivo Compose."
+          }
+        }
+      }
+    },
+    "Only used when starting the stack. Creating without starting ignores these options.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo se aplican al arrancar el stack. Al crear sin arrancar, estas opciones no se utilizan."
+          }
+        }
+      }
+    },
+    "Create stack": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear stack"
+          }
+        }
+      }
+    },
+    "Stack name": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombre del stack"
+          }
+        }
+      }
+    },
+    "Create and start": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear y arrancar"
+          }
+        }
+      }
+    },
+    "Retry start": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar arranque"
+          }
+        }
+      }
+    },
+    "Deployment options": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opciones de despliegue"
+          }
+        }
+      }
+    },
+    "Creating stack…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creando stack…"
+          }
+        }
+      }
+    },
+    "Starting stack…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrancando stack…"
+          }
+        }
+      }
+    },
+    "Failed to create stack": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo crear el stack"
+          }
+        }
+      }
+    },
+    "The server or environment changed. Close this form and try again.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El servidor o el entorno ha cambiado. Cierra este formulario y vuelve a intentarlo."
+          }
+        }
+      }
+    },
+    "The stack has been created. You can close this form or retry starting it.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El stack ya está creado. Puedes cerrar este formulario o reintentar el arranque."
+          }
+        }
+      }
+    },
+    "Use lowercase letters, numbers, hyphens or underscores. Start with a letter or number.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa minúsculas, números, guiones o guiones bajos. Empieza por una letra o un número."
+          }
+        }
+      }
+    },
+    "A stack with this name already exists in this environment.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya existe un stack con este nombre en este entorno."
+          }
+        }
+      }
+    },
+    "Compose must contain a non-empty services mapping.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compose debe contener un mapa de servicios no vacío."
+          }
+        }
+      }
+    },
     "Show server picker in header" : {
       "localizations" : {
         "es" : {

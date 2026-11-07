@@ -53,6 +53,7 @@ Pushing a `v*` tag that points to `main` creates the GitHub Release automaticall
 - Start, stop, restart and pause/unpause containers where the current state allows it.
 - View container logs, including live streaming logs when available.
 - List stacks, filter and sort them by state.
+- Create Compose stacks with optional `.env` content, save without starting, or create and deploy with pull/build/recreate options.
 - Open a stack detail view with its related containers and run container actions from there.
 - Edit stack compose content and `.env` files.
 - Validate compose YAML and `.env` format before saving.

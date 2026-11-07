@@ -14,6 +14,8 @@ enum StackRedeployStatus: Equatable {
 @Observable
 final class StacksStore {
     var stacks: [Components.Schemas.StackSummary] = []
+    private var listLoadToken = UUID()
+    private var loadedListScopeID: String?
     var isLoading = false
     var error: String?
     var actionMessage: String?
@@ -25,28 +27,32 @@ final class StacksStore {
     var redeployOutput: [String] = []
     var redeployError: String?
 
-    func load(appModel: AppModel) async {
+    func load(appModel: AppModel, service: DockhandService? = nil) async {
+        let scope = appModel.connectionLoadID
+        let token = UUID()
+        listLoadToken = token
+        isLoading = false
+        if loadedListScopeID != scope {
+            stacks = []
+            loadedListScopeID = scope
+        }
+        error = nil
         guard let baseURL = appModel.normalizedBaseURL,
               let environmentID = appModel.selectedEnvironment?.id else {
             stacks = []
             return
         }
 
-        // Keep the current list while refreshing so an open stack editor is not torn down.
         isLoading = true
-        error = nil
-        defer { isLoading = false }
-
+        defer { if listLoadToken == token { isLoading = false } }
         do {
-            let service = appModel.service(baseURL: baseURL)
-            stacks = try await service.fetchStacks(environmentID: environmentID)
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            let service = service ?? appModel.service(baseURL: baseURL)
+            let loaded = try await service.fetchStacks(environmentID: environmentID)
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !Task.isCancelled else { return }
+            stacks = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
-            guard !error.isDockhandCancellation else { return }
-            self.error = DockhandConnectionStageError(
-                stage: .selectedEnvironment,
-                underlying: error
-            ).dockhandUserFacingMessage
+            guard listLoadToken == token, scope == appModel.connectionLoadID, !error.isDockhandCancellation else { return }
+            self.error = DockhandConnectionStageError(stage: .selectedEnvironment, underlying: error).dockhandUserFacingMessage
         }
     }
 
@@ -153,6 +159,36 @@ final class StacksStore {
                 redeployError = error.dockhandUserFacingMessage
             }
             self.error = error.dockhandUserFacingMessage
+        }
+    }
+
+    func deployCreatedStack(name: String, service: DockhandService, environmentID: Int,
+                            appModel: AppModel, scope: DockhandConnectionScope,
+                            options: StackDeployOptions) async throws {
+        try Task.checkCancellation()
+        guard appModel.isCurrentScope(scope), scope.environmentID == environmentID, !hasPendingAction else { throw CancellationError() }
+        activeStackActionID = "create:" + name
+        resetRedeployProgress()
+        redeployStatus = .deploying
+        defer { activeStackActionID = nil }
+        do {
+            let start = try await service.startStackRedeploy(stackName: name, environmentID: environmentID, options: options)
+            let result: StackRedeployResult
+            switch start {
+            case .completed(let completed): result = completed
+            case .job(let id): result = try await watchStackRedeployJob(id, service: service, appModel: appModel, scope: scope)
+            }
+            try Task.checkCancellation()
+            guard appModel.isCurrentScope(scope) else { throw CancellationError() }
+            guard result.success == true, result.error == nil else {
+                throw DockhandServiceError.message(result.error ?? String(localized: "Stack redeploy failed"))
+            }
+            applyRedeployResult(result)
+            redeployStatus = .complete
+        } catch {
+            redeployStatus = error.isDockhandCancellation ? .cancelled : .failed
+            redeployError = error.dockhandUserFacingMessage
+            throw error
         }
     }
 

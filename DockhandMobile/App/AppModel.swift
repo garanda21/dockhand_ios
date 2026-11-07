@@ -42,6 +42,7 @@ final class AppModel {
     var environments: [Components.Schemas.Environment] = []
     var selectedEnvironmentID: Int?
     var isLoadingEnvironments = false
+    private var environmentsLoadToken = UUID()
     var environmentError: String?
     var lastHealthStatus: String?
     private(set) var dashboardRefreshRevision = 0
@@ -103,6 +104,12 @@ final class AppModel {
 
     var connectionScopeID: String {
         "\(selectedProfileID ?? "none"):\(selectedEnvironmentID ?? -1)"
+    }
+
+    /// A remembered environment ID alone is not enough: list tasks must restart
+    /// when the new server's environment actually becomes available.
+    var connectionLoadID: String {
+        "\(connectionScopeID):\(selectedEnvironment?.id ?? -1)"
     }
 
     var connectionScope: DockhandConnectionScope {
@@ -196,7 +203,10 @@ final class AppModel {
     }
 
     func refreshEnvironments(forceEnvironmentReset: Bool = false) async {
+        let loadToken = UUID()
+        environmentsLoadToken = loadToken
         guard selectedProfile != nil else {
+            isLoadingEnvironments = false
             environmentError = nil
             environments = []
             lastHealthStatus = nil
@@ -205,6 +215,7 @@ final class AppModel {
 
         guard let baseURL = normalizedBaseURL,
               let profileID = selectedProfile?.id else {
+            isLoadingEnvironments = false
             environmentError = String(localized: "Invalid Dockhand URL")
             environments = []
             lastHealthStatus = nil
@@ -215,7 +226,7 @@ final class AppModel {
         environmentError = nil
 
         defer {
-            isLoadingEnvironments = false
+            if loadToken == environmentsLoadToken { isLoadingEnvironments = false }
         }
 
         do {
@@ -235,6 +246,7 @@ final class AppModel {
                     throw DockhandConnectionStageError(stage: .environments, underlying: error)
                 }
             }
+            guard loadToken == environmentsLoadToken, selectedProfile?.id == profileID, !Task.isCancelled else { return }
             lastHealthStatus = loaded.0
             let loadedEnvironments = loaded.1
             environments = loadedEnvironments.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -254,7 +266,7 @@ final class AppModel {
 
             PreferencesStore.setSelectedEnvironmentID(selectedEnvironmentID, for: profileID)
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard loadToken == environmentsLoadToken, selectedProfile?.id == profileID, !error.isDockhandCancellation else { return }
             // Keep the last known environments so screens recover on their own
             // once the server is reachable again.
             environmentError = error.dockhandUserFacingMessage

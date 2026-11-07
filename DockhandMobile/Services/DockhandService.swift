@@ -362,6 +362,58 @@ struct ContainerUpdateCheckJobSnapshot: Decodable, Sendable, Hashable {
     var result: ContainerUpdateCheckResult?
 }
 
+struct ContainerBatchUpdateProgress: Decodable, Sendable {
+    var type: String
+    var containerId: String?
+    var containerName: String?
+    var step: String?
+    var message: String?
+    var error: String?
+    var pullStatus: String?
+    var pullProgress: String?
+    var summary: Summary?
+
+    struct Summary: Decodable, Sendable {
+        var total: Int
+        var success: Int
+        var failed: Int
+        var blocked: Int?
+        var skipped: Int?
+    }
+
+    var isTerminalContainerStep: Bool {
+        ["done", "failed", "blocked", "skipped"].contains(step ?? "")
+    }
+
+    var displayMessage: String {
+        let stage: String
+        switch step {
+        case "pulling": stage = String(localized: "Pulling image…")
+        case "scanning": stage = String(localized: "Scanning image…")
+        case "stopping": stage = String(localized: "Stopping container…")
+        case "removing": stage = String(localized: "Removing old container…")
+        case "creating": stage = String(localized: "Recreating container…")
+        case "starting": stage = String(localized: "Starting container…")
+        case "done": stage = String(localized: "Container updated")
+        default: return message ?? error ?? String(localized: "Updating containers…")
+        }
+        return containerName.map { "\($0): \(stage)" } ?? stage
+    }
+}
+
+private struct ContainerBatchUpdateJobSnapshot: Decodable {
+    struct Line: Decodable { var data: ContainerBatchUpdateProgress }
+    // failJob produces {success: false, error: ...} without a progress-event type.
+    struct Result: Decodable {
+        var type: String?
+        var error: String?
+        var summary: ContainerBatchUpdateProgress.Summary?
+    }
+    var status: String
+    var lines: [Line]
+    var result: Result?
+}
+
 struct ContainerBatchUpdateResult: Decodable, Sendable, Hashable {
     var containerID: String
     var containerName: String
@@ -517,19 +569,22 @@ struct DockhandService {
     let token: String
     let customHeaders: [DockhandCustomHeader]
     private let session: URLSession
+    private let apiSession: URLSession?
 
-    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = [], session: URLSession = DockhandHTTPSession.shared) {
+    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = [], session: URLSession? = nil) {
         self.baseURL = baseURL
         self.token = DockhandToken.normalized(token)
         self.customHeaders = DockhandCustomHeaderValidator.sanitized(customHeaders)
-        self.session = session
+        self.session = session ?? DockhandHTTPSession.shared
+        self.apiSession = session
     }
 
     private var client: Client {
         DockhandAPIClientFactory.makeClient(
             baseURL: baseURL,
             token: token.isEmpty ? nil : token,
-            customHeaders: customHeaders
+            customHeaders: customHeaders,
+            session: apiSession
         )
     }
 
@@ -733,6 +788,71 @@ struct DockhandService {
         )
         let data = try JSONSerialization.data(withJSONObject: response)
         return try JSONDecoder().decode(ContainerBatchUpdateResponse.self, from: data)
+    }
+
+    /// Only fall back on an unsupported route. Never repeat a mutation after an ambiguous failure.
+    func updateContainersWithProgress(
+        ids: [String], environmentID: Int,
+        onProgress: @escaping @Sendable (ContainerBatchUpdateProgress) async throws -> Void
+    ) async throws -> ContainerBatchUpdateResponse {
+        guard !ids.isEmpty else { throw DockhandServiceError.invalidResponse }
+        guard var components = URLComponents(url: baseURL.appending(path: "/api/containers/batch-update-stream"),
+                                              resolvingAgainstBaseURL: false) else {
+            throw DockhandServiceError.invalidResponse
+        }
+        components.queryItems = [URLQueryItem(name: "env", value: "\(environmentID)")]
+        guard let url = components.url else { throw DockhandServiceError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["containerIds": ids])
+        authorize(&request)
+        try Task.checkCancellation()
+        let (data, response) = try await send(request)
+        if let http = response as? HTTPURLResponse, [404, 405].contains(http.statusCode) {
+            try Task.checkCancellation()
+            // Let the caller recheck the active destination before the fallback mutation.
+            try await onProgress(.init(type: "start", message: String(localized: "Pulling images and recreating containers…")))
+            return try await updateContainers(ids: ids, environmentID: environmentID)
+        }
+        try Self.validateResponse(response, data: data)
+        let start = try JSONDecoder().decode(ImagePullJobStartPayload.self, from: data)
+        guard let jobID = start.jobId, !jobID.isEmpty else { throw DockhandServiceError.invalidResponse }
+        var cursor = 0
+        var results: [String: ContainerBatchUpdateResult] = [:]
+        while true {
+            try Task.checkCancellation()
+            try await onProgress(.init(type: "heartbeat"))
+            var poll = URLRequest(url: baseURL.appending(path: "/api/jobs").appending(path: jobID))
+            poll.setValue("application/json", forHTTPHeaderField: "Accept")
+            authorize(&poll)
+            let (jobData, jobResponse) = try await send(poll)
+            try Self.validateResponse(jobResponse, data: jobData)
+            let snapshot = try JSONDecoder().decode(ContainerBatchUpdateJobSnapshot.self, from: jobData)
+            for line in snapshot.lines.dropFirst(cursor) {
+                let event = line.data
+                if event.isTerminalContainerStep, let id = event.containerId, ids.contains(id) {
+                    results[id] = .init(containerID: id, containerName: event.containerName ?? id,
+                                        success: event.step == "done", error: event.error ?? event.message)
+                }
+                try await onProgress(event)
+            }
+            cursor = snapshot.lines.count
+            if snapshot.status != "running" {
+                guard snapshot.status != "error", let result = snapshot.result,
+                      result.type == "complete", let summary = result.summary,
+                      summary.total == ids.count, results.count == ids.count,
+                      summary.success == results.values.filter(\.success).count else {
+                    throw DockhandServiceError.message(snapshot.result?.error ?? String(localized: "Container update progress could not be confirmed. Refresh before trying again."))
+                }
+                let failed = summary.failed + (summary.blocked ?? 0) + (summary.skipped ?? 0)
+                guard summary.success + failed == summary.total else { throw DockhandServiceError.invalidResponse }
+                return .init(success: failed == 0, results: ids.compactMap { results[$0] },
+                             summary: .init(total: summary.total, success: summary.success, failed: failed))
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
     }
 
     func fetchVolumes(environmentID: Int) async throws -> [VolumeSnapshot] {
@@ -1364,6 +1484,19 @@ struct DockhandService {
         }
     }
 
+    /// Save first so a deployment failure never requires creating the stack again.
+    func createStack(name: String, compose: String, envContent: String, environmentID: Int) async throws {
+        let response = try await performJSONRequest(
+            path: "/api/stacks",
+            method: "POST",
+            environmentID: environmentID,
+            body: ["name": name, "compose": compose, "rawEnvContent": envContent, "start": false]
+        )
+        guard response["success"] as? Bool == true else {
+            throw DockhandServiceError.message((response["error"] as? String) ?? String(localized: "Failed to create stack"))
+        }
+    }
+
     func stackAction(_ action: StackAction, stackName: String, environmentID: Int) async throws {
         let encodedName = stackName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? stackName
         let response = try await performJSONRequest(
@@ -1426,6 +1559,8 @@ struct DockhandService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // Ask for a job ID so progress can be polled while Compose is running.
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         authorize(&request)
         request.httpBody = try JSONSerialization.data(withJSONObject: [

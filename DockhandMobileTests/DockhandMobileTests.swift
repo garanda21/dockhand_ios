@@ -4,6 +4,196 @@ import SwiftUI
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    @MainActor
+    func testEnvironmentSwitchClearsPreviousUpdateCheckPresentation() async {
+        let model = AppModel()
+        model.serverProfiles = [] // No connection: this test must not contact a real server.
+        model.selectedProfileID = "update-status-test"
+        model.selectedEnvironmentID = 1
+        let store = DashboardResourceDetailStore()
+        await store.loadUpdates(appModel: model)
+        XCTAssertFalse(store.hasCheckedCurrentEnvironment)
+
+        store.isCheckingUpdates = true
+        store.updateCheckProgress = 0.5
+        store.operationMessage = "Result from the previous environment"
+        await store.loadUpdates(appModel: model)
+        XCTAssertTrue(store.isCheckingUpdates, "Reloading the same environment must not cancel its active check")
+
+        model.selectedEnvironmentID = 2
+        await store.loadUpdates(appModel: model)
+        XCTAssertFalse(store.isCheckingUpdates)
+        XCTAssertNil(store.updateCheckProgress)
+        XCTAssertNil(store.operationMessage)
+        XCTAssertFalse(store.hasCheckedCurrentEnvironment, "Loading saved pending updates is not an update check")
+    }
+
+    @MainActor
+    func testListLoadIdentityChangesWhenRememberedEnvironmentArrives() async {
+        let model = AppModel()
+        model.serverProfiles = [.init(id: "work", name: "Work", baseURL: "https://work.test")]
+        model.selectedProfileID = "work"
+        model.selectedEnvironmentID = 1
+        model.environments = []
+        let identityBefore = model.connectionLoadID
+        let scopeBefore = model.connectionScopeID
+        let containers = ContainersStore()
+        let stacks = StacksStore()
+        let images = ImagesStore()
+        await containers.load(appModel: model)
+        await stacks.load(appModel: model)
+        await images.load(appModel: model)
+        XCTAssertTrue(containers.containers.isEmpty)
+        XCTAssertTrue(stacks.stacks.isEmpty)
+        XCTAssertTrue(images.images.isEmpty)
+
+        model.environments = [makeEnvironment(publicIP: nil)]
+        XCTAssertEqual(model.connectionScopeID, scopeBefore, "The remembered selection itself did not change")
+        XCTAssertNotEqual(model.connectionLoadID, identityBefore, "List tasks must restart once the environment is available")
+        XCTAssertEqual(ServerDetailsStore.loadID(appModel: model), model.connectionLoadID)
+    }
+
+    @MainActor
+    func testLateListResponsesCannotOverwriteNewServerData() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ServerSwitchURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let model = AppModel()
+        model.serverProfiles = [.init(id: "home", name: "Home", baseURL: "https://home.test"),
+                                .init(id: "work", name: "Work", baseURL: "https://work.test")]
+        model.selectedProfileID = "home"
+        model.selectedEnvironmentID = 1
+        model.environments = [makeEnvironment(publicIP: nil)]
+        let oldService = DockhandService(baseURL: URL(string: "https://home.test")!, token: "", session: session)
+        let newService = DockhandService(baseURL: URL(string: "https://work.test")!, token: "", session: session)
+        let containers = ContainersStore()
+        let stacks = StacksStore()
+        let images = ImagesStore()
+        let oldContainers = Task { await containers.load(appModel: model, service: oldService) }
+        let oldStacks = Task { await stacks.load(appModel: model, service: oldService) }
+        let oldImages = Task { await images.load(appModel: model, service: oldService) }
+        try await Task.sleep(for: .milliseconds(50))
+        model.selectedProfileID = "work"
+        await containers.load(appModel: model, service: newService)
+        await stacks.load(appModel: model, service: newService)
+        await images.load(appModel: model, service: newService)
+        XCTAssertEqual(stacks.stacks.first?.name, "work")
+        await oldContainers.value
+        await oldStacks.value
+        await oldImages.value
+        XCTAssertTrue(containers.containers.isEmpty)
+        XCTAssertEqual(stacks.stacks.first?.name, "work")
+        XCTAssertTrue(images.images.isEmpty)
+        XCTAssertNil(containers.error)
+        XCTAssertNil(stacks.error)
+        XCTAssertNil(images.error)
+    }
+
+    func testCreateStackSendsSavedComposeEnvAndAuthenticationToSelectedEnvironment() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StackCreationURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://dockhand.test/prefix")!, token: "test-token",
+                                      customHeaders: [.init(name: "X-Proxy-Token", value: "proxy-token")], session: session)
+        try await service.createStack(name: "new-stack", compose: "services:\n  app:\n    image: nginx\n",
+                                      envContent: "# comment\nPORT=8080\n", environmentID: 7)
+    }
+
+    func testCreateStackRejectsPermissionAndUnconfirmedResponses() async {
+        for host in ["forbidden.test", "unconfirmed.test", "failure.test"] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [StackCreationURLProtocol.self]
+            let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
+            let service = DockhandService(baseURL: URL(string: "https://" + host)!, token: "", session: session)
+            do {
+                try await service.createStack(name: "new-stack", compose: "services: {}", envContent: "", environmentID: 7)
+                XCTFail("Expected creation failure for \(host)")
+            } catch {
+                if host == "forbidden.test" {
+                    guard case DockhandServiceError.message(let message) = error else { return XCTFail("Expected API error") }
+                    XCTAssertEqual(message, "Permission denied")
+                }
+            }
+        }
+    }
+
+    func testNewStackValidationRejectsDuplicateNamesPathsAndNonComposeYAML() throws {
+        let compose = "services:\n  app:\n    image: nginx\n"
+        XCTAssertNoThrow(try StackEditorValidator.validateNewStack(name: "new-stack_1", compose: compose, env: "PORT=8080", existingNames: []))
+        for name in ["", "../stack", "UPPER", "-stack", "stack/name", "has space"] {
+            XCTAssertThrowsError(try StackEditorValidator.validateNewStack(name: name, compose: compose, env: "", existingNames: []))
+        }
+        XCTAssertThrowsError(try StackEditorValidator.validateNewStack(name: "existing", compose: compose, env: "", existingNames: ["existing"]))
+        for yaml in ["", "hello", "[]", "services: {}", "services: []", "services: {app: nginx}", "services: ["] {
+            XCTAssertThrowsError(try StackEditorValidator.validateNewStack(name: "new", compose: yaml, env: "", existingNames: []))
+        }
+        XCTAssertThrowsError(try StackEditorValidator.validateNewStack(name: "new", compose: compose, env: "INVALID LINE", existingNames: []))
+    }
+
+    @MainActor
+    func testCreatedStackDeploymentTracksCompletionAndRejectsChangedScope() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [GitDeploymentURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://dockhand.test")!, token: "test", session: session)
+        let model = AppModel()
+        model.selectedProfileID = "creation-test"
+        model.selectedEnvironmentID = 2
+        let scope = model.connectionScope
+        let store = StacksStore()
+        let options = StackDeployOptions(pull: true, build: true, forceRecreate: true)
+        try await store.deployCreatedStack(name: "local-stack", service: service, environmentID: 2,
+                                          appModel: model, scope: scope, options: options)
+        XCTAssertEqual(store.redeployStatus, .complete)
+        XCTAssertEqual(store.redeployOutput, ["Compose redeployed"])
+        XCTAssertFalse(store.hasPendingAction)
+        for changedScope in [DockhandConnectionScope(profileID: "other", environmentID: 2),
+                             DockhandConnectionScope(profileID: "creation-test", environmentID: 3)] {
+            do {
+                try await store.deployCreatedStack(name: "local-stack", service: service, environmentID: 2,
+                                                  appModel: model, scope: changedScope, options: options)
+                XCTFail("A different scope must never start deployment")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+        }
+        XCTAssertFalse(store.hasPendingAction)
+    }
+
+    @MainActor
+    func testCreatedStackJobPreservesProgressAndReportsFailure() async throws {
+        for fails in [false, true] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GitDeploymentURLProtocol.self]
+            let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
+            let host = fails ? "creation-failure.test" : "creation-progress.test"
+            let service = DockhandService(baseURL: URL(string: "https://" + host)!, token: "test", session: session)
+            let model = AppModel()
+            model.selectedProfileID = "creation-progress"
+            model.selectedEnvironmentID = 2
+            let store = StacksStore()
+            do {
+                try await store.deployCreatedStack(name: "local-stack", service: service, environmentID: 2,
+                                                  appModel: model, scope: model.connectionScope,
+                                                  options: .init(pull: true, build: true, forceRecreate: true))
+                XCTAssertFalse(fails, "A failed deployment must not be reported as successful")
+                XCTAssertEqual(store.redeployStatus, .complete)
+            } catch {
+                XCTAssertTrue(fails)
+                XCTAssertEqual(store.redeployStatus, .failed)
+                XCTAssertEqual(store.redeployError, "Image pull failed")
+            }
+            XCTAssertEqual(store.redeploySteps, ["Pulling images"])
+            XCTAssertTrue(store.redeployOutput.contains("app Pulling"))
+            XCTAssertFalse(store.hasPendingAction)
+        }
+    }
+
     func testComposeRedeployKeepsEndpointEnvironmentAndAllOptions() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [GitDeploymentURLProtocol.self]
@@ -1078,7 +1268,18 @@ private final class GitDeploymentURLProtocol: URLProtocol, @unchecked Sendable {
                     client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
                     return
                 }
-                payload = #"{"success":true,"output":"Compose redeployed"}"#
+                if request.url?.host?.hasPrefix("creation-") == true {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
+                    payload = #"{"jobId":"creation-job"}"#
+                } else {
+                    payload = #"{"success":true,"output":"Compose redeployed"}"#
+                }
+            case ("GET", "/api/jobs/creation-job"):
+                if request.url?.host == "creation-failure.test" {
+                    payload = #"{"status":"error","lines":[{"event":"progress","data":{"status":"Pulling images","line":"app Pulling"}}],"result":{"success":false,"error":"Image pull failed"}}"#
+                } else {
+                    payload = #"{"status":"done","lines":[{"event":"progress","data":{"status":"Pulling images","line":"app Pulling"}}],"result":{"success":true,"output":"app Pulling\napp Created\napp Started"}}"#
+                }
             case ("POST", "/api/git/stacks/20/deploy"):
                 payload = #"{"jobId":"git-job"}"#
             case ("GET", "/api/jobs/git-job"):
@@ -1109,4 +1310,223 @@ final class ListSearchTests: XCTestCase {
         XCTAssertTrue("cafe".isSearchMatch(in: ["Café"]))
         XCTAssertFalse("redis".isSearchMatch(in: ["postgres", "nginx"]))
     }
+}
+
+
+private final class StackCreationURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let host = request.url!.host!
+        var body = request.httpBody ?? Data()
+        if body.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                guard count > 0 else { break }
+                body.append(contentsOf: buffer.prefix(count))
+            }
+        }
+        if host == "dockhand.test" {
+            let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/prefix/api/stacks")
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "env", value: "7")])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Proxy-Token"), "proxy-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(json?["name"] as? String, "new-stack")
+            XCTAssertEqual(json?["compose"] as? String, "services:\n  app:\n    image: nginx\n")
+            XCTAssertEqual(json?["rawEnvContent"] as? String, "# comment\nPORT=8080\n")
+            XCTAssertEqual(json?["start"] as? Bool, false)
+        }
+        let payload: String
+        switch host {
+        case "forbidden.test": payload = #"{"error":"Permission denied"}"#
+        case "unconfirmed.test": payload = "{}"
+        case "failure.test": payload = #"{"success":false,"error":"Cannot create stack"}"#
+        default: payload = #"{"success":true,"started":false}"#
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: host == "forbidden.test" ? 403 : 200,
+                              httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+
+private actor BatchProgressRecorder {
+    var events: [ContainerBatchUpdateProgress] = []
+    func append(_ event: ContainerBatchUpdateProgress) { events.append(event) }
+}
+
+final class ContainerBatchProgressTests: XCTestCase {
+    func testJobReportsActualStagesAndPartialFailuresWithProfileHeaders() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://progress.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        let recorder = BatchProgressRecorder()
+        let result = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) {
+            await recorder.append($0)
+        }
+        XCTAssertFalse(result.success)
+        XCTAssertEqual(result.summary.success, 1)
+        XCTAssertEqual(result.summary.failed, 1)
+        XCTAssertEqual(result.failureDetails, "database: pull failed")
+        let events = await recorder.events
+        XCTAssertEqual(events.compactMap(\.step), ["pulling", "creating", "done", "failed"])
+        XCTAssertEqual(events.first(where: { $0.step == "pulling" })?.containerName, "website")
+    }
+
+    func testUnsupportedEndpointFallsBackWithoutInventingPerContainerProgress() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://legacy.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        let recorder = BatchProgressRecorder()
+        let result = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) {
+            await recorder.append($0)
+        }
+        XCTAssertTrue(result.success)
+        let events = await recorder.events
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.type, "start")
+        XCTAssertNil(events.first?.step)
+    }
+
+    func testPermissionPollingAndIncompleteResultErrorsNeverRepeatMutation() async {
+        for host in ["forbidden.test", "poll-failure.test", "incomplete.test", "job-error.test"] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [BatchProgressURLProtocol.self]
+            let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
+            let service = DockhandService(baseURL: URL(string: "https://" + host + "/prefix")!, token: "token",
+                                          customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+            do {
+                _ = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) { _ in }
+                XCTFail("An unconfirmed operation must not be reported as successful")
+            } catch {
+                if host == "job-error.test" {
+                    guard case DockhandServiceError.message(let message) = error else {
+                        return XCTFail("Job failures must preserve the server error")
+                    }
+                    XCTAssertEqual(message, "Scanner unavailable")
+                }
+            }
+        }
+    }
+
+    func testScopeCancellationCanStopFallbackBeforeItsMutation() async {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://cancelled.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        do {
+            _ = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) { _ in
+                throw CancellationError()
+            }
+            XCTFail("A changed scope must stop the fallback request")
+        } catch { XCTAssertTrue(error is CancellationError) }
+    }
+}
+
+private final class BatchProgressURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Proxy-Key"), "proxy")
+        let host = request.url!.host!
+        let path = request.url!.path
+        var status = 200
+        let payload: String
+        if request.httpMethod == "POST" {
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "env", value: "7")])
+            var body = request.httpBody ?? Data()
+            if body.isEmpty, let stream = request.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable {
+                    let n = stream.read(&buffer, maxLength: buffer.count)
+                    guard n > 0 else { break }
+                    body.append(contentsOf: buffer.prefix(n))
+                }
+            }
+            let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: [String]]
+            XCTAssertEqual(json?["containerIds"], ["web", "db"])
+        }
+        switch path {
+        case "/prefix/api/containers/batch-update-stream":
+            if ["legacy.test", "cancelled.test"].contains(host) {
+                status = 404
+                payload = #"{"error":"Not found"}"#
+            } else if host == "forbidden.test" {
+                status = 403
+                payload = #"{"error":"Permission denied"}"#
+            } else { payload = #"{"jobId":"batch-job"}"# }
+        case "/prefix/api/containers/batch-update":
+            XCTAssertEqual(host, "legacy.test", "Never repeat an update after polling fails or scope cancellation")
+            payload = #"{"success":true,"results":[{"containerId":"web","containerName":"website","success":true},{"containerId":"db","containerName":"database","success":true}],"summary":{"total":2,"success":2,"failed":0}}"#
+        case "/prefix/api/jobs/batch-job":
+            if host == "poll-failure.test" {
+                status = 500; payload = #"{"error":"Job unavailable"}"#
+            } else if host == "job-error.test" {
+                payload = #"{"status":"error","lines":[],"result":{"success":false,"error":"Scanner unavailable"}}"#
+            } else if host == "incomplete.test" {
+                payload = #"{"status":"done","lines":[],"result":{"type":"complete","summary":{"total":2,"success":2,"failed":0}}}"#
+            } else {
+                payload = #"{"status":"done","lines":[{"data":{"type":"progress","containerId":"web","containerName":"website","step":"pulling"}},{"data":{"type":"progress","containerId":"web","step":"creating"}},{"data":{"type":"progress","containerId":"web","containerName":"website","step":"done"}},{"data":{"type":"progress","containerId":"db","containerName":"database","step":"failed","error":"pull failed"}}],"result":{"type":"complete","summary":{"total":2,"success":1,"failed":1,"blocked":0,"skipped":0}}}"#
+            }
+        default:
+            XCTFail("Unexpected route: \(path)")
+            status = 500; payload = "{}"
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status,
+                             httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+
+private final class ServerSwitchURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let old = request.url?.host == "home.test"
+        DispatchQueue.global().asyncAfter(deadline: .now() + (old ? 0.2 : 0)) { [self] in
+            let status: Int
+            let payload: String
+            switch request.url!.path {
+            case "/api/stacks":
+                status = 200
+                let name = old ? "home" : "work"
+                payload = "[{\"name\":\"\(name)\",\"containers\":[],\"containerDetails\":[],\"status\":\"running\"}]"
+            case "/api/containers", "/api/images":
+                status = old ? 500 : 200
+                payload = old ? #"{"error":"Old server response must be ignored"}"# : "[]"
+            default:
+                status = 200; payload = "[]"
+            }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status,
+                                 httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(payload.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+    override func stopLoading() {}
 }
