@@ -6,7 +6,7 @@ Resource task identities now include the resolved environment as well as the sel
 
 Each resource load has a token and checks its captured destination before publishing data or errors. A destination change clears old rows, while same-destination refreshes retain them. Containers are published as soon as their main request completes, without waiting for optional update badges. Environment discovery also rejects obsolete responses after another server selection.
 
-The header reserves space for its connection indicator and prevents the inline server selector from compressing away. Lists show loading while environments/resources are being fetched rather than prematurely claiming no data.
+The header uses one server selector in a stable row, with the environment picker below it, and reserves space for its connection indicator. The server menu is no longer duplicated across alternative `ViewThatFits` layouts during dismissal. Lists show loading while environments/resources are being fetched rather than prematurely claiming no data.
 
 Regression tests cover arrival of a remembered environment without a raw scope-ID change, and delayed old-server list results/errors after the new server loads. Explicit test URLSession injection is honored by both manual requests and the generated client; default production sessions are unchanged.
 

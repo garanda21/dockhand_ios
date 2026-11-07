@@ -21,25 +21,15 @@ struct EnvironmentHeaderBar: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Side by side when it fits; stack the picker below on narrow widths (iPhone Duo folded).
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 10) {
-                    serverInfo
-                        .fixedSize(horizontal: true, vertical: false)
-                    // Pin the picker to the trailing edge on wide layouts (iPhone Duo unfolded, iPad).
-                    Spacer(minLength: 0)
-                    environmentMenu
-                    loadingIndicator
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    serverInfo
-                    HStack(spacing: 10) {
-                        environmentMenu
-                        loadingIndicator
-                    }
-                }
+            // Keep one live server Menu in a stable row. Duplicating it in
+            // ViewThatFits candidates can hide its label during menu dismissal.
+            HStack(alignment: .center, spacing: 10) {
+                serverInfo
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                loadingIndicator
             }
+            environmentMenu
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if let environment = appModel.selectedEnvironment {
                 ScrollView(.horizontal, showsIndicators: false) {
