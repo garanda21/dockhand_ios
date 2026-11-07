@@ -103,6 +103,10 @@ private final class DashboardResourceDetailStore {
     var isLoading = false
     var isCheckingUpdates = false
     var isUpdatingContainers = false
+    var updatingContainerIDs: Set<String> = []
+    var completedUpdateIDs: Set<String> = []
+    var containerUpdateMessage = ""
+    var containerUpdateOutput: [String] = []
     var updateCheckProgress: Double?
     var operationMessage: String?
     var error: String?
@@ -185,23 +189,51 @@ private final class DashboardResourceDetailStore {
     }
 
     func updateContainers(_ updates: [PendingContainerUpdate], appModel: AppModel) async {
-        guard !updates.isEmpty,
+        guard !updates.isEmpty, !isUpdatingContainers, !isCheckingUpdates,
               let service = service(for: appModel),
               let environmentID = appModel.selectedEnvironment?.id else { return }
 
+        let scope = appModel.connectionScope
         isUpdatingContainers = true
+        updatingContainerIDs = Set(updates.map(\.containerID))
+        completedUpdateIDs = []
+        containerUpdateMessage = String(localized: "Updating containers…")
+        containerUpdateOutput = []
         operationMessage = nil
         error = nil
-        defer { isUpdatingContainers = false }
+        defer {
+            isUpdatingContainers = false
+            updatingContainerIDs = []
+        }
 
         do {
-            let response = try await service.updateContainers(
+            let response = try await service.updateContainersWithProgress(
                 ids: updates.map(\.containerID),
                 environmentID: environmentID
-            )
+            ) { event in
+                try Task.checkCancellation()
+                try await MainActor.run {
+                    guard appModel.isCurrentScope(scope) else { throw CancellationError() }
+                    if event.type == "heartbeat" { return }
+                    if event.isTerminalContainerStep, let id = event.containerId {
+                        self.completedUpdateIDs.insert(id)
+                    }
+                    if event.type != "pull_log" && event.type != "scan_log" && event.type != "complete" {
+                        self.containerUpdateMessage = event.displayMessage
+                    }
+                    let line = event.message ?? event.error ?? [event.pullStatus, event.pullProgress].compactMap { $0 }.joined(separator: " ")
+                    if !line.isEmpty, self.containerUpdateOutput.last != line {
+                        self.containerUpdateOutput.append(line)
+                        if self.containerUpdateOutput.count > 200 { self.containerUpdateOutput.removeFirst() }
+                    }
+                }
+            }
+            guard appModel.isCurrentScope(scope), !Task.isCancelled else { return }
+            containerUpdateMessage = String(localized: "Refreshing container updates…")
             // loadUpdates clears messages, so refresh the list before reporting the outcome.
             appModel.requestDashboardRefresh()
             await loadUpdates(appModel: appModel)
+            guard appModel.isCurrentScope(scope), !Task.isCancelled else { return }
             if response.summary.success > 0 {
                 operationMessage = String(
                     format: String(localized: "%d containers updated"),
@@ -219,7 +251,7 @@ private final class DashboardResourceDetailStore {
                 )
             }
         } catch {
-            guard !error.isDockhandCancellation else { return }
+            guard appModel.isCurrentScope(scope), !error.isDockhandCancellation else { return }
             self.error = error.dockhandUserFacingMessage
         }
     }
@@ -878,6 +910,32 @@ private struct DashboardUpdatesDetailView: View {
                     .listRowBackground(Color.clear)
             }
 
+            if store.isUpdatingContainers {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text(store.containerUpdateMessage)
+                                .font(.headline)
+                                .accessibilityAddTraits(.updatesFrequently)
+                        }
+                        if !store.updatingContainerIDs.isEmpty {
+                            ProgressView(value: Double(store.completedUpdateIDs.count), total: Double(store.updatingContainerIDs.count))
+                            Text(String(format: String(localized: "%1$lld of %2$lld containers processed"),
+                                        Int64(store.completedUpdateIDs.count), Int64(store.updatingContainerIDs.count)))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !store.containerUpdateOutput.isEmpty {
+                            Text(store.containerUpdateOutput.suffix(8).joined(separator: "\n"))
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+
             if let error = store.error {
                 Section {
                     Text(error)
@@ -956,8 +1014,11 @@ private struct DashboardUpdatesDetailView: View {
                             Button {
                                 updatesToConfirm = [update]
                             } label: {
-                                Image(systemName: "arrow.up.circle")
-                                    .font(.title3)
+                                if store.updatingContainerIDs.contains(update.containerID) {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "arrow.up.circle").font(.title3)
+                                }
                             }
                             .buttonStyle(.borderless)
                             .disabled(store.isCheckingUpdates || store.isUpdatingContainers)
@@ -969,6 +1030,19 @@ private struct DashboardUpdatesDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            if store.isUpdatingContainers {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text(store.containerUpdateMessage).font(.subheadline.weight(.medium))
+                    Spacer(minLength: 0)
+                }
+                .padding(18)
+                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            }
+        }
         .navigationTitle("Available Updates")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: ServerDetailsStore.loadID(appModel: appModel)) {

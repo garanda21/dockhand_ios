@@ -1,6 +1,126 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Pulling image…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando imagen…"
+          }
+        }
+      }
+    },
+    "Scanning image…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analizando imagen…"
+          }
+        }
+      }
+    },
+    "Stopping container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deteniendo contenedor…"
+          }
+        }
+      }
+    },
+    "Removing old container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminando contenedor anterior…"
+          }
+        }
+      }
+    },
+    "Recreating container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recreando contenedor…"
+          }
+        }
+      }
+    },
+    "Starting container…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrancando contenedor…"
+          }
+        }
+      }
+    },
+    "Container updated": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenedor actualizado"
+          }
+        }
+      }
+    },
+    "Updating containers…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando contenedores…"
+          }
+        }
+      }
+    },
+    "Pulling images and recreating containers…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando imágenes y recreando contenedores…"
+          }
+        }
+      }
+    },
+    "Container update progress could not be confirmed. Refresh before trying again.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo confirmar el resultado de la actualización. Actualiza la lista antes de reintentarlo."
+          }
+        }
+      }
+    },
+    "Refreshing container updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizando lista de contenedores…"
+          }
+        }
+      }
+    },
+    "%1$lld of %2$lld containers processed": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld de %2$lld contenedores procesados"
+          }
+        }
+      }
+    },
     "Checking stack…": {
       "localizations": {
         "es": {

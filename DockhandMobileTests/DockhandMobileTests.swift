@@ -1271,3 +1271,147 @@ private final class StackCreationURLProtocol: URLProtocol, @unchecked Sendable {
     }
     override func stopLoading() {}
 }
+
+
+private actor BatchProgressRecorder {
+    var events: [ContainerBatchUpdateProgress] = []
+    func append(_ event: ContainerBatchUpdateProgress) { events.append(event) }
+}
+
+final class ContainerBatchProgressTests: XCTestCase {
+    func testJobReportsActualStagesAndPartialFailuresWithProfileHeaders() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://progress.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        let recorder = BatchProgressRecorder()
+        let result = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) {
+            await recorder.append($0)
+        }
+        XCTAssertFalse(result.success)
+        XCTAssertEqual(result.summary.success, 1)
+        XCTAssertEqual(result.summary.failed, 1)
+        XCTAssertEqual(result.failureDetails, "database: pull failed")
+        let events = await recorder.events
+        XCTAssertEqual(events.compactMap(\.step), ["pulling", "creating", "done", "failed"])
+        XCTAssertEqual(events.first(where: { $0.step == "pulling" })?.containerName, "website")
+    }
+
+    func testUnsupportedEndpointFallsBackWithoutInventingPerContainerProgress() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://legacy.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        let recorder = BatchProgressRecorder()
+        let result = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) {
+            await recorder.append($0)
+        }
+        XCTAssertTrue(result.success)
+        let events = await recorder.events
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.type, "start")
+        XCTAssertNil(events.first?.step)
+    }
+
+    func testPermissionPollingAndIncompleteResultErrorsNeverRepeatMutation() async {
+        for host in ["forbidden.test", "poll-failure.test", "incomplete.test", "job-error.test"] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [BatchProgressURLProtocol.self]
+            let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
+            let service = DockhandService(baseURL: URL(string: "https://" + host + "/prefix")!, token: "token",
+                                          customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+            do {
+                _ = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) { _ in }
+                XCTFail("An unconfirmed operation must not be reported as successful")
+            } catch {
+                if host == "job-error.test" {
+                    guard case DockhandServiceError.message(let message) = error else {
+                        return XCTFail("Job failures must preserve the server error")
+                    }
+                    XCTAssertEqual(message, "Scanner unavailable")
+                }
+            }
+        }
+    }
+
+    func testScopeCancellationCanStopFallbackBeforeItsMutation() async {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BatchProgressURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let service = DockhandService(baseURL: URL(string: "https://cancelled.test/prefix")!, token: "token",
+                                      customHeaders: [.init(name: "X-Proxy-Key", value: "proxy")], session: session)
+        do {
+            _ = try await service.updateContainersWithProgress(ids: ["web", "db"], environmentID: 7) { _ in
+                throw CancellationError()
+            }
+            XCTFail("A changed scope must stop the fallback request")
+        } catch { XCTAssertTrue(error is CancellationError) }
+    }
+}
+
+private final class BatchProgressURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Proxy-Key"), "proxy")
+        let host = request.url!.host!
+        let path = request.url!.path
+        var status = 200
+        let payload: String
+        if request.httpMethod == "POST" {
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "env", value: "7")])
+            var body = request.httpBody ?? Data()
+            if body.isEmpty, let stream = request.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable {
+                    let n = stream.read(&buffer, maxLength: buffer.count)
+                    guard n > 0 else { break }
+                    body.append(contentsOf: buffer.prefix(n))
+                }
+            }
+            let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: [String]]
+            XCTAssertEqual(json?["containerIds"], ["web", "db"])
+        }
+        switch path {
+        case "/prefix/api/containers/batch-update-stream":
+            if ["legacy.test", "cancelled.test"].contains(host) {
+                status = 404
+                payload = #"{"error":"Not found"}"#
+            } else if host == "forbidden.test" {
+                status = 403
+                payload = #"{"error":"Permission denied"}"#
+            } else { payload = #"{"jobId":"batch-job"}"# }
+        case "/prefix/api/containers/batch-update":
+            XCTAssertEqual(host, "legacy.test", "Never repeat an update after polling fails or scope cancellation")
+            payload = #"{"success":true,"results":[{"containerId":"web","containerName":"website","success":true},{"containerId":"db","containerName":"database","success":true}],"summary":{"total":2,"success":2,"failed":0}}"#
+        case "/prefix/api/jobs/batch-job":
+            if host == "poll-failure.test" {
+                status = 500; payload = #"{"error":"Job unavailable"}"#
+            } else if host == "job-error.test" {
+                payload = #"{"status":"error","lines":[],"result":{"success":false,"error":"Scanner unavailable"}}"#
+            } else if host == "incomplete.test" {
+                payload = #"{"status":"done","lines":[],"result":{"type":"complete","summary":{"total":2,"success":2,"failed":0}}}"#
+            } else {
+                payload = #"{"status":"done","lines":[{"data":{"type":"progress","containerId":"web","containerName":"website","step":"pulling"}},{"data":{"type":"progress","containerId":"web","step":"creating"}},{"data":{"type":"progress","containerId":"web","containerName":"website","step":"done"}},{"data":{"type":"progress","containerId":"db","containerName":"database","step":"failed","error":"pull failed"}}],"result":{"type":"complete","summary":{"total":2,"success":1,"failed":1,"blocked":0,"skipped":0}}}"#
+            }
+        default:
+            XCTFail("Unexpected route: \(path)")
+            status = 500; payload = "{}"
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status,
+                             httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
