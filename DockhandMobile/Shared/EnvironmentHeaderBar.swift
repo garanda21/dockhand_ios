@@ -12,6 +12,16 @@ struct EnvironmentHeaderBar: View {
     let appModel: AppModel
     @Environment(\.showsEnvironmentHeader) private var showsEnvironmentHeader
     @AppStorage(serverPickerKey) private var showsServerPicker = false
+    @State private var headerWidth: CGFloat = 0
+    @ScaledMetric(relativeTo: .body) private var minimumInlineWidth: CGFloat = 300
+
+    private var showsInlinePickers: Bool { headerWidth >= minimumInlineWidth }
+
+    private var pickerLayout: AnyLayout {
+        showsInlinePickers
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: 10))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+    }
 
     var body: some View {
         if showsEnvironmentHeader {
@@ -21,15 +31,23 @@ struct EnvironmentHeaderBar: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Keep one live server Menu in a stable row. Duplicating it in
-            // ViewThatFits candidates can hide its label during menu dismissal.
-            HStack(alignment: .center, spacing: 10) {
+            // AnyLayout rearranges the same menus without duplicating or replacing them.
+            // Choose by available width, so changing server names does not change layout.
+            pickerLayout {
                 serverInfo
                     .frame(maxWidth: .infinity, alignment: .leading)
-                loadingIndicator
+                HStack(spacing: 10) {
+                    environmentMenu
+                    loadingIndicator
+                }
+                .frame(maxWidth: showsInlinePickers ? min(248, headerWidth / 2) : .infinity, alignment: .leading)
             }
-            environmentMenu
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.size.width
+            } action: { width in
+                headerWidth = width
+            }
 
             if let environment = appModel.selectedEnvironment {
                 ScrollView(.horizontal, showsIndicators: false) {
