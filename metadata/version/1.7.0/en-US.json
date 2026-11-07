@@ -4,5 +4,5 @@
   "marketingUrl": "https://github.com/garanda21/dockhand_ios",
   "promotionalText": "Manage containers, stacks, images and logs on your self-hosted Dockhand servers from your iPhone.",
   "supportUrl": "https://github.com/garanda21/dockhand_ios/issues",
-  "whatsNew": "Create and deploy Compose stacks directly from Dockhand Mobile.\n\n- Create stacks with Compose YAML and an optional .env file. Save them for later or start them immediately.\n- Follow stack deployments and container updates with live status and server output.\n- Switch between servers and environments with lists that reload automatically and a stable server selector.\n- See clearer update messages that distinguish recorded pending updates from a fresh image check.\n- Retry a failed stack deployment without creating the stack again."
+  "whatsNew": "What's New\n• Create Compose stacks with an optional .env file. Save them for later or start them right away.\n• Follow deployment and container update progress with live status and server output.\n• Retry a failed deployment without creating the stack again.\n\nFixes\n• Container, stack and image lists now refresh automatically when you switch servers or environments.\n• The server selector stays visible while switching servers.\n• Update messages now distinguish recorded pending updates from a fresh image check."
 }
