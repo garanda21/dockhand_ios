@@ -4,6 +4,30 @@ import SwiftUI
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    @MainActor
+    func testEnvironmentSwitchClearsPreviousUpdateCheckPresentation() async {
+        let model = AppModel()
+        model.serverProfiles = [] // No connection: this test must not contact a real server.
+        model.selectedProfileID = "update-status-test"
+        model.selectedEnvironmentID = 1
+        let store = DashboardResourceDetailStore()
+        await store.loadUpdates(appModel: model)
+        XCTAssertFalse(store.hasCheckedCurrentEnvironment)
+
+        store.isCheckingUpdates = true
+        store.updateCheckProgress = 0.5
+        store.operationMessage = "Result from the previous environment"
+        await store.loadUpdates(appModel: model)
+        XCTAssertTrue(store.isCheckingUpdates, "Reloading the same environment must not cancel its active check")
+
+        model.selectedEnvironmentID = 2
+        await store.loadUpdates(appModel: model)
+        XCTAssertFalse(store.isCheckingUpdates)
+        XCTAssertNil(store.updateCheckProgress)
+        XCTAssertNil(store.operationMessage)
+        XCTAssertFalse(store.hasCheckedCurrentEnvironment, "Loading saved pending updates is not an update check")
+    }
+
     func testCreateStackSendsSavedComposeEnvAndAuthenticationToSelectedEnvironment() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StackCreationURLProtocol.self]

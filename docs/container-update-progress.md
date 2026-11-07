@@ -14,4 +14,8 @@ Official endpoint reviewed: [Dockhand v1.0.50 batch-update-stream route](https:/
 
 ## Validation
 
-Four mocked HTTP tests cover actual stages and partial failures, legacy fallback, authentication and environment/base-path routing, authorization/polling/incomplete-result failures, fatal job errors without a progress-event type, and cancellation before fallback. The full app test suite passed on iOS 26.5: 91 tests, 3 optional integration tests skipped, 0 failures. No live containers were updated by these tests.
+Four mocked HTTP tests cover actual stages and partial failures, legacy fallback, authentication and environment/base-path routing, authorization/polling/incomplete-result failures, fatal job errors without a progress-event type, and cancellation before fallback. The full app test suite passed on iOS 26.5: 92 tests, 3 optional integration tests skipped, 0 failures. No live containers were updated by these tests.
+
+## Loading saved updates versus checking images
+
+Changing the environment or refreshing the list only fetches pending updates already recorded by Dockhand. The screen labels this as loading pending updates and, if empty, invites an explicit **Check for updates** rather than claiming all containers are up to date. A completed explicit check with zero results enables the separate “No updates found in the last check” state. Environment changes clear that state and invalidate old check results/progress so they cannot appear under a different destination.

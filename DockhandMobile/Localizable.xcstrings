@@ -1,6 +1,76 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Checking for updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscando actualizaciones…"
+          }
+        }
+      }
+    },
+    "Loading pending updates…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando actualizaciones pendientes…"
+          }
+        }
+      }
+    },
+    "Waiting for the update check to finish…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando a que termine la comprobación…"
+          }
+        }
+      }
+    },
+    "No updates found": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron actualizaciones"
+          }
+        }
+      }
+    },
+    "No updates were found in the last check for this environment.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron actualizaciones en la última comprobación de este entorno."
+          }
+        }
+      }
+    },
+    "No recorded updates": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay actualizaciones registradas"
+          }
+        }
+      }
+    },
+    "Run Check for updates to look for newer images. Loading this list does not check for new updates.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulsa Buscar actualizaciones para buscar imágenes nuevas. Cargar esta lista no comprueba si hay nuevas actualizaciones."
+          }
+        }
+      }
+    },
     "Pulling image…": {
       "localizations": {
         "es": {
