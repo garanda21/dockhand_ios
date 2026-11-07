@@ -13,7 +13,7 @@ final class ServerDetailsStore {
     private var loadToken = UUID()
 
     static func loadID(appModel: AppModel) -> String {
-        "\(appModel.connectionScopeID):\(appModel.selectedEnvironment?.id ?? -1)"
+        appModel.connectionLoadID
     }
 
     func load(appModel: AppModel) async {

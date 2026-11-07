@@ -53,7 +53,11 @@ struct StacksView: View {
             }
 
             Section("Stacks") {
-                if store.error == nil && filteredStacks.isEmpty {
+                if appModel.isLoadingEnvironments && appModel.selectedEnvironment == nil {
+                    ProgressView("Loading environments…")
+                } else if store.isLoading && store.stacks.isEmpty {
+                    ProgressView("Loading…")
+                } else if store.error == nil && filteredStacks.isEmpty {
                     Text(
                         !searchText.trimmed.isEmpty
                             ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
@@ -123,12 +127,7 @@ struct StacksView: View {
                 }
             }
         }
-        .overlay {
-            if store.isLoading && store.stacks.isEmpty {
-                ProgressView()
-            }
-        }
-        .task(id: "\(appModel.connectionScopeID):\(appModel.dashboardRefreshRevision)") {
+        .task(id: "\(appModel.connectionLoadID):\(appModel.dashboardRefreshRevision)") {
             await store.load(appModel: appModel)
         }
         .refreshable {

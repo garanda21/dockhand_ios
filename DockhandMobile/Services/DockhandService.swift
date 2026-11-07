@@ -569,19 +569,22 @@ struct DockhandService {
     let token: String
     let customHeaders: [DockhandCustomHeader]
     private let session: URLSession
+    private let apiSession: URLSession?
 
-    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = [], session: URLSession = DockhandHTTPSession.shared) {
+    init(baseURL: URL, token: String, customHeaders: [DockhandCustomHeader] = [], session: URLSession? = nil) {
         self.baseURL = baseURL
         self.token = DockhandToken.normalized(token)
         self.customHeaders = DockhandCustomHeaderValidator.sanitized(customHeaders)
-        self.session = session
+        self.session = session ?? DockhandHTTPSession.shared
+        self.apiSession = session
     }
 
     private var client: Client {
         DockhandAPIClientFactory.makeClient(
             baseURL: baseURL,
             token: token.isEmpty ? nil : token,
-            customHeaders: customHeaders
+            customHeaders: customHeaders,
+            session: apiSession
         )
     }
 

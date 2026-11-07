@@ -53,7 +53,11 @@ struct ImagesView: View {
             }
 
             Section("Images") {
-                if filteredImages.isEmpty {
+                if appModel.isLoadingEnvironments && appModel.selectedEnvironment == nil {
+                    ProgressView("Loading environments…")
+                } else if store.isLoading && store.images.isEmpty {
+                    ProgressView("Loading…")
+                } else if filteredImages.isEmpty {
                     Text(
                         !searchText.trimmed.isEmpty
                             ? String(format: String(localized: "No results for “%@”"), locale: Locale.current, searchText.trimmed)
@@ -140,12 +144,7 @@ struct ImagesView: View {
         .sheet(isPresented: $pullSheetPresented) {
             PullImageSheet(appModel: appModel, scope: appModel.connectionScope, store: store, actionScope: .list)
         }
-        .overlay {
-            if store.isLoading && store.images.isEmpty {
-                ProgressView()
-            }
-        }
-        .task(id: "\(appModel.connectionScopeID):\(appModel.dashboardRefreshRevision)") {
+        .task(id: "\(appModel.connectionLoadID):\(appModel.dashboardRefreshRevision)") {
             await store.load(appModel: appModel)
         }
         .refreshable {

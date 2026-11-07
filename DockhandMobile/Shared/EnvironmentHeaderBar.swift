@@ -25,6 +25,7 @@ struct EnvironmentHeaderBar: View {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: 10) {
                     serverInfo
+                        .fixedSize(horizontal: true, vertical: false)
                     // Pin the picker to the trailing edge on wide layouts (iPhone Duo unfolded, iPad).
                     Spacer(minLength: 0)
                     environmentMenu
@@ -139,7 +140,7 @@ struct EnvironmentHeaderBar: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "globe.europe.africa.fill")
-                Text(appModel.selectedEnvironmentName)
+                Text(appModel.isLoadingEnvironments && appModel.environments.isEmpty ? String(localized: "Loading environments…") : appModel.selectedEnvironmentName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -156,13 +157,13 @@ struct EnvironmentHeaderBar: View {
         .disabled(appModel.environments.isEmpty)
     }
 
-    @ViewBuilder
     private var loadingIndicator: some View {
-        if appModel.isLoadingEnvironments {
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: 28, height: 28)
+        Group {
+            if appModel.isLoadingEnvironments {
+                ProgressView().controlSize(.small)
+            }
         }
+        .frame(width: 28, height: 28)
     }
 
     private var lastHealthStatus: String? {

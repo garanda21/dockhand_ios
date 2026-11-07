@@ -27,11 +27,12 @@ public enum DockhandAPIClientFactory {
     public static func makeClient(
         baseURL: URL,
         token: String?,
-        customHeaders: [DockhandCustomHeader] = []
+        customHeaders: [DockhandCustomHeader] = [],
+        session: URLSession? = nil
     ) -> Client {
         let normalizedToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         let transport = URLSessionTransport(
-            configuration: URLSessionTransport.Configuration(session: DockhandHTTPSession.api)
+            configuration: URLSessionTransport.Configuration(session: session ?? DockhandHTTPSession.api)
         )
 
         let trimmedPath = baseURL.path.hasSuffix("/") ? String(baseURL.path.dropLast()) : baseURL.path

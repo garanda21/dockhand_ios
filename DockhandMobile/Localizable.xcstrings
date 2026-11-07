@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Loading environments…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando entornos…"
+          }
+        }
+      }
+    },
     "Checking for updates…": {
       "localizations": {
         "es": {

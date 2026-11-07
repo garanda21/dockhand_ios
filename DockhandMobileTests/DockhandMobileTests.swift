@@ -28,6 +28,68 @@ final class DockhandMobileTests: XCTestCase {
         XCTAssertFalse(store.hasCheckedCurrentEnvironment, "Loading saved pending updates is not an update check")
     }
 
+    @MainActor
+    func testListLoadIdentityChangesWhenRememberedEnvironmentArrives() async {
+        let model = AppModel()
+        model.serverProfiles = [.init(id: "work", name: "Work", baseURL: "https://work.test")]
+        model.selectedProfileID = "work"
+        model.selectedEnvironmentID = 1
+        model.environments = []
+        let identityBefore = model.connectionLoadID
+        let scopeBefore = model.connectionScopeID
+        let containers = ContainersStore()
+        let stacks = StacksStore()
+        let images = ImagesStore()
+        await containers.load(appModel: model)
+        await stacks.load(appModel: model)
+        await images.load(appModel: model)
+        XCTAssertTrue(containers.containers.isEmpty)
+        XCTAssertTrue(stacks.stacks.isEmpty)
+        XCTAssertTrue(images.images.isEmpty)
+
+        model.environments = [makeEnvironment(publicIP: nil)]
+        XCTAssertEqual(model.connectionScopeID, scopeBefore, "The remembered selection itself did not change")
+        XCTAssertNotEqual(model.connectionLoadID, identityBefore, "List tasks must restart once the environment is available")
+        XCTAssertEqual(ServerDetailsStore.loadID(appModel: model), model.connectionLoadID)
+    }
+
+    @MainActor
+    func testLateListResponsesCannotOverwriteNewServerData() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ServerSwitchURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let model = AppModel()
+        model.serverProfiles = [.init(id: "home", name: "Home", baseURL: "https://home.test"),
+                                .init(id: "work", name: "Work", baseURL: "https://work.test")]
+        model.selectedProfileID = "home"
+        model.selectedEnvironmentID = 1
+        model.environments = [makeEnvironment(publicIP: nil)]
+        let oldService = DockhandService(baseURL: URL(string: "https://home.test")!, token: "", session: session)
+        let newService = DockhandService(baseURL: URL(string: "https://work.test")!, token: "", session: session)
+        let containers = ContainersStore()
+        let stacks = StacksStore()
+        let images = ImagesStore()
+        let oldContainers = Task { await containers.load(appModel: model, service: oldService) }
+        let oldStacks = Task { await stacks.load(appModel: model, service: oldService) }
+        let oldImages = Task { await images.load(appModel: model, service: oldService) }
+        try await Task.sleep(for: .milliseconds(50))
+        model.selectedProfileID = "work"
+        await containers.load(appModel: model, service: newService)
+        await stacks.load(appModel: model, service: newService)
+        await images.load(appModel: model, service: newService)
+        XCTAssertEqual(stacks.stacks.first?.name, "work")
+        await oldContainers.value
+        await oldStacks.value
+        await oldImages.value
+        XCTAssertTrue(containers.containers.isEmpty)
+        XCTAssertEqual(stacks.stacks.first?.name, "work")
+        XCTAssertTrue(images.images.isEmpty)
+        XCTAssertNil(containers.error)
+        XCTAssertNil(stacks.error)
+        XCTAssertNil(images.error)
+    }
+
     func testCreateStackSendsSavedComposeEnvAndAuthenticationToSelectedEnvironment() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StackCreationURLProtocol.self]
@@ -1436,6 +1498,35 @@ private final class BatchProgressURLProtocol: URLProtocol, @unchecked Sendable {
                              httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(payload.utf8))
         client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+
+private final class ServerSwitchURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let old = request.url?.host == "home.test"
+        DispatchQueue.global().asyncAfter(deadline: .now() + (old ? 0.2 : 0)) { [self] in
+            let status: Int
+            let payload: String
+            switch request.url!.path {
+            case "/api/stacks":
+                status = 200
+                let name = old ? "home" : "work"
+                payload = "[{\"name\":\"\(name)\",\"containers\":[],\"containerDetails\":[],\"status\":\"running\"}]"
+            case "/api/containers", "/api/images":
+                status = old ? 500 : 200
+                payload = old ? #"{"error":"Old server response must be ignored"}"# : "[]"
+            default:
+                status = 200; payload = "[]"
+            }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status,
+                                 httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(payload.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
     }
     override func stopLoading() {}
 }
