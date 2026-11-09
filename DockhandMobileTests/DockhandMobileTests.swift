@@ -1,9 +1,109 @@
 import XCTest
+import Security
 import SwiftUI
 @testable import DockhandMobile
 import DockhandAPI
 
 final class DockhandMobileTests: XCTestCase {
+    func testSyncTombstoneWinsAgainstOlderOfflineEdit() throws {
+        let profile = DockhandServerProfile(id: "sync-test", name: "Test", baseURL: "https://example.invalid")
+        let edit = ServerSyncRecord(profile: profile, modified: Date(timeIntervalSince1970: 10), mutation: "a", credentialID: "secret", position: 0, deleted: false)
+        var deletion = edit
+        deletion.modified = Date(timeIntervalSince1970: 20)
+        deletion.deleted = true
+        XCTAssertTrue(deletion.supersedes(edit))
+        XCTAssertFalse(edit.supersedes(deletion))
+        let decoded = try JSONDecoder().decode(ServerSyncRecord.self, from: JSONEncoder().encode(deletion))
+        XCTAssertEqual(decoded, deletion)
+        XCTAssertTrue(decoded.deleted)
+    }
+
+    func testReorderingDoesNotOverwriteNewerServerCredentials() {
+        let old = ServerSyncRecord(profile: .init(id: "server", name: "Old", baseURL: "https://old.invalid"), modified: Date(timeIntervalSince1970: 10), mutation: "a", credentialID: "old-secret", position: 0, deleted: false)
+        var reordered = old
+        reordered.position = 2
+        reordered.orderModified = Date(timeIntervalSince1970: 30)
+        reordered.orderMutation = "move"
+        var edited = old
+        edited.profile.baseURL = "https://new.invalid"
+        edited.credentialID = "new-secret"
+        edited.modified = Date(timeIntervalSince1970: 20)
+        let merged = ServerSyncRecord.merged(reordered, edited)
+        XCTAssertEqual(merged.profile.baseURL, "https://new.invalid")
+        XCTAssertEqual(merged.credentialID, "new-secret")
+        XCTAssertEqual(merged.position, 2)
+        XCTAssertEqual(merged, ServerSyncRecord.merged(edited, reordered))
+        edited.deleted = true
+        XCTAssertTrue(ServerSyncRecord.merged(reordered, edited).deleted)
+    }
+
+    func testSyncConcurrentChangesHaveDeterministicWinner() {
+        let profile = DockhandServerProfile(id: "sync-test", name: "Test", baseURL: "https://example.invalid")
+        let first = ServerSyncRecord(profile: profile, modified: Date(timeIntervalSince1970: 10), mutation: "a", credentialID: "secret", position: 0, deleted: false)
+        var second = first
+        second.mutation = "b"
+        XCTAssertTrue(second.supersedes(first))
+        XCTAssertFalse(first.supersedes(second))
+        XCTAssertFalse(first.supersedes(first))
+    }
+
+    @MainActor
+    func testEmptyProfileListDoesNotResurrectLegacyServer() throws {
+        withRestoredDefaults(keys: ["dockhand.serverProfiles", "dockhand.baseURL"]) { defaults in
+            defaults.set("https://legacy.invalid", forKey: "dockhand.baseURL")
+            PreferencesStore.serverProfiles = []
+            XCTAssertTrue(PreferencesStore.serverProfiles.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testDisablingSyncCanKeepOrRemoveLocalRecords() throws {
+        let keys = ["dockhand.serverProfiles", "dockhand.selectedProfileID", "dockhand.sync.enabled", "dockhand.sync.pending", "dockhand.sync.records", "dockhand.sync.orderDirty", "dockhand.sync.dirty", "dockhand.sync.dirtyDates"]
+        withRestoredDefaults(keys: keys) { defaults in
+            defaults.set(true, forKey: "dockhand.sync.enabled")
+            let profile = DockhandServerProfile(id: UUID().uuidString, name: "Test", baseURL: "https://example.invalid")
+            PreferencesStore.serverProfiles = [profile]
+            PreferencesStore.selectedProfileID = profile.id
+            let store = ServerSyncStore()
+            let otherWindow = ServerSyncStore()
+            store.disable(removeLocal: false)
+            otherWindow.refresh()
+            XCTAssertFalse(otherWindow.enabled, "Opting out applies to every window on this device")
+            XCTAssertEqual(PreferencesStore.serverProfiles, [profile])
+            XCTAssertEqual(PreferencesStore.selectedProfileID, profile.id)
+            XCTAssertFalse(store.enabled)
+            store.disable(removeLocal: true)
+            XCTAssertTrue(PreferencesStore.serverProfiles.isEmpty)
+            XCTAssertNil(PreferencesStore.selectedProfileID)
+        }
+    }
+
+    func testCredentialMigrationPreservesTokenAndCustomHeaders() throws {
+        let id = "sync-test-" + UUID().uuidString
+        defer {
+            KeychainStore.deleteToken(profileID: id)
+            KeychainStore.deleteCustomHeaders(profileID: id)
+        }
+        let expected = SyncedServerCredentials(token: "sample-token", headers: [.init(name: "X-Access", value: "sample-value")])
+        // Seed the pre-sync layout: separate token and header items.
+        for (account, data) in [
+            ("dockhand-token." + id, Data(expected.token.utf8)),
+            ("dockhand-headers." + id, try JSONEncoder().encode(expected.headers))
+        ] {
+            let item: [CFString: Any] = [kSecClass: kSecClassGenericPassword,
+                kSecAttrService: "pro.dockhand.mobile", kSecAttrAccount: account,
+                kSecValueData: data, kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+            XCTAssertEqual(SecItemAdd(item as CFDictionary, nil), errSecSuccess)
+        }
+        let legacy = try KeychainStore.credentialsForSync(profileID: id)
+        XCTAssertEqual(legacy.token, expected.token)
+        XCTAssertEqual(legacy.headers, expected.headers)
+        try KeychainStore.installSyncedCredentials(legacy, profileID: id)
+        let actual = try KeychainStore.credentialsForSync(profileID: id)
+        XCTAssertEqual(actual.token, expected.token)
+        XCTAssertEqual(actual.headers, expected.headers)
+    }
+
     @MainActor
     func testEnvironmentSwitchClearsPreviousUpdateCheckPresentation() async {
         let model = AppModel()

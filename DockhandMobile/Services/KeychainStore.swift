@@ -13,50 +13,94 @@ enum KeychainStore {
     private static let legacyAccount = "dockhand-token"
 
     static func readToken(profileID: String) -> String? {
-        readToken(account: account(for: profileID)).map(DockhandToken.normalized)
+        if let local = try? credentialsForSync(profileID: profileID) { return DockhandToken.normalized(local.token) }
+        return nil
     }
 
     static func writeToken(_ token: String, profileID: String) {
-        writeToken(DockhandToken.normalized(token), account: account(for: profileID))
+        guard var local = try? credentialsForSync(profileID: profileID) else { return }
+        local.token = DockhandToken.normalized(token)
+        try? installSyncedCredentials(local, profileID: profileID)
     }
 
     static func deleteToken(profileID: String) {
+        writeToken("", profileID: profileID)
+    }
+
+    static func deleteCredentials(profileID: String) {
+        deleteItem(account: "dockhand-credentials." + profileID)
         deleteItem(account: account(for: profileID))
+        deleteItem(account: headersAccount(for: profileID))
     }
 
     static func migrateLegacyTokenIfNeeded(to profileID: String) {
-        let targetAccount = account(for: profileID)
-        guard readToken(account: targetAccount) == nil,
-              let legacyToken = readLegacyToken(),
-              !legacyToken.isEmpty else {
-            return
+        guard var local = try? credentialsForSync(profileID: profileID),
+              readData(account: "dockhand-credentials." + profileID) == nil,
+              readToken(account: account(for: profileID)) == nil,
+              let legacyToken = readLegacyToken(), !legacyToken.isEmpty else { return }
+        local.token = DockhandToken.normalized(legacyToken)
+        do {
+            try installSyncedCredentials(local, profileID: profileID)
+            deleteItem(account: legacyAccount)
+        } catch {
+            // Preserve the legacy item until the complete local snapshot is committed.
         }
-
-        writeToken(DockhandToken.normalized(legacyToken), account: targetAccount)
-        deleteItem(account: legacyAccount)
     }
 
     /// Custom header names and values are stored together as one JSON item per
-    /// profile. The item never leaves this device (no backups, no iCloud sync)
-    /// and stays readable after first unlock so background refresh keeps working.
+    /// profile. This local mirror stays readable after first unlock. When users
+    /// enable sync, a separate versioned item is stored in iCloud Keychain.
     static func readCustomHeaders(profileID: String) -> [DockhandCustomHeader] {
-        guard let data = readData(account: headersAccount(for: profileID)),
-              let headers = try? JSONDecoder().decode([DockhandCustomHeader].self, from: data) else {
-            return []
-        }
-        return headers
+        (try? credentialsForSync(profileID: profileID).headers) ?? []
     }
 
     static func writeCustomHeaders(_ headers: [DockhandCustomHeader], profileID: String) {
-        let account = headersAccount(for: profileID)
-        guard !headers.isEmpty, let data = try? JSONEncoder().encode(headers) else {
-            deleteItem(account: account)
-            return
-        }
-        writeData(data, account: account, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+        guard var local = try? credentialsForSync(profileID: profileID) else { return }
+        local.headers = headers
+        try? installSyncedCredentials(local, profileID: profileID)
     }
 
     static func deleteCustomHeaders(profileID: String) {
+        guard let local = try? credentialsForSync(profileID: profileID) else { return }
+        if local.token.isEmpty { deleteCredentials(profileID: profileID) }
+        else { writeCustomHeaders([], profileID: profileID) }
+    }
+
+    static func credentialsForSync(profileID: String) throws -> SyncedServerCredentials {
+        func checkedData(_ account: String) throws -> Data? {
+            let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword,
+                kSecAttrService: service, kSecAttrAccount: account, kSecAttrSynchronizable: false,
+                kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne]
+            var result: AnyObject?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            if status == errSecItemNotFound { return nil }
+            guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+            return result as? Data
+        }
+        if let bundle = try checkedData("dockhand-credentials." + profileID) {
+            return try JSONDecoder().decode(SyncedServerCredentials.self, from: bundle)
+        }
+        let tokenData = try checkedData(account(for: profileID))
+        let headersData = try checkedData(headersAccount(for: profileID))
+        return SyncedServerCredentials(
+            token: tokenData.flatMap { String(data: $0, encoding: .utf8) } ?? "",
+            headers: try headersData.map { try JSONDecoder().decode([DockhandCustomHeader].self, from: $0) } ?? [])
+    }
+
+    /// Commit the complete credential snapshot as one atomic Keychain update.
+    static func installSyncedCredentials(_ credentials: SyncedServerCredentials, profileID: String) throws {
+        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service, kSecAttrAccount: "dockhand-credentials." + profileID,
+            kSecAttrSynchronizable: false]
+        let attributes: [CFString: Any] = [kSecValueData: try JSONEncoder().encode(credentials),
+            kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(query.merging(attributes) { _, new in new } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        // Remove legacy fragments only after the complete local snapshot exists.
+        deleteItem(account: account(for: profileID))
         deleteItem(account: headersAccount(for: profileID))
     }
 
@@ -91,40 +135,6 @@ enum KeychainStore {
             return nil
         }
         return data
-    }
-
-    private static func writeToken(_ token: String, account: String) {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account
-        ]
-
-        if token.isEmpty {
-            SecItemDelete(query as CFDictionary)
-            return
-        }
-
-        writeData(Data(token.utf8), account: account, accessibility: nil)
-    }
-
-    private static func writeData(_ data: Data, account: String, accessibility: CFString?) {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account
-        ]
-
-        var attributes: [CFString: Any] = [kSecValueData: data]
-        if let accessibility {
-            attributes[kSecAttrAccessible] = accessibility
-        }
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-
-        if updateStatus == errSecItemNotFound {
-            let item = query.merging(attributes) { _, new in new }
-            SecItemAdd(item as CFDictionary, nil)
-        }
     }
 
     private static func deleteItem(account: String) {

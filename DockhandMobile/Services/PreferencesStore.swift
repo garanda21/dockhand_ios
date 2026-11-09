@@ -32,8 +32,7 @@ enum PreferencesStore {
     static var serverProfiles: [DockhandServerProfile] {
         get {
             if let data = defaults.data(forKey: profilesKey) {
-                if let decoded = try? JSONDecoder().decode([DockhandServerProfile].self, from: data),
-                   !decoded.isEmpty {
+                if let decoded = try? JSONDecoder().decode([DockhandServerProfile].self, from: data) {
                     return decoded
                 }
                 defaults.removeObject(forKey: profilesKey)
