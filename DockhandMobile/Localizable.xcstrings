@@ -4932,6 +4932,146 @@
           }
         }
       }
+    },
+    "Sync servers with iCloud" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincroniza servidores con iCloud"
+          }
+        }
+      }
+    },
+    "Sync server addresses, order, tokens and custom headers across your devices. Credentials use iCloud Keychain. Your selected server and environment stay on this device." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincroniza las direcciones, el orden, los tokens y los headers personalizados de tus servidores entre dispositivos. Las credenciales usan el llavero de iCloud. El servidor y el entorno seleccionados se mantienen en este dispositivo."
+          }
+        }
+      }
+    },
+    "Some server credentials are unavailable. Wait for iCloud Keychain or edit the server." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faltan credenciales de algunos servidores. Espera al llavero de iCloud o edita el servidor."
+          }
+        }
+      }
+    },
+    "Turn off iCloud sync?" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Desactivar la sincronización con iCloud?"
+          }
+        }
+      }
+    },
+    "Keep servers on this device" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservar los servidores en este dispositivo"
+          }
+        }
+      }
+    },
+    "Remove servers from this device" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar los servidores de este dispositivo"
+          }
+        }
+      }
+    },
+    "Choose whether to keep a local copy. Servers in iCloud and on your other devices will be kept." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige si quieres conservar una copia local. Se conservarán los servidores en iCloud y en tus otros dispositivos."
+          }
+        }
+      }
+    },
+    "Could not enable iCloud sync. Check your iCloud account and iCloud Keychain settings, then try again." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo activar la sincronización. Revisa tu cuenta y el llavero de iCloud y vuelve a intentarlo."
+          }
+        }
+      }
+    },
+    "iCloud storage limit reached. Your servers remain saved locally." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se alcanzó el límite de almacenamiento de iCloud. Tus servidores siguen guardados localmente."
+          }
+        }
+      }
+    },
+    "Could not sync credentials. Your changes remain saved locally." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron sincronizar las credenciales. Tus cambios siguen guardados localmente."
+          }
+        }
+      }
+    },
+    "Your iCloud account changed. Sync has been turned off; your local servers were kept." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu cuenta de iCloud ha cambiado. Se ha desactivado la sincronización y se han conservado tus servidores locales."
+          }
+        }
+      }
+    },
+    "Could not save credentials. Unlock your device and try again." : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron guardar las credenciales. Desbloquea tu dispositivo y vuelve a intentarlo."
+          }
+        }
+      }
+    },
+    "Move up" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subir"
+          }
+        }
+      }
+    },
+    "Move down" : {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bajar"
+          }
+        }
+      }
     }
   },
   "version" : "1.2"

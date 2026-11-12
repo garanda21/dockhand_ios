@@ -5,6 +5,7 @@ import Observation
 struct DockhandConnectionScope: Hashable, Sendable {
     var profileID: String?
     var environmentID: Int?
+    var revision: Int = 0
 }
 
 enum DockhandServerAddress {
@@ -35,6 +36,9 @@ enum DockhandServerAddress {
 @MainActor
 @Observable
 final class AppModel {
+    let serverSync = ServerSyncStore()
+    private var syncConnectionRevision = 0
+    private var activeSyncPending = false
     var serverProfiles: [DockhandServerProfile]
     var selectedProfileID: String?
     var token: String
@@ -91,7 +95,8 @@ final class AppModel {
     }
 
     var normalizedBaseURL: URL? {
-        selectedProfile.flatMap { DockhandServerAddress.normalizedURL(from: $0.baseURL) }
+        guard !serverSync.pendingCredentials.contains(selectedProfileID ?? "") else { return nil }
+        return selectedProfile.flatMap { DockhandServerAddress.normalizedURL(from: $0.baseURL) }
     }
 
     var selectedEnvironment: Components.Schemas.Environment? {
@@ -103,7 +108,7 @@ final class AppModel {
     }
 
     var connectionScopeID: String {
-        "\(selectedProfileID ?? "none"):\(selectedEnvironmentID ?? -1)"
+        "\(selectedProfileID ?? "none"):\(selectedEnvironmentID ?? -1):\(syncConnectionRevision)"
     }
 
     /// A remembered environment ID alone is not enough: list tasks must restart
@@ -113,7 +118,7 @@ final class AppModel {
     }
 
     var connectionScope: DockhandConnectionScope {
-        DockhandConnectionScope(profileID: selectedProfileID, environmentID: selectedEnvironmentID)
+        DockhandConnectionScope(profileID: selectedProfileID, environmentID: selectedEnvironmentID, revision: syncConnectionRevision)
     }
 
     /// Builds a service carrying the active profile's token and custom headers.
@@ -131,11 +136,14 @@ final class AppModel {
     }
 
     func bootstrap() async {
+        serverSync.onChange = { [weak self] in self?.applySyncedServers() }
+        serverSync.refresh()
         await refreshEnvironments(forceEnvironmentReset: false)
     }
 
     /// Persists the profile immediately. Reconnecting runs in the background so
     /// an unreachable server never blocks the editor.
+    @discardableResult
     func saveServerProfile(
         profileID: String?,
         name: String,
@@ -143,7 +151,7 @@ final class AppModel {
         token: String,
         customHeaders: [DockhandCustomHeader] = [],
         makeActive: Bool = true
-    ) {
+    ) -> Bool {
         let cleanedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedURL = baseURLText.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = cleanedName.isEmpty ? cleanedURL : cleanedName
@@ -151,29 +159,37 @@ final class AppModel {
         let targetID = profileID ?? UUID().uuidString
         let profile = DockhandServerProfile(id: targetID, name: resolvedName, baseURL: cleanedURL)
 
+        do {
+            try KeychainStore.installSyncedCredentials(
+                SyncedServerCredentials(token: DockhandToken.normalized(token), headers: DockhandCustomHeaderValidator.sanitized(customHeaders)),
+                profileID: targetID)
+        } catch {
+            serverSync.error = String(localized: "Could not save credentials. Unlock your device and try again.")
+            return false
+        }
+
         if let index = serverProfiles.firstIndex(where: { $0.id == targetID }) {
             serverProfiles[index] = profile
         } else {
             serverProfiles.append(profile)
         }
 
-        serverProfiles.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         PreferencesStore.serverProfiles = serverProfiles
-        KeychainStore.writeToken(token, profileID: targetID)
-        KeychainStore.writeCustomHeaders(DockhandCustomHeaderValidator.sanitized(customHeaders), profileID: targetID)
 
+        serverSync.save(profile, position: serverProfiles.firstIndex(where: { $0.id == targetID }) ?? 0)
         if makeActive || selectedProfileID == nil {
             Task { await selectServerProfile(targetID, forceEnvironmentReset: true) }
         }
+        return true
     }
 
     func deleteServerProfile(_ profileID: String) async {
+        if let profile = serverProfiles.first(where: { $0.id == profileID }) { serverSync.delete(profile) }
         serverProfiles.removeAll { $0.id == profileID }
         PreferencesStore.serverProfiles = serverProfiles
         PreferencesStore.removeSelectedEnvironmentID(for: profileID)
         PreferencesStore.removeCachedDashboardSnapshots(for: profileID)
-        KeychainStore.deleteToken(profileID: profileID)
-        KeychainStore.deleteCustomHeaders(profileID: profileID)
+        KeychainStore.deleteCredentials(profileID: profileID)
 
         if selectedProfileID == profileID {
             selectedProfileID = serverProfiles.first?.id
@@ -186,6 +202,41 @@ final class AppModel {
             environmentError = nil
             await refreshEnvironments(forceEnvironmentReset: true)
         }
+    }
+
+    func moveServers(from source: IndexSet, to destination: Int) {
+        guard (0...serverProfiles.count).contains(destination),
+              source.allSatisfy({ serverProfiles.indices.contains($0) }) else { return }
+        var reordered = serverProfiles
+        let moving = source.sorted().map { reordered[$0] }
+        for index in source.sorted(by: >) { reordered.remove(at: index) }
+        reordered.insert(contentsOf: moving, at: destination - source.filter { $0 < destination }.count)
+        serverProfiles = reordered
+        PreferencesStore.serverProfiles = reordered
+        serverSync.reorder(reordered)
+    }
+
+    private func applySyncedServers() {
+        let profiles = PreferencesStore.serverProfiles
+        let active = profiles.first(where: { $0.id == selectedProfileID }) ?? profiles.first
+        let pending = serverSync.pendingCredentials.contains(active?.id ?? "")
+        let newToken = pending ? "" : active.flatMap { KeychainStore.readToken(profileID: $0.id) } ?? ""
+        let newHeaders = pending ? [] : active.map { KeychainStore.readCustomHeaders(profileID: $0.id) } ?? []
+        let changed = pending != activeSyncPending || selectedProfile != active || token != newToken || customHeaders != newHeaders || (pending && !environments.isEmpty)
+        activeSyncPending = pending
+        serverProfiles = profiles
+        guard changed else { return }
+        syncConnectionRevision += 1
+        environmentsLoadToken = UUID()
+        selectedProfileID = active?.id
+        PreferencesStore.selectedProfileID = active?.id
+        token = newToken
+        customHeaders = newHeaders
+        environments = []
+        selectedEnvironmentID = active.flatMap { PreferencesStore.selectedEnvironmentID(for: $0.id) }
+        lastHealthStatus = nil
+        environmentError = nil
+        Task { await refreshEnvironments(forceEnvironmentReset: false) }
     }
 
     func selectServerProfile(_ profileID: String, forceEnvironmentReset: Bool = false) async {

@@ -78,6 +78,14 @@ struct DockhandRootView: View {
             }
             await appModel.bootstrap()
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            appModel.serverSync.foregroundRefresh()
+            while !Task.isCancelled {
+                appModel.serverSync.refresh()
+                do { try await Task.sleep(for: .seconds(5)) } catch { break }
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await appModel.recoverConnectionIfNeeded() }
