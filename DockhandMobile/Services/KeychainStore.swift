@@ -17,14 +17,14 @@ enum KeychainStore {
         return nil
     }
 
-    static func writeToken(_ token: String, profileID: String) {
-        guard var local = try? credentialsForSync(profileID: profileID) else { return }
+    static func writeToken(_ token: String, profileID: String) throws {
+        var local = try credentialsForUpdate(profileID: profileID)
         local.token = DockhandToken.normalized(token)
-        try? installSyncedCredentials(local, profileID: profileID)
+        try installSyncedCredentials(local, profileID: profileID)
     }
 
-    static func deleteToken(profileID: String) {
-        writeToken("", profileID: profileID)
+    static func deleteToken(profileID: String) throws {
+        try writeToken("", profileID: profileID)
     }
 
     static func deleteCredentials(profileID: String) {
@@ -54,16 +54,16 @@ enum KeychainStore {
         (try? credentialsForSync(profileID: profileID).headers) ?? []
     }
 
-    static func writeCustomHeaders(_ headers: [DockhandCustomHeader], profileID: String) {
-        guard var local = try? credentialsForSync(profileID: profileID) else { return }
+    static func writeCustomHeaders(_ headers: [DockhandCustomHeader], profileID: String) throws {
+        var local = try credentialsForUpdate(profileID: profileID)
         local.headers = headers
-        try? installSyncedCredentials(local, profileID: profileID)
+        try installSyncedCredentials(local, profileID: profileID)
     }
 
-    static func deleteCustomHeaders(profileID: String) {
-        guard let local = try? credentialsForSync(profileID: profileID) else { return }
+    static func deleteCustomHeaders(profileID: String) throws {
+        let local = try credentialsForUpdate(profileID: profileID)
         if local.token.isEmpty { deleteCredentials(profileID: profileID) }
-        else { writeCustomHeaders([], profileID: profileID) }
+        else { try writeCustomHeaders([], profileID: profileID) }
     }
 
     static func credentialsForSync(profileID: String) throws -> SyncedServerCredentials {
@@ -85,6 +85,16 @@ enum KeychainStore {
         return SyncedServerCredentials(
             token: tokenData.flatMap { String(data: $0, encoding: .utf8) } ?? "",
             headers: try headersData.map { try JSONDecoder().decode([DockhandCustomHeader].self, from: $0) } ?? [])
+    }
+
+    /// Writes can safely replace a malformed saved snapshot with the new value.
+    /// Keychain access errors still propagate so callers can report locked-device failures.
+    private static func credentialsForUpdate(profileID: String) throws -> SyncedServerCredentials {
+        do {
+            return try credentialsForSync(profileID: profileID)
+        } catch is DecodingError {
+            return SyncedServerCredentials(token: "", headers: [])
+        }
     }
 
     /// Commit the complete credential snapshot as one atomic Keychain update.

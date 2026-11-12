@@ -31,6 +31,10 @@ struct SyncedServerCredentials: Codable, Sendable {
         }
     }
 
+    static func delete(_ id: String) {
+        SecItemDelete(identity(id) as CFDictionary)
+    }
+
     static func deleteAll(profileID: String) {
         var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword,
             kSecAttrService: service, kSecAttrSynchronizable: true,

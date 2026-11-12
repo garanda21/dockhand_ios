@@ -58,7 +58,7 @@ final class DockhandMobileTests: XCTestCase {
 
     @MainActor
     func testDisablingSyncCanKeepOrRemoveLocalRecords() throws {
-        let keys = ["dockhand.serverProfiles", "dockhand.selectedProfileID", "dockhand.sync.enabled", "dockhand.sync.pending", "dockhand.sync.records", "dockhand.sync.orderDirty", "dockhand.sync.dirty", "dockhand.sync.dirtyDates"]
+        let keys = ["dockhand.serverProfiles", "dockhand.selectedProfileID", "dockhand.sync.enabled", "dockhand.sync.pending", "dockhand.sync.records", "dockhand.sync.orderDirty", "dockhand.sync.dirty", "dockhand.sync.dirtyDates", "dockhand.sync.pendingDeletions"]
         withRestoredDefaults(keys: keys) { defaults in
             defaults.set(true, forKey: "dockhand.sync.enabled")
             let profile = DockhandServerProfile(id: UUID().uuidString, name: "Test", baseURL: "https://example.invalid")
@@ -81,8 +81,8 @@ final class DockhandMobileTests: XCTestCase {
     func testCredentialMigrationPreservesTokenAndCustomHeaders() throws {
         let id = "sync-test-" + UUID().uuidString
         defer {
-            KeychainStore.deleteToken(profileID: id)
-            KeychainStore.deleteCustomHeaders(profileID: id)
+            try? KeychainStore.deleteToken(profileID: id)
+            try? KeychainStore.deleteCustomHeaders(profileID: id)
         }
         let expected = SyncedServerCredentials(token: "sample-token", headers: [.init(name: "X-Access", value: "sample-value")])
         // Seed the pre-sync layout: separate token and header items.

@@ -16,6 +16,12 @@ final class ServerSyncStore {
         guard let data = UserDefaults.standard.data(forKey: "dockhand.sync.dirtyDates") else { return [:] }
         return (try? JSONDecoder().decode([String: Date].self, from: data)) ?? [:]
     }()
+    @ObservationIgnored private var pendingDeletions: [String: ServerSyncRecord] = {
+        guard let data = UserDefaults.standard.data(forKey: "dockhand.sync.pendingDeletions") else { return [:] }
+        return (try? JSONDecoder().decode([String: ServerSyncRecord].self, from: data)) ?? [:]
+    }()
+    @ObservationIgnored private var credentialRetryTask: Task<Void, Never>?
+    @ObservationIgnored private var credentialRetryAttempt = 0
     @ObservationIgnored private var owner: Data?
     private static let prefix = "server.v1."
 
@@ -55,6 +61,7 @@ final class ServerSyncStore {
         UserDefaults.standard.set(newOwner, forKey: "dockhand.sync.owner")
         cloud.synchronize()
         mergeRemote()
+        flushPendingDeletions()
         for (position, profile) in PreferencesStore.serverProfiles.enumerated() where records[profile.id] == nil || dirty.contains(profile.id) {
             try publish(profile, position: position)
         }
@@ -65,6 +72,9 @@ final class ServerSyncStore {
     }
 
     func disable(removeLocal: Bool) {
+        credentialRetryTask?.cancel()
+        credentialRetryTask = nil
+        credentialRetryAttempt = 0
         enabled = false
         UserDefaults.standard.set(false, forKey: "dockhand.sync.enabled")
         if removeLocal {
@@ -76,6 +86,7 @@ final class ServerSyncStore {
             records = [:]
             dirty = []
             dirtyDates = [:]
+            pendingDeletions = [:]
             PreferencesStore.serverProfiles = []
             PreferencesStore.selectedProfileID = nil
         }
@@ -116,13 +127,18 @@ final class ServerSyncStore {
     func delete(_ profile: DockhandServerProfile) {
         reloadParticipationIfNeeded()
         dirty.remove(profile.id)
-        persist()
-        guard enabled else { return }
-        guard let identity = FileManager.default.ubiquityIdentityToken, sameAccount(identity) else { refresh(); return }
+        dirtyDates.removeValue(forKey: profile.id)
         var record = records[profile.id] ?? ServerSyncRecord(profile: profile, modified: .distantPast, mutation: "", credentialID: "", position: 0, deleted: false)
         record.deleted = true
         stamp(&record)
-        write(record)
+        records[profile.id] = record
+        pendingDeletions[profile.id] = record
+        persist()
+        guard enabled else { return }
+        guard let identity = FileManager.default.ubiquityIdentityToken, sameAccount(identity) else { refresh(); return }
+        cloud.synchronize()
+        mergeRemote()
+        flushPendingDeletions()
     }
 
     func foregroundRefresh() {
@@ -142,6 +158,7 @@ final class ServerSyncStore {
             return
         }
         mergeRemote()
+        flushPendingDeletions()
         for (position, profile) in PreferencesStore.serverProfiles.enumerated() where dirty.contains(profile.id) {
             do { try publish(profile, position: position) }
             catch { self.error = String(localized: "Could not sync credentials. Your changes remain saved locally.") }
@@ -177,6 +194,7 @@ final class ServerSyncStore {
         persist()
         PreferencesStore.serverProfiles = profiles
         onChange?()
+        scheduleCredentialRetryIfNeeded()
     }
 
     /// Multiple windows can own an AppModel; a device-level opt-out applies to all of them.
@@ -186,6 +204,11 @@ final class ServerSyncStore {
         let storedEnabled = defaults.bool(forKey: "dockhand.sync.enabled")
         guard storedEnabled != enabled else { return false }
         enabled = storedEnabled
+        if !storedEnabled {
+            credentialRetryTask?.cancel()
+            credentialRetryTask = nil
+            credentialRetryAttempt = 0
+        }
         owner = defaults.data(forKey: "dockhand.sync.owner")
         if let data = defaults.data(forKey: "dockhand.sync.records"),
            let stored = try? JSONDecoder().decode([String: ServerSyncRecord].self, from: data) { records = stored }
@@ -193,6 +216,10 @@ final class ServerSyncStore {
         if let data = defaults.data(forKey: "dockhand.sync.dirtyDates"),
            let dates = try? JSONDecoder().decode([String: Date].self, from: data) { dirtyDates = dates }
         pendingCredentials = Set(defaults.stringArray(forKey: "dockhand.sync.pending") ?? [])
+        if let data = defaults.data(forKey: "dockhand.sync.pendingDeletions"),
+           let deletions = try? JSONDecoder().decode([String: ServerSyncRecord].self, from: data) {
+            pendingDeletions = deletions
+        }
         return true
     }
 
@@ -204,6 +231,7 @@ final class ServerSyncStore {
             persist()
             return
         }
+        let previousCredentialID = records[profile.id]?.credentialID
         let credentialID = "\(profile.id).\(UUID().uuidString)"
         try credentials.write(credentialID)
         var record = ServerSyncRecord(profile: profile, modified: .distantPast, mutation: "", credentialID: credentialID, position: position, deleted: false)
@@ -220,6 +248,44 @@ final class ServerSyncStore {
         dirtyDates.removeValue(forKey: profile.id)
         dirty.remove(profile.id)
         write(record)
+        if let previousCredentialID, previousCredentialID != credentialID {
+            SyncedServerCredentials.delete(previousCredentialID)
+        }
+    }
+
+    private func flushPendingDeletions() {
+        for (id, pending) in Array(pendingDeletions) {
+            var record = records[id].map { ServerSyncRecord.merged(pending, $0) } ?? pending
+            record.deleted = true
+            record.modified = max(Date(), max(record.modified, pending.modified).addingTimeInterval(0.001))
+            record.mutation = UUID().uuidString
+            records[id] = record
+            write(record)
+            pendingDeletions.removeValue(forKey: id)
+        }
+        persist()
+    }
+
+    private func scheduleCredentialRetryIfNeeded() {
+        guard enabled, !pendingCredentials.isEmpty else {
+            credentialRetryTask?.cancel()
+            credentialRetryTask = nil
+            credentialRetryAttempt = 0
+            return
+        }
+        guard credentialRetryTask == nil else { return }
+        let delay = min(30, 1 << min(credentialRetryAttempt, 5))
+        credentialRetryAttempt += 1
+        credentialRetryTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000_000)
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.credentialRetryTask = nil
+            self.refresh()
+        }
     }
 
     private func sameAccount(_ identity: any NSCoding & NSCopying & NSObjectProtocol) -> Bool {
@@ -260,6 +326,9 @@ final class ServerSyncStore {
         UserDefaults.standard.set(Array(pendingCredentials), forKey: "dockhand.sync.pending")
         if let data = try? JSONEncoder().encode(dirtyDates) { UserDefaults.standard.set(data, forKey: "dockhand.sync.dirtyDates") }
         UserDefaults.standard.set(Array(dirty), forKey: "dockhand.sync.dirty")
+        if let data = try? JSONEncoder().encode(pendingDeletions) {
+            UserDefaults.standard.set(data, forKey: "dockhand.sync.pendingDeletions")
+        }
         if let data = try? JSONEncoder().encode(records) { UserDefaults.standard.set(data, forKey: "dockhand.sync.records") }
     }
 }
