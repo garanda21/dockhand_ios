@@ -58,7 +58,7 @@ final class DockhandMobileTests: XCTestCase {
 
     @MainActor
     func testDisablingSyncCanKeepOrRemoveLocalRecords() throws {
-        let keys = ["dockhand.serverProfiles", "dockhand.selectedProfileID", "dockhand.sync.enabled", "dockhand.sync.pending", "dockhand.sync.records", "dockhand.sync.orderDirty", "dockhand.sync.dirty", "dockhand.sync.dirtyDates", "dockhand.sync.pendingDeletions"]
+        let keys = ["dockhand.serverProfiles", "dockhand.selectedProfileID", "dockhand.sync.enabled", "dockhand.sync.pending", "dockhand.sync.records", "dockhand.sync.orderDirty", "dockhand.sync.dirty", "dockhand.sync.dirtyDates", "dockhand.sync.pendingDeletions", "dockhand.sync.supersededCredentials"]
         withRestoredDefaults(keys: keys) { defaults in
             defaults.set(true, forKey: "dockhand.sync.enabled")
             let profile = DockhandServerProfile(id: UUID().uuidString, name: "Test", baseURL: "https://example.invalid")

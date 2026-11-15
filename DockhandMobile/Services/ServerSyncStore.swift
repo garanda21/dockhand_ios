@@ -20,10 +20,18 @@ final class ServerSyncStore {
         guard let data = UserDefaults.standard.data(forKey: "dockhand.sync.pendingDeletions") else { return [:] }
         return (try? JSONDecoder().decode([String: ServerSyncRecord].self, from: data)) ?? [:]
     }()
+    @ObservationIgnored private var supersededCredentials: [String: Date] = {
+        guard let data = UserDefaults.standard.data(forKey: "dockhand.sync.supersededCredentials") else { return [:] }
+        return (try? JSONDecoder().decode([String: Date].self, from: data)) ?? [:]
+    }()
     @ObservationIgnored private var credentialRetryTask: Task<Void, Never>?
     @ObservationIgnored private var credentialRetryAttempt = 0
     @ObservationIgnored private var owner: Data?
     private static let prefix = "server.v1."
+    /// Keychain and key-value changes reach other devices independently, so a replaced
+    /// credential item stays readable long enough for every device to merge the newer record.
+    private static let supersededCredentialGracePeriod: TimeInterval = 24 * 60 * 60
+    private static let maxCredentialRetryAttempts = 8
 
     init() {
         owner = UserDefaults.standard.data(forKey: "dockhand.sync.owner")
@@ -40,6 +48,7 @@ final class ServerSyncStore {
                 if reason == NSUbiquitousKeyValueStoreQuotaViolationChange {
                     self.error = String(localized: "iCloud storage limit reached. Your servers remain saved locally.")
                 } else {
+                    self.credentialRetryAttempt = 0
                     self.refresh()
                 }
             }
@@ -56,7 +65,11 @@ final class ServerSyncStore {
         }
         let newOwner = try NSKeyedArchiver.archivedData(withRootObject: identity, requiringSecureCoding: false)
         // A different account starts a new journal; never upload the previous account's journal.
-        if !sameAccount(identity) { records = [:] }
+        if !sameAccount(identity) {
+            records = [:]
+            pendingDeletions = [:]
+            supersededCredentials = [:]
+        }
         owner = newOwner
         UserDefaults.standard.set(newOwner, forKey: "dockhand.sync.owner")
         cloud.synchronize()
@@ -87,6 +100,7 @@ final class ServerSyncStore {
             dirty = []
             dirtyDates = [:]
             pendingDeletions = [:]
+            supersededCredentials = [:]
             PreferencesStore.serverProfiles = []
             PreferencesStore.selectedProfileID = nil
         }
@@ -142,6 +156,7 @@ final class ServerSyncStore {
     }
 
     func foregroundRefresh() {
+        credentialRetryAttempt = 0
         if enabled { cloud.synchronize() }
         refresh()
     }
@@ -159,6 +174,7 @@ final class ServerSyncStore {
         }
         mergeRemote()
         flushPendingDeletions()
+        purgeSupersededCredentials()
         for (position, profile) in PreferencesStore.serverProfiles.enumerated() where dirty.contains(profile.id) {
             do { try publish(profile, position: position) }
             catch { self.error = String(localized: "Could not sync credentials. Your changes remain saved locally.") }
@@ -171,7 +187,11 @@ final class ServerSyncStore {
             let id = record.profile.id
             if dirty.contains(id) { continue }
             if record.deleted {
-                SyncedServerCredentials.deleteAll(profileID: id)
+                // A newer edit from another device may still revive this profile, so its synced
+                // credential items are only removed once the tombstone has stood for the grace period.
+                if record.modified < Date().addingTimeInterval(-Self.supersededCredentialGracePeriod) {
+                    SyncedServerCredentials.deleteAll(profileID: id)
+                }
                 KeychainStore.deleteCredentials(profileID: id)
                 PreferencesStore.removeSelectedEnvironmentID(for: id)
                 PreferencesStore.removeCachedDashboardSnapshots(for: id)
@@ -184,6 +204,10 @@ final class ServerSyncStore {
                     if local.token != credentials.token || local.headers != credentials.headers {
                         try KeychainStore.installSyncedCredentials(credentials, profileID: id)
                     }
+                } else if (try? KeychainStore.credentialsForSync(profileID: id))?.token.isEmpty == false {
+                    // The referenced item is missing, but this device still holds usable credentials.
+                    // Keep using them instead of blocking the server; never republish them, since the
+                    // newer item may simply not have arrived yet.
                 } else { pending.insert(id) }
             } catch { pending.insert(id) }
         }
@@ -220,6 +244,10 @@ final class ServerSyncStore {
            let deletions = try? JSONDecoder().decode([String: ServerSyncRecord].self, from: data) {
             pendingDeletions = deletions
         }
+        if let data = defaults.data(forKey: "dockhand.sync.supersededCredentials"),
+           let superseded = try? JSONDecoder().decode([String: Date].self, from: data) {
+            supersededCredentials = superseded
+        }
         return true
     }
 
@@ -248,19 +276,28 @@ final class ServerSyncStore {
         dirtyDates.removeValue(forKey: profile.id)
         dirty.remove(profile.id)
         write(record)
-        if let previousCredentialID, previousCredentialID != credentialID {
-            SyncedServerCredentials.delete(previousCredentialID)
+        if let previousCredentialID, !previousCredentialID.isEmpty, previousCredentialID != credentialID {
+            supersededCredentials[previousCredentialID] = Date()
+            persist()
         }
+    }
+
+    private func purgeSupersededCredentials() {
+        let referenced = Set(records.values.filter { !$0.deleted }.map(\.credentialID))
+        let cutoff = Date().addingTimeInterval(-Self.supersededCredentialGracePeriod)
+        for (id, replaced) in supersededCredentials where replaced < cutoff {
+            if !referenced.contains(id) { SyncedServerCredentials.delete(id) }
+            supersededCredentials.removeValue(forKey: id)
+        }
+        persist()
     }
 
     private func flushPendingDeletions() {
         for (id, pending) in Array(pendingDeletions) {
-            var record = records[id].map { ServerSyncRecord.merged(pending, $0) } ?? pending
-            record.deleted = true
-            record.modified = max(Date(), max(record.modified, pending.modified).addingTimeInterval(0.001))
-            record.mutation = UUID().uuidString
+            // Keep the tombstone's original stamp so a newer edit from another device still wins.
+            let record = records[id].map { ServerSyncRecord.merged(pending, $0) } ?? pending
             records[id] = record
-            write(record)
+            if record.deleted { write(record) }
             pendingDeletions.removeValue(forKey: id)
         }
         persist()
@@ -273,7 +310,7 @@ final class ServerSyncStore {
             credentialRetryAttempt = 0
             return
         }
-        guard credentialRetryTask == nil else { return }
+        guard credentialRetryTask == nil, credentialRetryAttempt < Self.maxCredentialRetryAttempts else { return }
         let delay = min(30, 1 << min(credentialRetryAttempt, 5))
         credentialRetryAttempt += 1
         credentialRetryTask = Task { @MainActor [weak self] in
@@ -328,6 +365,9 @@ final class ServerSyncStore {
         UserDefaults.standard.set(Array(dirty), forKey: "dockhand.sync.dirty")
         if let data = try? JSONEncoder().encode(pendingDeletions) {
             UserDefaults.standard.set(data, forKey: "dockhand.sync.pendingDeletions")
+        }
+        if let data = try? JSONEncoder().encode(supersededCredentials) {
+            UserDefaults.standard.set(data, forKey: "dockhand.sync.supersededCredentials")
         }
         if let data = try? JSONEncoder().encode(records) { UserDefaults.standard.set(data, forKey: "dockhand.sync.records") }
     }
