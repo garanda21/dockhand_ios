@@ -91,6 +91,11 @@ struct SettingsList: View {
                         )
                     }
                 }
+                .onMove { appModel.moveServers(from: $0, to: $1) }
+            }
+
+            Section {
+                ServerSyncSettingsView(appModel: appModel)
             }
 
             Section(String(localized: "About")) {
@@ -107,6 +112,7 @@ struct SettingsList: View {
         }
         .navigationTitle(String(localized: "Settings"))
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { EditButton() }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     isAddingServer = true
@@ -210,6 +216,9 @@ struct SettingsView: View {
                     statusCard(statusMessage)
                 }
 
+                ServerSyncSettingsView(appModel: appModel)
+                    .padding(16)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
                 aboutCard
             }
             .padding()
@@ -512,6 +521,16 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
+                    .contextMenu {
+                        if let index = appModel.serverProfiles.firstIndex(where: { $0.id == profile.id }) {
+                            Button(String(localized: "Move up"), systemImage: "arrow.up") {
+                                appModel.moveServers(from: IndexSet(integer: index), to: index - 1)
+                            }.disabled(index == 0)
+                            Button(String(localized: "Move down"), systemImage: "arrow.down") {
+                                appModel.moveServers(from: IndexSet(integer: index), to: index + 2)
+                            }.disabled(index == appModel.serverProfiles.count - 1)
+                        }
+                    }
                 }
             }
         }
@@ -973,7 +992,7 @@ private struct ServerProfileDetailView: View {
     }
 
     private func saveProfile() {
-        appModel.saveServerProfile(
+        let saved = appModel.saveServerProfile(
             profileID: profileID,
             name: draftName,
             baseURLText: draftBaseURL,
@@ -981,7 +1000,8 @@ private struct ServerProfileDetailView: View {
             customHeaders: draftHeaders.headers,
             makeActive: true
         )
-        dismiss()
+        if saved { dismiss() }
+        else { statusMessage = appModel.serverSync.error }
     }
 
     @MainActor

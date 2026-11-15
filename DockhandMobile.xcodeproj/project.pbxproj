@@ -41,6 +41,10 @@
 		F854ED0C103528EC1A4988AC /* EnvironmentHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D71C8FB475456C871903FB /* EnvironmentHeaderBar.swift */; };
 		A1D4A7E25C0B4F6E9A3C2B11 /* AdaptiveActionGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D4A7E25C0B4F6E9A3C2B12 /* AdaptiveActionGrid.swift */; };
 		FE2A71ABBC45203166737B6E /* DockhandService+Decoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */; };
+		EA2200000000000000000000 /* ServerSyncRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1100000000000000000000; };
+		EA2200000000000000000001 /* SyncedServerCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1100000000000000000001; };
+		EA2200000000000000000002 /* ServerSyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1100000000000000000002; };
+		EA2200000000000000000003 /* ServerSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1100000000000000000003; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +94,10 @@
 		EF70FDD79036BE973B27B8D1 /* ContainerShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellView.swift; sourceTree = "<group>"; };
 		F0976C1D3ECF9207F9267361 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; name = .gitkeep; path = es.lproj/.gitkeep; sourceTree = "<group>"; };
 		FAE66F21FC999D77378C2C04 /* ContainerShellStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerShellStore.swift; sourceTree = "<group>"; };
+		EA1100000000000000000000 /* ServerSyncRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSyncRecord.swift; sourceTree = "<group>"; };
+		EA1100000000000000000001 /* SyncedServerCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncedServerCredentials.swift; sourceTree = "<group>"; };
+		EA1100000000000000000002 /* ServerSyncStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSyncStore.swift; sourceTree = "<group>"; };
+		EA1100000000000000000003 /* ServerSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSyncSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -244,6 +252,9 @@
 				E5A1342B619AADBFCAF7582E /* DockhandService.swift */,
 				6945D3BE7FFCE50A45EE56BC /* DockhandService+Decoding.swift */,
 				08E6CB656D0F64ACB6AFBAC0 /* KeychainStore.swift */,
+				EA1100000000000000000002 /* ServerSyncStore.swift */,
+				EA1100000000000000000001 /* SyncedServerCredentials.swift */,
+				EA1100000000000000000000 /* ServerSyncRecord.swift */,
 				3A1F5D851E40D36A5154376B /* PreferencesStore.swift */,
 			);
 			path = Services;
@@ -264,6 +275,7 @@
 			children = (
 				C0A1B2C3D4E5F60718293A4C /* CustomHeadersEditor.swift */,
 				13E28C30131DD132BCF62665 /* SettingsView.swift */,
+				EA1100000000000000000003 /* ServerSyncSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -382,6 +394,10 @@
 				A814D3A2D9614875BAFF6C4A /* ImagesStore.swift in Sources */,
 				4866D6323DEB9849B27209D2 /* ImagesView.swift in Sources */,
 				D259E02834327E2FBF25E5D2 /* KeychainStore.swift in Sources */,
+				EA2200000000000000000003 /* ServerSyncSettingsView.swift in Sources */,
+				EA2200000000000000000002 /* ServerSyncStore.swift in Sources */,
+				EA2200000000000000000001 /* SyncedServerCredentials.swift in Sources */,
+				EA2200000000000000000000 /* ServerSyncRecord.swift in Sources */,
 				AB608708755DE5D3031BCBCE /* PreferencesStore.swift in Sources */,
 				C0A1B2C3D4E5F60718293A4B /* CustomHeadersEditor.swift in Sources */,
 				B6C034E5D85C2DDB6C9100CC /* SettingsView.swift in Sources */,
@@ -516,6 +532,7 @@
 		"CODE_SIGN_IDENTITY" = "iPhone Developer";
 		"CURRENT_PROJECT_VERSION" = 18;
 		"DEVELOPMENT_TEAM" = 8DA225EN79;
+				CODE_SIGN_ENTITLEMENTS = DockhandMobile/DockhandMobile.entitlements;
 		"GENERATE_INFOPLIST_FILE" = NO;
 		"INFOPLIST_FILE" = "DockhandMobile/Info.plist";
 		"LD_RUNPATH_SEARCH_PATHS" = (
@@ -540,6 +557,7 @@
 		"CODE_SIGN_IDENTITY" = "iPhone Developer";
 		"CURRENT_PROJECT_VERSION" = 18;
 		"DEVELOPMENT_TEAM" = 8DA225EN79;
+				CODE_SIGN_ENTITLEMENTS = DockhandMobile/DockhandMobile.entitlements;
 		"GENERATE_INFOPLIST_FILE" = NO;
 		"INFOPLIST_FILE" = "DockhandMobile/Info.plist";
 		"LD_RUNPATH_SEARCH_PATHS" = (

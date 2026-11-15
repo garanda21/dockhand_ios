@@ -53,20 +53,20 @@ final class CustomHeadersTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "P-Access-Token"), "token-secret")
     }
 
-    func testKeychainRoundTripsAndDeletesCustomHeaders() {
+    func testKeychainRoundTripsAndDeletesCustomHeaders() throws {
         let profileID = "custom-headers-test-\(UUID().uuidString)"
-        defer { KeychainStore.deleteCustomHeaders(profileID: profileID) }
+        defer { try? KeychainStore.deleteCustomHeaders(profileID: profileID) }
 
         XCTAssertEqual(KeychainStore.readCustomHeaders(profileID: profileID), [])
 
-        KeychainStore.writeCustomHeaders(pangolinHeaders, profileID: profileID)
+        try KeychainStore.writeCustomHeaders(pangolinHeaders, profileID: profileID)
         XCTAssertEqual(KeychainStore.readCustomHeaders(profileID: profileID), pangolinHeaders)
 
         let replaced = [DockhandCustomHeader(name: "CF-Access-Client-Id", value: "client")]
-        KeychainStore.writeCustomHeaders(replaced, profileID: profileID)
+        try KeychainStore.writeCustomHeaders(replaced, profileID: profileID)
         XCTAssertEqual(KeychainStore.readCustomHeaders(profileID: profileID), replaced)
 
-        KeychainStore.writeCustomHeaders([], profileID: profileID)
+        try KeychainStore.writeCustomHeaders([], profileID: profileID)
         XCTAssertEqual(KeychainStore.readCustomHeaders(profileID: profileID), [])
     }
 

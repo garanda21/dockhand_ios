@@ -28,7 +28,8 @@ targets:
       - package: SwiftTerm
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: pro.dockhand.mobile
+        PRODUCT_BUNDLE_IDENTIFIER: garanda.dockhand.mobile
+        CODE_SIGN_ENTITLEMENTS: DockhandMobile/DockhandMobile.entitlements
         SWIFT_VERSION: 6.0
         TARGETED_DEVICE_FAMILY: "1,2"
         CURRENT_PROJECT_VERSION: 18
