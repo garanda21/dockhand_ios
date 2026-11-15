@@ -32,7 +32,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: DockhandMobile/DockhandMobile.entitlements
         SWIFT_VERSION: 6.0
         TARGETED_DEVICE_FAMILY: "1,2"
-        CURRENT_PROJECT_VERSION: 19
+        CURRENT_PROJECT_VERSION: 20
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: DockhandMobile/Info.plist
         MARKETING_VERSION: 1.8.0

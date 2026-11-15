@@ -1,9 +1,35 @@
 import DockhandAPI
 import SwiftUI
+import UIKit
 
 extension EnvironmentValues {
     /// False where the layout shows the header elsewhere, such as the iPad sidebar footer.
     @Entry var showsEnvironmentHeader = true
+}
+
+/// Menu label for a picker item. The selected item shows a green check so it stands out at a glance;
+/// system menus tint SF Symbols monochrome, so the color is baked into the image.
+struct SelectableMenuLabel: View {
+    let title: String
+    let isSelected: Bool
+    var systemImage: String?
+
+    var body: some View {
+        if isSelected {
+            Label {
+                Text(title)
+            } icon: {
+                Image(uiImage: Self.selectedImage)
+            }
+        } else if let systemImage {
+            Label(title, systemImage: systemImage)
+        } else {
+            Text(title)
+        }
+    }
+
+    private static let selectedImage = UIImage(systemName: "checkmark.circle.fill")!
+        .withTintColor(.systemGreen, renderingMode: .alwaysOriginal)
 }
 
 struct EnvironmentHeaderBar: View {
@@ -92,11 +118,7 @@ struct EnvironmentHeaderBar: View {
                         guard profile.id != appModel.selectedProfileID else { return }
                         Task { await appModel.selectServerProfile(profile.id, forceEnvironmentReset: true) }
                     } label: {
-                        if appModel.selectedProfileID == profile.id {
-                            Label(profile.name, systemImage: "checkmark")
-                        } else {
-                            Text(profile.name)
-                        }
+                        SelectableMenuLabel(title: profile.name, isSelected: appModel.selectedProfileID == profile.id)
                     }
                 }
             } label: {
@@ -142,7 +164,7 @@ struct EnvironmentHeaderBar: View {
                 Button {
                     appModel.selectEnvironment(environment.id)
                 } label: {
-                    Label(environment.name, systemImage: appModel.selectedEnvironmentID == environment.id ? "checkmark.circle.fill" : "globe")
+                    SelectableMenuLabel(title: environment.name, isSelected: appModel.selectedEnvironmentID == environment.id, systemImage: "globe")
                 }
             }
         } label: {
