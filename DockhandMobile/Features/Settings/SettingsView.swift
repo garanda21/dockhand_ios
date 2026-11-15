@@ -367,10 +367,7 @@ struct SettingsView: View {
                         statusMessage = appModel.environmentError ?? String(localized: "Server changed")
                     }
                 } label: {
-                    Label(
-                        profile.name,
-                        systemImage: appModel.selectedProfileID == profile.id ? "checkmark.circle.fill" : "server.rack"
-                    )
+                    SelectableMenuLabel(title: profile.name, isSelected: appModel.selectedProfileID == profile.id, systemImage: "server.rack")
                 }
             }
         } label: {
